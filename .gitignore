@@ -33,3 +33,4 @@ models/
 public/models
 *.onnx
 public/*.wasm
+public/ort-*.mjs
