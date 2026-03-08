@@ -6,7 +6,9 @@ import { BpeTokenizer } from './lib/tokenizer';
 
 // Let ort-web resolve wasm/mjs files relative to its own module in node_modules
 // Use multiple threads if SharedArrayBuffer is available (requires COOP/COEP headers)
-ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
+const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
+ort.env.wasm.numThreads = hasSharedBuffer ? navigator.hardwareConcurrency || 4 : 1;
+console.log(`[ort-web] SharedArrayBuffer: ${hasSharedBuffer}, threads: ${ort.env.wasm.numThreads}`);
 
 const MODEL_URLS = {
   yolo: '/models/yolo-lines.onnx',
