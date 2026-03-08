@@ -5,9 +5,11 @@
     lines: Line[];
     currentLine: number;
     currentText: string;
+    hoveredLine: number;
+    onHoverLine: (index: number) => void;
   }
 
-  let { lines, currentLine, currentText }: Props = $props();
+  let { lines, currentLine, currentText, hoveredLine, onHoverLine }: Props = $props();
   let panelEl: HTMLDivElement;
 
   // Auto-scroll to current line
@@ -24,8 +26,11 @@
     <div
       class="line"
       class:current={i === currentLine}
+      class:hovered={i === hoveredLine}
       class:complete={line.complete}
       data-line={i}
+      onmouseenter={() => onHoverLine(i)}
+      onmouseleave={() => onHoverLine(-1)}
     >
       <span class="line-number">{i + 1}</span>
       <span class="line-text">
@@ -61,7 +66,8 @@
     transition: background-color 0.2s;
   }
 
-  .line.current {
+  .line.current,
+  .line.hovered {
     background-color: rgba(255, 107, 0, 0.08);
   }
 

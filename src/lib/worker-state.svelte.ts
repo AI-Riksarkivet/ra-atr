@@ -1,4 +1,12 @@
 import type { WorkerOutMessage, PipelineStage, Line } from './types';
+import { areAllModelsCached } from './model-cache';
+
+const MODEL_URLS = [
+  '/models/yolo-lines.onnx',
+  '/models/encoder.onnx',
+  '/models/decoder.onnx',
+  '/models/tokenizer.json',
+];
 
 export class HTRWorkerState {
   stage = $state<PipelineStage>('idle');
@@ -8,6 +16,8 @@ export class HTRWorkerState {
   modelsReady = $state<boolean>(false);
   error = $state<string | null>(null);
   modelProgress = $state<Record<string, number>>({});
+  /** True once we've checked the cache; false while checking */
+  cacheChecked = $state<boolean>(false);
 
   private worker: Worker;
 
@@ -17,6 +27,14 @@ export class HTRWorkerState {
     this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
       this.handleMessage(e.data);
     };
+
+    // Auto-load if all models are already cached
+    areAllModelsCached(MODEL_URLS).then((cached) => {
+      this.cacheChecked = true;
+      if (cached) {
+        this.loadModels();
+      }
+    });
   }
 
   private handleMessage(msg: WorkerOutMessage) {

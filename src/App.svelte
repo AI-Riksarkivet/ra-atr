@@ -10,6 +10,7 @@
   let htr = $state(new HTRWorkerState());
   let imageUrl = $state<string | null>(null);
   let dividerX = $state(60); // percentage for left panel
+  let hoveredLine = $state(-1);
   let isDraggingDivider = $state(false);
 
   onMount(() => {
@@ -53,11 +54,14 @@
   {/if}
 
   <div class="workspace">
-    {#if !htr.modelsReady}
+    {#if !htr.modelsReady && !htr.cacheChecked}
+      <div class="loading-container"><p>Checking cached models...</p></div>
+    {:else if !htr.modelsReady}
       <ModelManager
         modelProgress={htr.modelProgress}
         onLoadModels={() => htr.loadModels()}
         modelsReady={htr.modelsReady}
+        autoLoading={htr.stage === 'loading_models'}
       />
     {:else if !imageUrl}
       <div class="upload-container">
@@ -66,7 +70,7 @@
     {:else}
       <div class="panels">
         <div class="left-panel" style="width: {dividerX}%">
-          <DocumentViewer {imageUrl} lines={htr.lines} currentLine={htr.currentLine} />
+          <DocumentViewer {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} />
         </div>
         <div
           class="divider"
@@ -81,6 +85,8 @@
             lines={htr.lines}
             currentLine={htr.currentLine}
             currentText={htr.currentText}
+            {hoveredLine}
+            onHoverLine={(i) => hoveredLine = i}
           />
         </div>
       </div>
@@ -148,7 +154,8 @@
     display: flex;
   }
 
-  .upload-container {
+  .upload-container,
+  .loading-container {
     flex: 1;
     display: flex;
     align-items: center;

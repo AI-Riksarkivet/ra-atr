@@ -85,12 +85,18 @@ self.onmessage = async (e: MessageEvent) => {
 
         const yoloInputName = yoloSession.inputNames[0];
         const yoloResult = await yoloSession.run({ [yoloInputName]: yoloTensor });
-        const yoloOutputName = yoloSession.outputNames[0];
-        const yoloOutput = yoloResult[yoloOutputName];
+        const yoloOutput = yoloResult[yoloSession.outputNames[0]];
+
+        // Get prototype masks if available (seg model output1: [1, 32, 160, 160])
+        const protoOutput = yoloSession.outputNames.length > 1
+          ? yoloResult[yoloSession.outputNames[1]]
+          : null;
 
         let detections = parseYoloOutput(
           yoloOutput.data as Float32Array,
           yoloOutput.dims,
+          protoOutput ? protoOutput.data as Float32Array : null,
+          protoOutput ? protoOutput.dims : null,
           origW,
           origH,
           scale,
@@ -105,6 +111,12 @@ self.onmessage = async (e: MessageEvent) => {
 
         console.timeEnd('[pipeline] YOLO');
         console.log(`[pipeline] ${detections.length} lines detected`);
+        for (let i = 0; i < Math.min(3, detections.length); i++) {
+          const d = detections[i];
+          console.log(`[line ${i}] bbox: (${d.x.toFixed(0)}, ${d.y.toFixed(0)}, ${d.w.toFixed(0)}, ${d.h.toFixed(0)})`,
+            `polygon: ${d.polygon ? d.polygon.length + ' points' : 'none'}`,
+            d.polygon ? `first: (${d.polygon[0].x.toFixed(0)}, ${d.polygon[0].y.toFixed(0)})` : '');
+        }
         self.postMessage({ type: 'segmentation', payload: { lines: detections } });
 
         // --- TrOCR transcription ---

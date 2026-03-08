@@ -82,6 +82,12 @@ export async function isModelCached(url: string): Promise<boolean> {
   return response !== null;
 }
 
+export async function areAllModelsCached(urls: string[]): Promise<boolean> {
+  const cache = await caches.open(CACHE_NAME);
+  const results = await Promise.all(urls.map((url) => cache.match(url)));
+  return results.every((r) => r !== null);
+}
+
 export async function clearModelCache(): Promise<void> {
   await caches.delete(CACHE_NAME);
 }

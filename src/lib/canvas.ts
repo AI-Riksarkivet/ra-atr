@@ -166,6 +166,17 @@ export class CanvasController {
     this.scheduleRender();
   };
 
+  /** Convert screen coordinates (relative to canvas element) to image-space coordinates */
+  screenToImage(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    return {
+      x: (sx - this.transform.x) / this.transform.scale,
+      y: (sy - this.transform.y) / this.transform.scale,
+    };
+  }
+
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
     let delta = -e.deltaY;

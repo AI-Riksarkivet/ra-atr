@@ -12,12 +12,18 @@ export type WorkerOutMessage =
   | { type: 'error'; payload: { message: string } }
   | { type: 'ready' };
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
 export interface BBox {
   x: number;
   y: number;
   w: number;
   h: number;
   confidence: number;
+  polygon?: Point[];
 }
 
 export type PipelineStage = 'idle' | 'loading_models' | 'segmenting' | 'transcribing' | 'done';
