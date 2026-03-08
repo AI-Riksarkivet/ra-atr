@@ -2,6 +2,7 @@ use std::sync::OnceLock;
 
 use wasm_bindgen::prelude::*;
 
+mod pipeline;
 mod preprocessing;
 mod tokenizer;
 mod trocr;
@@ -56,4 +57,22 @@ pub fn load_trocr(
         .set(model)
         .map_err(|_| JsError::new("TrOCR model already loaded"))?;
     Ok(())
+}
+
+#[wasm_bindgen]
+pub fn run_pipeline(
+    image_bytes: &[u8],
+    on_segmentation: &js_sys::Function,
+    on_token: &js_sys::Function,
+    on_line_done: &js_sys::Function,
+    on_done: &js_sys::Function,
+) -> Result<(), JsError> {
+    let yolo = YOLO_MODEL
+        .get()
+        .ok_or_else(|| JsError::new("YOLO model not loaded"))?;
+    let trocr = TROCR_MODEL
+        .get()
+        .ok_or_else(|| JsError::new("TrOCR model not loaded"))?;
+    pipeline::run(yolo, trocr, image_bytes, on_segmentation, on_token, on_line_done, on_done)
+        .map_err(|e| JsError::new(&e.to_string()))
 }
