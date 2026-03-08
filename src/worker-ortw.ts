@@ -38,6 +38,7 @@ self.onmessage = async (e: MessageEvent) => {
       case 'load_models': {
         const eps = await getExecutionProviders();
         const backend = eps[0];
+        console.log(`[ort-web] Using execution provider: ${backend}`, eps);
         self.postMessage({
           type: 'model_status',
           payload: { model: 'backend', status: backend === 'webgpu' ? 'WebGPU' : 'WASM (no WebGPU)' },
