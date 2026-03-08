@@ -1,6 +1,12 @@
+use std::sync::OnceLock;
+
 use wasm_bindgen::prelude::*;
 
+mod preprocessing;
 mod utils;
+mod yolo;
+
+static YOLO_MODEL: OnceLock<yolo::YoloModel> = OnceLock::new();
 
 #[wasm_bindgen(start)]
 pub fn init() {
@@ -10,4 +16,27 @@ pub fn init() {
 #[wasm_bindgen]
 pub fn greet() -> String {
     "htr-wasm initialized (tract backend)".to_string()
+}
+
+#[wasm_bindgen]
+pub fn load_yolo(model_bytes: &[u8]) -> Result<(), JsError> {
+    let model =
+        yolo::YoloModel::new(model_bytes).map_err(|e| JsError::new(&e.to_string()))?;
+    YOLO_MODEL
+        .set(model)
+        .map_err(|_| JsError::new("YOLO model already loaded"))?;
+    Ok(())
+}
+
+#[wasm_bindgen]
+pub fn run_yolo(image_bytes: &[u8]) -> Result<String, JsError> {
+    let img =
+        image::load_from_memory(image_bytes).map_err(|e| JsError::new(&e.to_string()))?;
+    let model = YOLO_MODEL
+        .get()
+        .ok_or_else(|| JsError::new("YOLO model not loaded"))?;
+    let detections = model
+        .detect(&img, 0.25, 0.45)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    serde_json::to_string(&detections).map_err(|e| JsError::new(&e.to_string()))
 }
