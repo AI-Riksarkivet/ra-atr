@@ -8,10 +8,10 @@
   let { modelProgress, onLoadModels, modelsReady }: Props = $props();
 
   const models = [
-    { key: 'yolo', label: 'YOLO Line Detection', size: '~25 MB' },
-    { key: 'trocr-encoder', label: 'TrOCR Encoder', size: '~170 MB' },
-    { key: 'trocr-decoder', label: 'TrOCR Decoder', size: '~220 MB' },
-    { key: 'tokenizer', label: 'Tokenizer', size: '<1 MB' },
+    { key: 'yolo', label: 'YOLO Line Detection', size: '~229 MB' },
+    { key: 'trocr-encoder', label: 'TrOCR Encoder', size: '~329 MB' },
+    { key: 'trocr-decoder', label: 'TrOCR Decoder', size: '~1.2 GB' },
+    { key: 'tokenizer', label: 'Tokenizer', size: '~2 MB' },
   ];
 
   let loading = $state(false);
@@ -24,7 +24,7 @@
 
 <div class="model-manager">
   <h2>Download Models</h2>
-  <p class="info">Models run entirely in your browser. Total download: ~430 MB (cached after first load).</p>
+  <p class="info">Models run entirely in your browser. Total download: ~1.8 GB (cached after first load).</p>
 
   <div class="model-list">
     {#each models as model}
