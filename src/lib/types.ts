@@ -6,6 +6,7 @@ export type WorkerOutMessage =
   | { type: 'model_status'; payload: { model: string; status: 'downloading' | 'cached' | 'loaded'; progress?: number } }
   | { type: 'segmentation'; payload: { lines: BBox[] } }
   | { type: 'token'; payload: { lineIndex: number; token: string } }
+  | { type: 'beam_update'; payload: { lineIndex: number; text: string } }
   | { type: 'line_done'; payload: { lineIndex: number; text: string; confidence: number } }
   | { type: 'pipeline_done' }
   | { type: 'error'; payload: { message: string } }

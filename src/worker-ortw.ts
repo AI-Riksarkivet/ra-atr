@@ -1,4 +1,4 @@
-import * as ort from 'onnxruntime-web/webgpu';
+import * as ort from 'onnxruntime-web';
 import { downloadAndCacheModel } from './lib/model-cache';
 import { preprocessYolo, preprocessTrOCR, decodeImage, cropImageData } from './lib/preprocessing';
 import { parseYoloOutput } from './lib/yolo';
@@ -8,14 +8,10 @@ import { BpeTokenizer } from './lib/tokenizer';
 // Use multiple threads if SharedArrayBuffer is available (requires COOP/COEP headers)
 ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
 
-// Use fp32 models for WebGPU (int8 quantized ops fall back to CPU)
-// Use int8 models for WASM-only (smaller download, same CPU speed)
-const useQuantized = typeof navigator !== 'undefined' && !(navigator as any).gpu;
-
 const MODEL_URLS = {
-  yolo: useQuantized ? '/models/yolo-lines-int8.onnx' : '/models/yolo-lines.onnx',
-  trOcrEncoder: useQuantized ? '/models/encoder-int8.onnx' : '/models/encoder.onnx',
-  trOcrDecoder: useQuantized ? '/models/decoder-int8.onnx' : '/models/decoder.onnx',
+  yolo: '/models/yolo-lines.onnx',
+  trOcrEncoder: '/models/encoder.onnx',
+  trOcrDecoder: '/models/decoder.onnx',
   tokenizer: '/models/tokenizer.json',
 };
 
@@ -25,28 +21,14 @@ let decoderSession: ort.InferenceSession | null = null;
 let tokenizer: BpeTokenizer | null = null;
 let ready = false;
 
-// Detect WebGPU availability
-async function getExecutionProviders(): Promise<string[]> {
-  try {
-    const gpu = (navigator as any).gpu;
-    if (gpu) {
-      const adapter = await gpu.requestAdapter();
-      if (adapter) return ['webgpu', 'wasm'];
-    }
-  } catch {}
-  return ['wasm'];
-}
-
 self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
       case 'load_models': {
-        const eps = await getExecutionProviders();
-        const backend = eps[0];
-        console.log(`[ort-web] Using execution provider: ${backend}`, eps);
+        console.log('[ort-web] Using execution provider: wasm');
         self.postMessage({
           type: 'model_status',
-          payload: { model: 'backend', status: backend === 'webgpu' ? 'WebGPU' : 'WASM (no WebGPU)' },
+          payload: { model: 'backend', status: 'WASM' },
         });
 
         const progress = (p: { model: string; percent: number }) => {
@@ -64,20 +46,19 @@ self.onmessage = async (e: MessageEvent) => {
           downloadAndCacheModel(MODEL_URLS.tokenizer, 'tokenizer', progress),
         ]);
 
-        // Create sessions (ort-web loads from ArrayBuffer)
-        const sessionOpts: ort.InferenceSession.SessionOptions = {
-          executionProviders: eps,
+        const wasmOpts: ort.InferenceSession.SessionOptions = {
+          executionProviders: ['wasm'],
         };
 
-        yoloSession = await ort.InferenceSession.create(yoloBytes, sessionOpts);
+        yoloSession = await ort.InferenceSession.create(yoloBytes, wasmOpts);
         console.log('[models] YOLO inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 
-        encoderSession = await ort.InferenceSession.create(encoderBytes, sessionOpts);
+        encoderSession = await ort.InferenceSession.create(encoderBytes, wasmOpts);
         console.log('[models] Encoder inputs:', encoderSession.inputNames, 'outputs:', encoderSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-encoder', status: 'loaded' } });
 
-        decoderSession = await ort.InferenceSession.create(decoderBytes, sessionOpts);
+        decoderSession = await ort.InferenceSession.create(decoderBytes, wasmOpts);
         console.log('[models] Decoder inputs:', decoderSession.inputNames, 'outputs:', decoderSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-decoder', status: 'loaded' } });
 
@@ -143,46 +124,53 @@ self.onmessage = async (e: MessageEvent) => {
           const encResult = await encoderSession.run({
             [encoderSession.inputNames[0]]: pixelValues,
           });
-          const hiddenStates = encResult[encoderSession.outputNames[0]];
-          console.log(`[line ${i}] encoder output shape:`, hiddenStates.dims);
+          const hiddenStatesRaw = encResult[encoderSession.outputNames[0]];
+
+          // Force encoder output to CPU so decoder can read it
+          // (GPU tensors from one session may not transfer to another)
+          let hiddenStates: ort.Tensor;
+          if (hiddenStatesRaw.location === 'gpu-buffer') {
+            const cpuData = await hiddenStatesRaw.getData();
+            hiddenStates = new ort.Tensor('float32', cpuData as Float32Array, hiddenStatesRaw.dims);
+            console.log(`[line ${i}] encoder output copied from GPU to CPU`);
+          } else {
+            hiddenStates = hiddenStatesRaw;
+          }
+
+          const hData = hiddenStates.data as Float32Array;
+          console.log(`[line ${i}] encoder output shape:`, hiddenStates.dims,
+            'location:', hiddenStatesRaw.location,
+            'first 5 values:', Array.from(hData.slice(0, 5)).map(v => v.toFixed(4)));
           console.timeEnd(`[line ${i}] encoder`);
 
-          // Autoregressive decoding
+          // Greedy decoding
           console.time(`[line ${i}] decoder`);
-          const decoderStartId = 2; // </s> token
           const maxLength = 256;
-          const tokenIds: number[] = [decoderStartId];
+
+          // decoder_start_token_id = 0 (BOS) per generation_config.json
+          const tokenIds: number[] = [0];
 
           for (let step = 0; step < maxLength; step++) {
             const seqLen = tokenIds.length;
 
-            // Build decoder inputs matching session's expected names
             const inputIds = new ort.Tensor(
               'int64',
               BigInt64Array.from(tokenIds.map(id => BigInt(id))),
               [1, seqLen],
             );
+
             const attentionMask = new ort.Tensor(
               'int64',
               new BigInt64Array(seqLen).fill(1n),
               [1, seqLen],
             );
 
-            if (step === 0) {
-              console.log(`[line ${i}] decoder step 0: input_ids=[1,${seqLen}], hidden=`, hiddenStates.dims);
-            }
-
-            // Use actual input names from the model
+            // Build decoder feeds dynamically from model's expected inputs
             const decFeeds: Record<string, ort.Tensor> = {};
-            const decInputNames = decoderSession.inputNames;
-            for (const name of decInputNames) {
-              if (name.includes('input_ids') || name === 'input_ids') decFeeds[name] = inputIds;
-              else if (name.includes('attention_mask') || name.includes('mask')) decFeeds[name] = attentionMask;
-              else if (name.includes('hidden') || name.includes('encoder')) decFeeds[name] = hiddenStates;
-              else console.warn(`[decoder] Unknown input: ${name}`);
-            }
-            if (step === 0) {
-              console.log(`[line ${i}] decoder feeds:`, Object.keys(decFeeds));
+            for (const name of decoderSession.inputNames) {
+              if (name === 'input_ids') decFeeds[name] = inputIds;
+              else if (name === 'attention_mask') decFeeds[name] = attentionMask;
+              else if (name === 'encoder_hidden_states') decFeeds[name] = hiddenStates;
             }
 
             let decResult;
@@ -193,33 +181,46 @@ self.onmessage = async (e: MessageEvent) => {
               break;
             }
 
-            // Get logits: [1, seqLen, vocabSize]
-            const logits = decResult[decoderSession.outputNames[0]];
-            const logitsData = logits.data as Float32Array;
-            const vocabSize = logits.dims[2];
-
-            // Argmax over last token's logits
+            // logits is the first output
+            const logitsRaw = decResult['logits'];
+            let logitsData: Float32Array;
+            if (logitsRaw.location === 'gpu-buffer') {
+              logitsData = (await logitsRaw.getData()) as Float32Array;
+            } else {
+              logitsData = logitsRaw.data as Float32Array;
+            }
+            const vocabSize = logitsRaw.dims[2];
             const offset = (seqLen - 1) * vocabSize;
+
+            // Apply no_repeat_ngram_size=3: ban tokens that would create a repeated trigram
+            const noRepeatNgramSize = 3;
+            const bannedTokens = new Set<number>();
+            bannedTokens.add(1); // always suppress PAD
+            if (tokenIds.length >= noRepeatNgramSize - 1) {
+              const prefix = tokenIds.slice(-(noRepeatNgramSize - 1));
+              for (let j = 0; j <= tokenIds.length - noRepeatNgramSize; j++) {
+                let match = true;
+                for (let k = 0; k < noRepeatNgramSize - 1; k++) {
+                  if (tokenIds[j + k] !== prefix[k]) { match = false; break; }
+                }
+                if (match) bannedTokens.add(tokenIds[j + noRepeatNgramSize - 1]);
+              }
+            }
+
+            // Argmax over non-banned tokens
             let bestToken = 0;
             let bestScore = -Infinity;
             for (let v = 0; v < vocabSize; v++) {
+              if (bannedTokens.has(v)) continue;
               if (logitsData[offset + v] > bestScore) {
                 bestScore = logitsData[offset + v];
                 bestToken = v;
               }
             }
 
-            if (step < 5) {
-              // Log first 5 steps to debug
-              const topTokens: Array<{id: number, score: number}> = [];
-              for (let v = 0; v < vocabSize; v++) {
-                topTokens.push({ id: v, score: logitsData[offset + v] });
-              }
-              topTokens.sort((a, b) => b.score - a.score);
-              console.log(`[line ${i}] step ${step}: best=${bestToken} score=${bestScore.toFixed(3)} logits shape=${logits.dims} top5=`, topTokens.slice(0, 5).map(t => `${t.id}(${t.score.toFixed(2)})`));
-            }
-
             if (bestToken === tokenizer.eosTokenId) break;
+
+            tokenIds.push(bestToken);
 
             const tokenText = tokenizer.decodeToken(bestToken);
             if (tokenText !== null) {
@@ -228,12 +229,10 @@ self.onmessage = async (e: MessageEvent) => {
                 payload: { lineIndex: i, token: tokenText },
               });
             }
-
-            tokenIds.push(bestToken);
           }
 
           console.timeEnd(`[line ${i}] decoder`);
-          const fullText = tokenizer.decode(tokenIds.slice(1));
+          const fullText = tokenizer.decode(tokenIds.slice(1)); // skip BOS start token
           console.log(`[line ${i}] "${fullText}" (${tokenIds.length - 1} tokens)`);
           self.postMessage({
             type: 'line_done',

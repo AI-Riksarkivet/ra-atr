@@ -1,9 +1,12 @@
 /**
  * Minimal BPE tokenizer for TrOCR decoding.
  * Parses HuggingFace tokenizer.json format.
+ * Handles RoBERTa byte-level BPE: tokens are sequences of Unicode codepoints
+ * that map to raw bytes, which must be reassembled into UTF-8.
  */
 export class BpeTokenizer {
   private vocab: Map<number, string>;
+  private byteDecoder: Map<string, number>;
   readonly eosTokenId: number;
   readonly bosTokenId: number;
   readonly padTokenId: number;
@@ -28,26 +31,62 @@ export class BpeTokenizer {
     this.bosTokenId = 0;
     this.padTokenId = 1;
     this.eosTokenId = 2;
+
+    // Build byte decoder: maps Unicode codepoints back to byte values
+    // This is the inverse of GPT-2/RoBERTa's bytes_to_unicode() mapping
+    this.byteDecoder = new Map();
+    const bs: number[] = [];
+    // Printable ASCII ranges that map to themselves
+    for (let i = 0x21; i <= 0x7E; i++) bs.push(i); // ! to ~
+    for (let i = 0xA1; i <= 0xAC; i++) bs.push(i); // ¡ to ¬
+    for (let i = 0xAE; i <= 0xFF; i++) bs.push(i); // ® to ÿ
+    const cs = [...bs];
+    let n = 0;
+    for (let b = 0; b < 256; b++) {
+      if (!bs.includes(b)) {
+        bs.push(b);
+        cs.push(256 + n);
+        n++;
+      }
+    }
+    for (let i = 0; i < bs.length; i++) {
+      this.byteDecoder.set(String.fromCodePoint(cs[i]), bs[i]);
+    }
   }
 
-  /** Decode a single token ID to text. Returns null for special tokens. */
+  /** Decode a single token ID to its raw BPE string (for streaming display). */
   decodeToken(id: number): string | null {
     if (id === this.bosTokenId || id === this.eosTokenId || id === this.padTokenId) {
       return null;
     }
     const token = this.vocab.get(id);
     if (!token) return null;
-    // RoBERTa uses Ġ (U+0120) for leading space
-    return token.replace(/\u0120/g, ' ');
+    // Convert byte-level BPE token to actual bytes, then to UTF-8 string
+    return this.bytesToString(token);
   }
 
-  /** Decode a sequence of token IDs to text. Skips BOS (first token). */
+  /** Decode a sequence of token IDs to text. */
   decode(ids: number[]): string {
-    let result = '';
+    // Collect all raw BPE characters, then convert to bytes in one pass
+    // This handles multi-byte UTF-8 chars that may span token boundaries
+    let raw = '';
     for (const id of ids) {
-      const text = this.decodeToken(id);
-      if (text !== null) result += text;
+      if (id === this.bosTokenId || id === this.eosTokenId || id === this.padTokenId) continue;
+      const token = this.vocab.get(id);
+      if (token) raw += token;
     }
-    return result;
+    return this.bytesToString(raw);
+  }
+
+  /** Convert a BPE token string (using RoBERTa's byte mapping) to a UTF-8 string. */
+  private bytesToString(bpeStr: string): string {
+    const bytes: number[] = [];
+    for (const ch of bpeStr) {
+      const b = this.byteDecoder.get(ch);
+      if (b !== undefined) {
+        bytes.push(b);
+      }
+    }
+    return new TextDecoder().decode(new Uint8Array(bytes));
   }
 }

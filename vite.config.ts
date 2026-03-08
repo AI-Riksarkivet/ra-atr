@@ -25,7 +25,7 @@ export default defineConfig({
   },
   server: {
     watch: {
-      ignored: ['**/target/**', '**/models/**'],
+      ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**', '**/node_modules/**'],
     },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'htr-models-v1';
+const CACHE_NAME = 'htr-models-v3';
 
 export interface DownloadProgress {
   model: string;
@@ -66,8 +66,12 @@ export async function downloadAndCacheModel(
   }
 
   const blob = new Blob(chunks);
-  const cache = await caches.open(CACHE_NAME);
-  await cache.put(url, new Response(blob.slice(0)));
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(url, new Response(blob.slice(0)));
+  } catch (e) {
+    console.warn(`[model-cache] Failed to cache ${modelName}, continuing without cache:`, e);
+  }
 
   return blob.arrayBuffer();
 }

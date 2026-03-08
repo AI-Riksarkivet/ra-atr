@@ -7,18 +7,10 @@
   import ModelManager from './lib/components/ModelManager.svelte';
   import { onMount } from 'svelte';
 
-  let backend = $state<'wasm' | 'webgpu'>('webgpu');
-  let htr = $state(new HTRWorkerState(backend));
+  let htr = $state(new HTRWorkerState());
   let imageUrl = $state<string | null>(null);
   let dividerX = $state(60); // percentage for left panel
   let isDraggingDivider = $state(false);
-
-  function switchBackend(newBackend: 'wasm' | 'webgpu') {
-    if (htr.modelsReady) return;
-    htr.destroy();
-    backend = newBackend;
-    htr = new HTRWorkerState(backend);
-  }
 
   onMount(() => {
     return () => htr.destroy();
@@ -51,19 +43,8 @@
 <div class="app">
   <header>
     <h1>Lejonet HTR</h1>
-    {#if !htr.modelsReady}
-      <div class="backend-selector">
-        <button
-          class:active={backend === 'webgpu'}
-          onclick={() => switchBackend('webgpu')}
-        >WebGPU</button>
-        <button
-          class:active={backend === 'wasm'}
-          onclick={() => switchBackend('wasm')}
-        >WASM</button>
-      </div>
-    {:else}
-      <span class="badge ready">{backend === 'webgpu' ? 'WebGPU' : 'WASM'}</span>
+    {#if htr.modelsReady}
+      <span class="badge ready">Ready</span>
     {/if}
   </header>
 
@@ -153,30 +134,7 @@
     color: #22c55e;
   }
 
-  .backend-selector {
-    display: flex;
-    gap: 2px;
-    background: var(--bg-primary);
-    border-radius: 6px;
-    padding: 2px;
-  }
-
-  .backend-selector button {
-    padding: 0.2rem 0.6rem;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 0.75rem;
-  }
-
-  .backend-selector button.active {
-    background: var(--accent-color, #3b82f6);
-    color: white;
-  }
-
-  .error-bar {
+.error-bar {
     padding: 0.5rem 1rem;
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;

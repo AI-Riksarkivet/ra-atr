@@ -11,11 +11,8 @@ export class HTRWorkerState {
 
   private worker: Worker;
 
-  constructor(backend: 'wasm' | 'webgpu' = 'webgpu') {
-    // Static URLs so Vite can detect and bundle each worker
-    this.worker = backend === 'webgpu'
-      ? new Worker(new URL('../worker-ortw.ts', import.meta.url), { type: 'module' })
-      : new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
+  constructor() {
+    this.worker = new Worker(new URL('../worker-ortw.ts', import.meta.url), { type: 'module' });
 
     this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
       this.handleMessage(e.data);
@@ -48,6 +45,13 @@ export class HTRWorkerState {
         this.currentText += msg.payload.token;
         if (this.lines[msg.payload.lineIndex]) {
           this.lines[msg.payload.lineIndex].text = this.currentText;
+        }
+        break;
+      case 'beam_update':
+        this.currentLine = msg.payload.lineIndex;
+        this.currentText = msg.payload.text;
+        if (this.lines[msg.payload.lineIndex]) {
+          this.lines[msg.payload.lineIndex].text = msg.payload.text;
         }
         break;
       case 'line_done':
