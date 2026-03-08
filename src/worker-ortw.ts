@@ -8,10 +8,14 @@ import { BpeTokenizer } from './lib/tokenizer';
 // Use multiple threads if SharedArrayBuffer is available (requires COOP/COEP headers)
 ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
 
+// Use fp32 models for WebGPU (int8 quantized ops fall back to CPU)
+// Use int8 models for WASM-only (smaller download, same CPU speed)
+const useQuantized = typeof navigator !== 'undefined' && !(navigator as any).gpu;
+
 const MODEL_URLS = {
-  yolo: '/models/yolo-lines-int8.onnx',
-  trOcrEncoder: '/models/encoder-int8.onnx',
-  trOcrDecoder: '/models/decoder-int8.onnx',
+  yolo: useQuantized ? '/models/yolo-lines-int8.onnx' : '/models/yolo-lines.onnx',
+  trOcrEncoder: useQuantized ? '/models/encoder-int8.onnx' : '/models/encoder.onnx',
+  trOcrDecoder: useQuantized ? '/models/decoder-int8.onnx' : '/models/decoder.onnx',
   tokenizer: '/models/tokenizer.json',
 };
 
