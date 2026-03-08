@@ -23,6 +23,7 @@
     "vite-plugin-wasm": "^3.5.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.2.0"
+    "@modelcontextprotocol/ext-apps": "^1.2.0",
+    "onnxruntime-web": "^1.24.3"
   }
 }

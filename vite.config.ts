@@ -20,4 +20,12 @@ export default defineConfig({
       $lib: path.resolve('./src/lib'),
     },
   },
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
+  server: {
+    watch: {
+      ignored: ['**/target/**', '**/models/**'],
+    },
+  },
 });
