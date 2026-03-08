@@ -4,7 +4,8 @@ import { preprocessYolo, preprocessTrOCR, decodeImage, cropImageData } from './l
 import { parseYoloOutput } from './lib/yolo';
 import { BpeTokenizer } from './lib/tokenizer';
 
-// Disable multi-threading to avoid SharedArrayBuffer requirement
+// WASM files are served from public/ root; mjs modules resolve via Vite from node_modules
+ort.env.wasm.wasmPaths = '/';
 ort.env.wasm.numThreads = 1;
 
 const MODEL_URLS = {
