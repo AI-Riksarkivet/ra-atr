@@ -1,5 +1,5 @@
 {
-  "name": "lejonet-scaffold",
+  "name": "lejonet",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "build:mcp": "VITE_MCP=true vite build"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
@@ -20,5 +21,8 @@
     "vite-plugin-singlefile": "^2.3.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.2.0"
   }
 }
