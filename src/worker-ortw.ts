@@ -209,6 +209,16 @@ self.onmessage = async (e: MessageEvent) => {
               }
             }
 
+            if (step < 5) {
+              // Log first 5 steps to debug
+              const topTokens: Array<{id: number, score: number}> = [];
+              for (let v = 0; v < vocabSize; v++) {
+                topTokens.push({ id: v, score: logitsData[offset + v] });
+              }
+              topTokens.sort((a, b) => b.score - a.score);
+              console.log(`[line ${i}] step ${step}: best=${bestToken} score=${bestScore.toFixed(3)} logits shape=${logits.dims} top5=`, topTokens.slice(0, 5).map(t => `${t.id}(${t.score.toFixed(2)})`));
+            }
+
             if (bestToken === tokenizer.eosTokenId) break;
 
             const tokenText = tokenizer.decodeToken(bestToken);
