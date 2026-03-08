@@ -7,7 +7,7 @@ use crate::tokenizer::BpeTokenizer;
 
 pub struct TrOCRModel {
     encoder: Arc<TypedRunnableModel>,
-    decoder: Arc<TypedRunnableModel>,
+    decoder_bytes: Vec<u8>,
     pub tokenizer: BpeTokenizer,
 }
 
@@ -17,21 +17,27 @@ impl TrOCRModel {
         decoder_bytes: &[u8],
         tokenizer_json: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let encoder = tract_onnx::onnx()
-            .model_for_read(&mut std::io::Cursor::new(encoder_bytes))?
-            .into_optimized()?
-            .into_runnable()?;
-        let decoder = tract_onnx::onnx()
-            .model_for_read(&mut std::io::Cursor::new(decoder_bytes))?
-            .into_optimized()?
-            .into_runnable()?;
+        let mut encoder_model = tract_onnx::onnx()
+            .model_for_read(&mut std::io::Cursor::new(encoder_bytes))?;
+        encoder_model.set_input_fact(0, f32::fact([1, 3, 384, 384]).into())?;
+        let encoder = encoder_model.into_optimized()?.into_runnable()?;
+
         let tokenizer = BpeTokenizer::from_json(tokenizer_json)?;
 
         Ok(Self {
             encoder,
-            decoder,
+            decoder_bytes: decoder_bytes.to_vec(),
             tokenizer,
         })
+    }
+
+    fn build_decoder(&self, seq_len: usize) -> Result<Arc<TypedRunnableModel>, Box<dyn std::error::Error>> {
+        let mut model = tract_onnx::onnx()
+            .model_for_read(&mut std::io::Cursor::new(&self.decoder_bytes))?;
+        model.set_input_fact(0, i64::fact([1, seq_len]).into())?;
+        model.set_input_fact(1, i64::fact([1, seq_len]).into())?;
+        model.set_input_fact(2, f32::fact([1, 577, 768]).into())?;
+        Ok(model.into_optimized()?.into_runnable()?)
     }
 
     pub fn transcribe_line(
@@ -46,18 +52,22 @@ impl TrOCRModel {
         let hidden_states = encoder_output[0].clone();
 
         // Decode autoregressively
-        let decoder_start_id = 2u32; // TrOCR decoder_start_token_id
+        let decoder_start_id = 2u32;
         let mut token_ids: Vec<u32> = vec![decoder_start_id];
 
         for _ in 0..max_length {
             let seq_len = token_ids.len();
+
+            // Build decoder for current sequence length
+            let decoder = self.build_decoder(seq_len)?;
+
             let input_ids_data: Vec<i64> = token_ids.iter().map(|&id| id as i64).collect();
             let input_ids =
                 tract_ndarray::Array2::from_shape_vec((1, seq_len), input_ids_data)?.into_tensor();
             let attention_mask =
                 tract_ndarray::Array2::<i64>::ones((1, seq_len)).into_tensor();
 
-            let decoder_output = self.decoder.run(tvec![
+            let decoder_output = decoder.run(tvec![
                 input_ids.into(),
                 attention_mask.into(),
                 hidden_states.clone(),
@@ -81,7 +91,6 @@ impl TrOCRModel {
                 break;
             }
 
-            // Stream the token
             if let Some(text) = self.tokenizer.decode_token(best_token) {
                 on_token(best_token, &text);
             }
@@ -89,7 +98,6 @@ impl TrOCRModel {
             token_ids.push(best_token);
         }
 
-        // Return full decoded text (skip decoder_start_token)
         Ok(self.tokenizer.decode(&token_ids[1..]))
     }
 }

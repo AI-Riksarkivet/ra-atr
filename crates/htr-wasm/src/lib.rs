@@ -3,11 +3,11 @@ use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
 mod pipeline;
-mod preprocessing;
-mod tokenizer;
-mod trocr;
+pub mod preprocessing;
+pub mod tokenizer;
+pub mod trocr;
 mod utils;
-mod yolo;
+pub mod yolo;
 
 static YOLO_MODEL: OnceLock<yolo::YoloModel> = OnceLock::new();
 static TROCR_MODEL: OnceLock<trocr::TrOCRModel> = OnceLock::new();

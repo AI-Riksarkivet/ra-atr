@@ -61,4 +61,35 @@ impl BpeTokenizer {
             .get(&token_id)
             .map(|t| t.replace('\u{0120}', " "))
     }
+
+    pub fn vocab_size(&self) -> usize {
+        self.id_to_token.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_real_tokenizer() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("models/tokenizer.json");
+        if !path.exists() {
+            eprintln!("Skipping: models/tokenizer.json not found");
+            return;
+        }
+        let json = std::fs::read_to_string(&path).unwrap();
+        let tokenizer = BpeTokenizer::from_json(&json).unwrap();
+        assert!(tokenizer.vocab_size() > 1000, "vocab too small: {}", tokenizer.vocab_size());
+        // Check special tokens are mapped
+        assert!(tokenizer.id_to_token.contains_key(&0), "missing bos token");
+        assert!(tokenizer.id_to_token.contains_key(&1), "missing pad token");
+        assert!(tokenizer.id_to_token.contains_key(&2), "missing eos token");
+        eprintln!("Tokenizer loaded: {} tokens", tokenizer.vocab_size());
+    }
 }

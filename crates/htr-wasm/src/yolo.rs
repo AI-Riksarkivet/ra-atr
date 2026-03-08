@@ -22,10 +22,11 @@ pub struct YoloModel {
 
 impl YoloModel {
     pub fn new(model_bytes: &[u8]) -> TractResult<Self> {
-        let model = tract_onnx::onnx()
-            .model_for_read(&mut std::io::Cursor::new(model_bytes))?
-            .into_optimized()?
-            .into_runnable()?;
+        let mut model = tract_onnx::onnx()
+            .model_for_read(&mut std::io::Cursor::new(model_bytes))?;
+        // Set concrete input shape: [1, 3, 640, 640]
+        model.set_input_fact(0, f32::fact([1, 3, 640, 640]).into())?;
+        let model = model.into_optimized()?.into_runnable()?;
         Ok(Self { model })
     }
 
@@ -40,11 +41,18 @@ impl YoloModel {
         let result = self.model.run(tvec![tensor.into()])?;
         let output = result[0].to_array_view::<f32>()?;
 
-        // Output shape: [1, 4+num_classes, num_detections]
+        // Output shape: [1, 4+num_classes(+mask_coeffs), num_detections]
+        // For seg models: [1, 37, 8400] = 4 box + 1 class + 32 mask
+        // For det models: [1, 4+C, N]
         let shape = output.shape();
         let num_features = shape[1];
         let num_detections = shape[2];
-        let num_classes = num_features - 4;
+        // Determine number of classes: if features > 36, it's a seg model (32 mask coeffs)
+        let num_classes = if num_features > 36 {
+            num_features - 4 - 32 // seg model: subtract box coords and mask coefficients
+        } else {
+            num_features - 4 // pure detection model
+        };
 
         let (orig_w, orig_h) = img.dimensions();
         let mut detections = Vec::new();
@@ -55,7 +63,7 @@ impl YoloModel {
             let w = output[[0, 2, j]];
             let h = output[[0, 3, j]];
 
-            // Find best class
+            // Find best class score (only look at class indices, not mask coefficients)
             let mut best_class = 0;
             let mut best_score = f32::NEG_INFINITY;
             for c in 0..num_classes {
