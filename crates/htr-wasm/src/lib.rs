@@ -3,10 +3,13 @@ use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
 mod preprocessing;
+mod tokenizer;
+mod trocr;
 mod utils;
 mod yolo;
 
 static YOLO_MODEL: OnceLock<yolo::YoloModel> = OnceLock::new();
+static TROCR_MODEL: OnceLock<trocr::TrOCRModel> = OnceLock::new();
 
 #[wasm_bindgen(start)]
 pub fn init() {
@@ -39,4 +42,18 @@ pub fn run_yolo(image_bytes: &[u8]) -> Result<String, JsError> {
         .detect(&img, 0.25, 0.45)
         .map_err(|e| JsError::new(&e.to_string()))?;
     serde_json::to_string(&detections).map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[wasm_bindgen]
+pub fn load_trocr(
+    encoder_bytes: &[u8],
+    decoder_bytes: &[u8],
+    tokenizer_json: &str,
+) -> Result<(), JsError> {
+    let model = trocr::TrOCRModel::new(encoder_bytes, decoder_bytes, tokenizer_json)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    TROCR_MODEL
+        .set(model)
+        .map_err(|_| JsError::new("TrOCR model already loaded"))?;
+    Ok(())
 }
