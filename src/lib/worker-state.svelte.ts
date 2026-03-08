@@ -11,11 +11,11 @@ export class HTRWorkerState {
 
   private worker: Worker;
 
-  constructor() {
-    this.worker = new Worker(
-      new URL('../worker.ts', import.meta.url),
-      { type: 'module' }
-    );
+  constructor(backend: 'wasm' | 'webgpu' = 'webgpu') {
+    const workerUrl = backend === 'webgpu'
+      ? new URL('../worker-ortw.ts', import.meta.url)
+      : new URL('../worker.ts', import.meta.url);
+    this.worker = new Worker(workerUrl, { type: 'module' });
 
     this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
       this.handleMessage(e.data);
