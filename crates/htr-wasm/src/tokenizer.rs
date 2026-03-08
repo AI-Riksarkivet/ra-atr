@@ -9,6 +9,7 @@ pub struct TokenizerConfig {
 #[derive(Deserialize)]
 pub struct TokenizerModel {
     pub vocab: HashMap<String, u32>,
+    #[allow(dead_code)]
     pub merges: Vec<String>,
 }
 

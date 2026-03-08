@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rust / WASM
+crates/htr-wasm/target
+crates/htr-wasm/pkg
+Cargo.lock
+
+# Models
+models/
+*.onnx
