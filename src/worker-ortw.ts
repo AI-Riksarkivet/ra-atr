@@ -9,9 +9,9 @@ import { BpeTokenizer } from './lib/tokenizer';
 ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
 
 const MODEL_URLS = {
-  yolo: '/models/yolo-lines.onnx',
-  trOcrEncoder: '/models/encoder.onnx',
-  trOcrDecoder: '/models/decoder.onnx',
+  yolo: '/models/yolo-lines-int8.onnx',
+  trOcrEncoder: '/models/encoder-int8.onnx',
+  trOcrDecoder: '/models/decoder-int8.onnx',
   tokenizer: '/models/tokenizer.json',
 };
 
