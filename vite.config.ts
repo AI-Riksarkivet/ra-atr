@@ -27,5 +27,9 @@ export default defineConfig({
     watch: {
       ignored: ['**/target/**', '**/models/**'],
     },
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 });

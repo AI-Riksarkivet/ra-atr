@@ -5,7 +5,8 @@ import { parseYoloOutput } from './lib/yolo';
 import { BpeTokenizer } from './lib/tokenizer';
 
 // Let ort-web resolve wasm/mjs files relative to its own module in node_modules
-ort.env.wasm.numThreads = 1;
+// Use multiple threads if SharedArrayBuffer is available (requires COOP/COEP headers)
+ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? navigator.hardwareConcurrency || 4 : 1;
 
 const MODEL_URLS = {
   yolo: '/models/yolo-lines.onnx',
@@ -90,6 +91,7 @@ self.onmessage = async (e: MessageEvent) => {
         const { width: origW, height: origH } = imageData;
 
         // --- YOLO segmentation ---
+        console.time('[pipeline] YOLO');
         const { tensor: yoloInput, scale, padX, padY } = preprocessYolo(imageData, 640);
         const yoloTensor = new ort.Tensor('float32', yoloInput, [1, 3, 640, 640]);
 
@@ -113,6 +115,8 @@ self.onmessage = async (e: MessageEvent) => {
         // Sort by Y then X (reading order)
         detections.sort((a, b) => a.y - b.y || a.x - b.x);
 
+        console.timeEnd('[pipeline] YOLO');
+        console.log(`[pipeline] ${detections.length} lines detected`);
         self.postMessage({ type: 'segmentation', payload: { lines: detections } });
 
         // --- TrOCR transcription ---
@@ -127,13 +131,16 @@ self.onmessage = async (e: MessageEvent) => {
           const encoderInput = preprocessTrOCR(cropped);
 
           // Run encoder
+          console.time(`[line ${i}] encoder`);
           const pixelValues = new ort.Tensor('float32', encoderInput, [1, 3, 384, 384]);
           const encResult = await encoderSession.run({
             [encoderSession.inputNames[0]]: pixelValues,
           });
           const hiddenStates = encResult[encoderSession.outputNames[0]];
+          console.timeEnd(`[line ${i}] encoder`);
 
           // Autoregressive decoding
+          console.time(`[line ${i}] decoder`);
           const decoderStartId = 2; // </s> token
           const maxLength = 256;
           const tokenIds: number[] = [decoderStartId];
@@ -186,7 +193,9 @@ self.onmessage = async (e: MessageEvent) => {
             tokenIds.push(bestToken);
           }
 
+          console.timeEnd(`[line ${i}] decoder`);
           const fullText = tokenizer.decode(tokenIds.slice(1));
+          console.log(`[line ${i}] "${fullText}" (${tokenIds.length - 1} tokens)`);
           self.postMessage({
             type: 'line_done',
             payload: { lineIndex: i, text: fullText, confidence: det.confidence },
