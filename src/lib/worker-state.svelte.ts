@@ -12,10 +12,10 @@ export class HTRWorkerState {
   private worker: Worker;
 
   constructor(backend: 'wasm' | 'webgpu' = 'webgpu') {
-    const workerUrl = backend === 'webgpu'
-      ? new URL('../worker-ortw.ts', import.meta.url)
-      : new URL('../worker.ts', import.meta.url);
-    this.worker = new Worker(workerUrl, { type: 'module' });
+    // Static URLs so Vite can detect and bundle each worker
+    this.worker = backend === 'webgpu'
+      ? new Worker(new URL('../worker-ortw.ts', import.meta.url), { type: 'module' })
+      : new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
 
     this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
       this.handleMessage(e.data);
