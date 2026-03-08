@@ -66,12 +66,15 @@ self.onmessage = async (e: MessageEvent) => {
         };
 
         yoloSession = await ort.InferenceSession.create(yoloBytes, sessionOpts);
+        console.log('[models] YOLO inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 
         encoderSession = await ort.InferenceSession.create(encoderBytes, sessionOpts);
+        console.log('[models] Encoder inputs:', encoderSession.inputNames, 'outputs:', encoderSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-encoder', status: 'loaded' } });
 
         decoderSession = await ort.InferenceSession.create(decoderBytes, sessionOpts);
+        console.log('[models] Decoder inputs:', decoderSession.inputNames, 'outputs:', decoderSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-decoder', status: 'loaded' } });
 
         tokenizer = new BpeTokenizer(new TextDecoder().decode(tokenizerBytes));
@@ -137,6 +140,7 @@ self.onmessage = async (e: MessageEvent) => {
             [encoderSession.inputNames[0]]: pixelValues,
           });
           const hiddenStates = encResult[encoderSession.outputNames[0]];
+          console.log(`[line ${i}] encoder output shape:`, hiddenStates.dims);
           console.timeEnd(`[line ${i}] encoder`);
 
           // Autoregressive decoding
@@ -147,6 +151,8 @@ self.onmessage = async (e: MessageEvent) => {
 
           for (let step = 0; step < maxLength; step++) {
             const seqLen = tokenIds.length;
+
+            // Build decoder inputs matching session's expected names
             const inputIds = new ort.Tensor(
               'int64',
               BigInt64Array.from(tokenIds.map(id => BigInt(id))),
@@ -158,11 +164,30 @@ self.onmessage = async (e: MessageEvent) => {
               [1, seqLen],
             );
 
-            const decResult = await decoderSession.run({
-              input_ids: inputIds,
-              attention_mask: attentionMask,
-              encoder_hidden_states: hiddenStates,
-            });
+            if (step === 0) {
+              console.log(`[line ${i}] decoder step 0: input_ids=[1,${seqLen}], hidden=`, hiddenStates.dims);
+            }
+
+            // Use actual input names from the model
+            const decFeeds: Record<string, ort.Tensor> = {};
+            const decInputNames = decoderSession.inputNames;
+            for (const name of decInputNames) {
+              if (name.includes('input_ids') || name === 'input_ids') decFeeds[name] = inputIds;
+              else if (name.includes('attention_mask') || name.includes('mask')) decFeeds[name] = attentionMask;
+              else if (name.includes('hidden') || name.includes('encoder')) decFeeds[name] = hiddenStates;
+              else console.warn(`[decoder] Unknown input: ${name}`);
+            }
+            if (step === 0) {
+              console.log(`[line ${i}] decoder feeds:`, Object.keys(decFeeds));
+            }
+
+            let decResult;
+            try {
+              decResult = await decoderSession.run(decFeeds);
+            } catch (decErr: any) {
+              console.error(`[line ${i}] decoder step ${step} failed:`, decErr.message);
+              break;
+            }
 
             // Get logits: [1, seqLen, vocabSize]
             const logits = decResult[decoderSession.outputNames[0]];
