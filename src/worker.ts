@@ -1,11 +1,14 @@
 import init, { load_yolo, load_trocr, run_pipeline } from '../crates/htr-wasm/pkg/htr_wasm.js';
 import { downloadAndCacheModel } from './lib/model-cache';
 
+// Models must be unquantized (tract doesn't support int8 quantized ONNX nodes).
+// In dev: serve from /models/ via vite public dir or a local server.
+// In prod: host on HuggingFace or CDN and update these URLs.
 const MODEL_URLS = {
-  yolo: 'https://huggingface.co/Riksarkivet/yolov9-lines-within-regions-1/resolve/main/yolo-lines-int8.onnx',
-  trOcrEncoder: 'https://huggingface.co/Riksarkivet/trocr-base-handwritten-hist-swe-2/resolve/main/encoder-int8.onnx',
-  trOcrDecoder: 'https://huggingface.co/Riksarkivet/trocr-base-handwritten-hist-swe-2/resolve/main/decoder-int8.onnx',
-  tokenizer: 'https://huggingface.co/Riksarkivet/trocr-base-handwritten-hist-swe-2/resolve/main/tokenizer.json',
+  yolo: '/models/yolo-lines.onnx',
+  trOcrEncoder: '/models/encoder.onnx',
+  trOcrDecoder: '/models/decoder.onnx',
+  tokenizer: '/models/tokenizer.json',
 };
 
 let wasmReady = false;

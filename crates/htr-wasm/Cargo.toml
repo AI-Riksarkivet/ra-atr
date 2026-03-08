@@ -16,6 +16,7 @@ web-sys = { version = "0.3", features = ["console"] }
 tract-onnx = { version = "0.23.0-dev.2", features = ["getrandom-js"] }
 ndarray = "0.16"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+console_error_panic_hook = "0.1"
 
 [profile.release]
 opt-level = "s"
