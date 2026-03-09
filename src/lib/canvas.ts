@@ -86,6 +86,18 @@ export class CanvasController {
     this.transform.y = (rect.height - h * scale) / 2 - y * scale;
   }
 
+  zoomBy(factor: number) {
+    const rect = this.canvas.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.transform.scale * factor));
+    const ratio = newScale / this.transform.scale;
+    this.transform.x = cx - ratio * (cx - this.transform.x);
+    this.transform.y = cy - ratio * (cy - this.transform.y);
+    this.transform.scale = newScale;
+    this.targetScale = newScale;
+  }
+
   render() {
     this.scheduleRender();
   }

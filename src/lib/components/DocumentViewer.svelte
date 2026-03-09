@@ -24,6 +24,10 @@
   let img: HTMLImageElement | null = null;
 
   /** Zoom to fit the bounding box of the given line indices */
+  export function zoomIn() { controller?.zoomBy(1.4); controller?.render(); }
+  export function zoomOut() { controller?.zoomBy(1 / 1.4); controller?.render(); }
+  export function resetView() { controller?.fitToCanvas(); controller?.render(); }
+
   export function focusLines(indices: number[]) {
     if (!controller || indices.length === 0) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

@@ -29,6 +29,9 @@ let pendingOrder: number[] | null = null;
 // Store last decoded image for region re-detection
 let lastImageData: ImageData | null = null;
 
+// Incremented on set_image to abort in-flight transcription
+let imageGeneration = 0;
+
 self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
@@ -79,8 +82,9 @@ self.onmessage = async (e: MessageEvent) => {
       }
 
       case 'set_image': {
+        imageGeneration++;
         lastImageData = await decodeImage(e.data.payload.imageData);
-        console.log(`[worker] image set: ${lastImageData.width}x${lastImageData.height}`);
+        console.log(`[worker] image set: ${lastImageData.width}x${lastImageData.height} (gen ${imageGeneration})`);
         self.postMessage({ type: 'image_ready' });
         break;
       }
@@ -143,7 +147,9 @@ self.onmessage = async (e: MessageEvent) => {
         // Transcribe the newly detected lines using full image
         const origW = lastImageData.width;
         const origH = lastImageData.height;
+        const gen = imageGeneration;
         for (let di = 0; di < detections.length; di++) {
+          if (imageGeneration !== gen) { console.log('[redetect] aborted — new image'); break; }
           const det = detections[di];
           const lineIndex = startIndex + di;
           const lx = Math.max(0, Math.round(det.x));
@@ -300,8 +306,10 @@ self.onmessage = async (e: MessageEvent) => {
         const queue: number[] = Array.from({ length: detections.length }, (_, i) => i);
         const done = new Set<number>();
         pendingOrder = null;
+        const pipelineGen = imageGeneration;
 
         while (queue.length > 0) {
+          if (imageGeneration !== pipelineGen) { console.log('[pipeline] aborted — new image'); break; }
           // Check if a new priority order arrived between iterations
           if (pendingOrder !== null) {
             const newOrder = pendingOrder;

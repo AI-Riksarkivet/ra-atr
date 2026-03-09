@@ -128,7 +128,9 @@ export class HTRWorkerState {
   }
 
   setImage(imageData: ArrayBuffer) {
+    this.runId++;
     this.imageReady = false;
+    this.stage = 'idle';
     this.lines = [];
     this.currentLine = -1;
     this.currentText = '';

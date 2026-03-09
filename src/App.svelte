@@ -169,6 +169,11 @@
       >{selectMode ? 'Pan mode' : 'Select'}</button>
     {/if}
     {#if imageUrl}
+      <div class="zoom-controls">
+        <button class="icon-btn" onclick={() => docViewer?.zoomIn()} title="Zoom in">+</button>
+        <button class="icon-btn" onclick={() => docViewer?.zoomOut()} title="Zoom out">&minus;</button>
+        <button class="icon-btn" onclick={() => docViewer?.resetView()} title="Fit to view">&#x21BA;</button>
+      </div>
       <button class="new-btn" onclick={() => { imageUrl = null; htr.reset(); selectedLines = new Set(); groups = []; groupCounter = 0; selectMode = false; }}>New image</button>
     {/if}
   </header>
@@ -288,6 +293,32 @@
     background: rgba(250, 204, 21, 0.15);
     border-color: #facc15;
     color: #facc15;
+  }
+
+  .zoom-controls {
+    display: flex;
+    gap: 2px;
+  }
+
+  .icon-btn {
+    width: 1.8rem;
+    height: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary, #333);
+    color: var(--text-primary, #fff);
+    border: 1px solid var(--border-color, #444);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .icon-btn:first-child { border-radius: 6px 0 0 6px; }
+  .icon-btn:last-child { border-radius: 0 6px 6px 0; }
+  .icon-btn:not(:first-child):not(:last-child) { border-radius: 0; }
+
+  .icon-btn:hover {
+    background: var(--bg-primary, #222);
   }
 
   .new-btn {
