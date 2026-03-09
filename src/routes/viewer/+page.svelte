@@ -6,6 +6,7 @@
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
+  import LinePreview from '$lib/components/LinePreview.svelte';
   import { Button } from '$lib/components/ui/button';
   import type { LineGroup, Line, BBox } from '$lib/types';
 
@@ -286,6 +287,11 @@
     />
   </div>
 </div>
+
+<LinePreview
+  imageUrl={activeDoc?.imageUrl ?? null}
+  bbox={appState.hoveredLine >= 0 ? (activeDoc?.lines[appState.hoveredLine]?.bbox ?? null) : null}
+/>
 
 {#if appState.htr.stage !== 'idle' || appState.htr.modelsReady}
   <StatusBar

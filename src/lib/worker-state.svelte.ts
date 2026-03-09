@@ -172,25 +172,23 @@ export class HTRWorkerState {
         this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
         this.onLineDone?.(imageId, lineIndex, text, confidence);
 
-        for (const [rId, info] of this.regionPending) {
-          if (info.imageId === imageId) {
-            info.done++;
-            if (info.done >= info.total) {
-              this.regionPending.delete(rId);
-              // Remove from active sets
-              const nextRegions = new Set(this.activeRegions);
-              nextRegions.delete(rId);
-              this.activeRegions = nextRegions;
-              // Check if this image still has active regions
-              const imageStillActive = [...this.regionPending.values()].some(r => r.imageId === imageId);
-              if (!imageStillActive) {
-                const nextImages = new Set(this.activeImageIds);
-                nextImages.delete(imageId);
-                this.activeImageIds = nextImages;
-              }
-              this.onRegionDone?.(imageId, rId);
+        const pending = this.regionPending.get(regionId);
+        if (pending) {
+          pending.done++;
+          if (pending.done >= pending.total) {
+            this.regionPending.delete(regionId);
+            // Remove from active sets
+            const nextRegions = new Set(this.activeRegions);
+            nextRegions.delete(regionId);
+            this.activeRegions = nextRegions;
+            // Check if this image still has active regions
+            const imageStillActive = [...this.regionPending.values()].some(r => r.imageId === imageId);
+            if (!imageStillActive) {
+              const nextImages = new Set(this.activeImageIds);
+              nextImages.delete(imageId);
+              this.activeImageIds = nextImages;
             }
-            break;
+            this.onRegionDone?.(imageId, regionId);
           }
         }
 
