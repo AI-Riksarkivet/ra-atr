@@ -26,17 +26,19 @@ let ready = false;
 // Priority queue: updated via 'prioritize' messages, consumed by transcription loop
 let pendingOrder: number[] | null = null;
 
-// Store last decoded image for region re-detection
+// Store decoded images by id for multi-image support
+const imageStore = new Map<string, ImageData>();
+// Legacy: last image for run_pipeline compatibility
 let lastImageData: ImageData | null = null;
 
 // Incremented on set_image to abort in-flight transcription
 let imageGeneration = 0;
 
-// Total lines sent to UI (for computing startIndex of new regions)
-let totalLinesSent = 0;
+// Total lines sent to UI per image (for computing startIndex of new regions)
+const totalLinesSentPerImage = new Map<string, number>();
 
 // Region queue: serializes region detection + transcription
-type RegionRequest = { regionId: string; x: number; y: number; w: number; h: number };
+type RegionRequest = { imageId: string; regionId: string; x: number; y: number; w: number; h: number };
 const regionQueue: RegionRequest[] = [];
 let processingRegion = false;
 const cancelledRegions = new Set<string>();
@@ -98,6 +100,17 @@ self.onmessage = async (e: MessageEvent) => {
         break;
       }
 
+      case 'add_image': {
+        const { imageId, imageData } = e.data.payload;
+        const decoded = await decodeImage(imageData);
+        imageStore.set(imageId, decoded);
+        // Also set as lastImageData for compatibility
+        lastImageData = decoded;
+        console.log(`[worker] image added: ${imageId} (${decoded.width}x${decoded.height}), total: ${imageStore.size}`);
+        self.postMessage({ type: 'image_ready' });
+        break;
+      }
+
       case 'prioritize': {
         pendingOrder = e.data.payload.order;
         console.log('[worker] received priority order:', pendingOrder);
@@ -105,8 +118,8 @@ self.onmessage = async (e: MessageEvent) => {
       }
 
       case 'redetect_region': {
-        const { regionId, x, y, w, h } = e.data.payload;
-        regionQueue.push({ regionId, x, y, w, h });
+        const { imageId, regionId, x, y, w, h } = e.data.payload;
+        regionQueue.push({ imageId, regionId, x, y, w, h });
         processNextRegion();
         break;
       }
@@ -168,7 +181,6 @@ self.onmessage = async (e: MessageEvent) => {
             `polygon: ${d.polygon ? d.polygon.length + ' points' : 'none'}`,
             d.polygon ? `first: (${d.polygon[0].x.toFixed(0)}, ${d.polygon[0].y.toFixed(0)})` : '');
         }
-        totalLinesSent = detections.length;
         self.postMessage({ type: 'segmentation', payload: { lines: detections } });
 
         // --- TrOCR transcription ---
@@ -351,7 +363,7 @@ async function processNextRegion() {
   processingRegion = true;
 
   const region = regionQueue.shift()!;
-  const { regionId, x: rx, y: ry, w: rw, h: rh } = region;
+  const { imageId, regionId, x: rx, y: ry, w: rw, h: rh } = region;
 
   if (cancelledRegions.has(regionId)) {
     cancelledRegions.delete(regionId);
@@ -361,17 +373,23 @@ async function processNextRegion() {
   }
 
   try {
-    if (!ready || !yoloSession || !encoderSession || !decoderSession || !tokenizer || !lastImageData) {
-      throw new Error('Models not loaded or no image available');
+    if (!ready || !yoloSession || !encoderSession || !decoderSession || !tokenizer) {
+      throw new Error('Models not loaded');
+    }
+
+    // Get the right image for this region
+    const imgData = imageStore.get(imageId) ?? lastImageData;
+    if (!imgData) {
+      throw new Error(`No image data for ${imageId}`);
     }
 
     const cx = Math.max(0, Math.round(rx));
     const cy = Math.max(0, Math.round(ry));
-    const cw = Math.max(1, Math.min(Math.round(rw), lastImageData.width - cx));
-    const ch = Math.max(1, Math.min(Math.round(rh), lastImageData.height - cy));
+    const cw = Math.max(1, Math.min(Math.round(rw), imgData.width - cx));
+    const ch = Math.max(1, Math.min(Math.round(rh), imgData.height - cy));
 
     console.time(`[redetect ${regionId}] YOLO`);
-    const cropped = cropImageData(lastImageData, cx, cy, cw, ch);
+    const cropped = cropImageData(imgData, cx, cy, cw, ch);
     const { tensor: yoloInput, scale, padX, padY } = preprocessYolo(cropped, 640);
     const yoloTensor = new ort.Tensor('float32', yoloInput, [1, 3, 640, 640]);
 
@@ -405,14 +423,15 @@ async function processNextRegion() {
     console.timeEnd(`[redetect ${regionId}] YOLO`);
     console.log(`[redetect ${regionId}] ${detections.length} lines found`);
 
-    // Worker computes startIndex — no race with UI
-    const startIndex = totalLinesSent;
-    totalLinesSent += detections.length;
-    self.postMessage({ type: 'region_lines', payload: { regionId, startIndex, lines: detections } });
+    // Worker computes startIndex per image — no race with UI
+    const prevSent = totalLinesSentPerImage.get(imageId) ?? 0;
+    const startIndex = prevSent;
+    totalLinesSentPerImage.set(imageId, prevSent + detections.length);
+    self.postMessage({ type: 'region_lines', payload: { imageId, regionId, startIndex, lines: detections } });
 
     // Transcribe the newly detected lines
-    const origW = lastImageData.width;
-    const origH = lastImageData.height;
+    const origW = imgData.width;
+    const origH = imgData.height;
     const gen = imageGeneration;
 
     for (let di = 0; di < detections.length; di++) {
@@ -426,7 +445,7 @@ async function processNextRegion() {
       const lw = Math.max(1, Math.min(Math.round(det.w), origW - lx));
       const lh = Math.max(1, Math.min(Math.round(det.h), origH - ly));
 
-      const lineCrop = cropImageData(lastImageData, lx, ly, lw, lh);
+      const lineCrop = cropImageData(imgData, lx, ly, lw, lh);
       const encoderInput = preprocessTrOCR(lineCrop);
 
       const pixelValues = new ort.Tensor('float32', encoderInput, [1, 3, 384, 384]);
@@ -521,7 +540,7 @@ async function processNextRegion() {
       }
     }
 
-    self.postMessage({ type: 'region_done', payload: { regionId } });
+    self.postMessage({ type: 'region_done', payload: { imageId, regionId } });
   } catch (err: any) {
     self.postMessage({ type: 'error', payload: { message: (err as Error).message ?? String(err) } });
   }

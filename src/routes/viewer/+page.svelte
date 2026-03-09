@@ -7,17 +7,21 @@
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import { Button } from '$lib/components/ui/button';
-  import type { LineGroup } from '$lib/types';
+  import type { LineGroup, Line, BBox } from '$lib/types';
 
   let dividerX = $state(60);
   let isDraggingDivider = $state(false);
   let docViewer: DocumentViewer;
 
-
-  // Redirect to home if no image loaded
+  // Redirect to home if no documents
   $effect(() => {
-    if (!appState.imageUrl) goto('/');
+    if (appState.documents.length === 0) goto('/');
   });
+
+  // Active document derived state
+  let activeDoc = $derived(appState.activeDocument);
+  let lines = $derived(activeDoc?.lines ?? []);
+  let groups = $derived(activeDoc?.groups ?? []);
 
   function handleSelectLine(index: number, additive: boolean) {
     if (index < 0) { appState.selectedLines = new Set(); return; }
@@ -35,80 +39,82 @@
   }
 
   function createGroup() {
-    if (appState.selectedLines.size === 0) return;
+    if (!activeDoc || appState.selectedLines.size === 0) return;
     const sel = appState.selectedLines;
-    for (const g of appState.groups) {
+    for (const g of activeDoc.groups) {
       g.lineIndices = g.lineIndices.filter(i => !sel.has(i));
     }
-    appState.groups = appState.groups.filter(g => g.lineIndices.length > 0);
-    appState.groupCounter++;
+    activeDoc.groups = activeDoc.groups.filter(g => g.lineIndices.length > 0);
+    activeDoc.groupCounter++;
     const newGroup: LineGroup = {
-      id: `group-${appState.groupCounter}`,
-      name: `Group ${appState.groupCounter}`,
+      id: `group-${activeDoc.groupCounter}`,
+      name: `Group ${activeDoc.groupCounter}`,
       lineIndices: [...sel].sort((a, b) => a - b),
       collapsed: false,
     };
-    appState.groups = [...appState.groups, newGroup];
+    activeDoc.groups = [...activeDoc.groups, newGroup];
+    appState.documents = [...appState.documents];
     appState.selectedLines = new Set();
-    if (appState.htr.stage === 'transcribing') {
-      const allGroups = [...appState.groups.filter(g => g.lineIndices.length > 0)];
-      const grouped = new Set(allGroups.flatMap(g => g.lineIndices));
-      const order = [
-        ...allGroups.flatMap(g => g.lineIndices),
-        ...Array.from({ length: appState.htr.lines.length }, (_, i) => i).filter(i => !grouped.has(i)),
-      ];
-      appState.htr.prioritizeLines(order);
-    }
   }
 
   function deleteSelectedLines() {
-    if (appState.selectedLines.size === 0) return;
+    if (!activeDoc || appState.selectedLines.size === 0) return;
     const removed = appState.selectedLines;
     const remap = new Map<number, number>();
     let newIdx = 0;
-    for (let i = 0; i < appState.htr.lines.length; i++) {
+    for (let i = 0; i < activeDoc.lines.length; i++) {
       if (!removed.has(i)) remap.set(i, newIdx++);
     }
-    appState.htr.lines = appState.htr.lines.filter((_, i) => !removed.has(i));
-    for (const g of appState.groups) {
+    activeDoc.lines = activeDoc.lines.filter((_, i) => !removed.has(i));
+    for (const g of activeDoc.groups) {
       g.lineIndices = g.lineIndices.filter(i => !removed.has(i)).map(i => remap.get(i)!);
     }
-    // Cancel regions for groups that are now empty
-    for (const g of appState.groups) {
+    for (const g of activeDoc.groups) {
       if (g.lineIndices.length === 0 && g.regionId) {
         appState.htr.cancelRegion(g.regionId);
       }
     }
-    appState.groups = appState.groups.filter(g => g.lineIndices.length > 0);
+    activeDoc.groups = activeDoc.groups.filter(g => g.lineIndices.length > 0);
+    appState.documents = [...appState.documents];
     appState.selectedLines = new Set();
   }
 
   function deleteGroup(groupId: string) {
-    const group = appState.groups.find(g => g.id === groupId);
+    if (!activeDoc) return;
+    const group = activeDoc.groups.find(g => g.id === groupId);
     if (!group) return;
-    // Cancel in-flight transcription if region-based
     if (group.regionId) {
       appState.htr.cancelRegion(group.regionId);
     }
-    // Remove the group's lines and remap indices for remaining groups
     const removed = new Set(group.lineIndices);
     if (removed.size > 0) {
       const remap = new Map<number, number>();
       let newIdx = 0;
-      for (let i = 0; i < appState.htr.lines.length; i++) {
+      for (let i = 0; i < activeDoc.lines.length; i++) {
         if (!removed.has(i)) remap.set(i, newIdx++);
       }
-      appState.htr.lines = appState.htr.lines.filter((_, i) => !removed.has(i));
-      for (const g of appState.groups) {
+      activeDoc.lines = activeDoc.lines.filter((_, i) => !removed.has(i));
+      for (const g of activeDoc.groups) {
         if (g.id !== groupId) {
           g.lineIndices = g.lineIndices.filter(i => !removed.has(i)).map(i => remap.get(i)!);
         }
       }
     }
-    appState.groups = appState.groups.filter(g => g.id !== groupId);
+    activeDoc.groups = activeDoc.groups.filter(g => g.id !== groupId);
+    appState.documents = [...appState.documents];
   }
-  function renameGroup(groupId: string, name: string) { appState.groups = appState.groups.map(g => g.id === groupId ? { ...g, name } : g); }
-  function toggleGroup(groupId: string) { appState.groups = appState.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g); }
+
+  function renameGroup(groupId: string, name: string) {
+    if (!activeDoc) return;
+    activeDoc.groups = activeDoc.groups.map(g => g.id === groupId ? { ...g, name } : g);
+    appState.documents = [...appState.documents];
+  }
+
+  function toggleGroup(groupId: string) {
+    if (!activeDoc) return;
+    activeDoc.groups = activeDoc.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g);
+    appState.documents = [...appState.documents];
+  }
 
   function onKeyDown(e: KeyboardEvent) {
     if ((e.key === 'Delete' || e.key === 'Backspace') && appState.selectedLines.size > 0) {
@@ -123,14 +129,55 @@
   }
 
   onMount(() => {
-    appState.htr.onRegionDetected = (regionId, startIndex, count) => {
+    // Route region detections to the right document
+    appState.htr.onRegionDetected = (imageId, regionId, startIndex, bboxes) => {
       docViewer?.clearRedetecting(regionId);
-      // Find the group created earlier and populate its line indices
-      const lineIndices = Array.from({ length: count }, (_, i) => startIndex + i);
-      appState.groups = appState.groups.map(g =>
-        g.regionId === regionId ? { ...g, lineIndices } : g
-      );
+      const newLines: Line[] = bboxes.map((bbox) => ({
+        bbox,
+        text: '',
+        confidence: 0,
+        complete: false,
+      }));
+      appState.updateDocumentLines(imageId, (doc) => {
+        doc.lines = [...doc.lines, ...newLines];
+        const lineIndices = Array.from({ length: bboxes.length }, (_, i) => startIndex + i);
+        doc.groups = doc.groups.map(g =>
+          g.regionId === regionId ? { ...g, lineIndices } : g
+        );
+      });
     };
+
+    // Route token updates to the right document
+    appState.htr.onToken = (imageId, lineIndex, token) => {
+      const doc = appState.documents.find(d => d.id === imageId);
+      if (doc?.lines[lineIndex]) {
+        doc.lines[lineIndex].text += token;
+        appState.documents = [...appState.documents];
+      }
+    };
+
+    // Route line completions to the right document
+    appState.htr.onLineDone = (imageId, lineIndex, text, confidence) => {
+      const doc = appState.documents.find(d => d.id === imageId);
+      if (doc?.lines[lineIndex]) {
+        doc.lines[lineIndex].text = text;
+        doc.lines[lineIndex].confidence = confidence;
+        doc.lines[lineIndex].complete = true;
+        appState.documents = [...appState.documents];
+      }
+    };
+
+    // Route region completion
+    appState.htr.onRegionDone = (imageId, regionId) => {
+      // Check if all lines across all documents are complete
+      const anyIncomplete = appState.documents.some(d =>
+        d.lines.some(l => !l.complete && l.text === '')
+      );
+      if (!anyIncomplete && appState.htr.stage === 'transcribing') {
+        appState.htr.stage = 'done';
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
     return () => { window.removeEventListener('keydown', onKeyDown); };
   });
@@ -175,9 +222,9 @@
   <div class="relative overflow-hidden" style="width: {dividerX}%">
     <DocumentViewer
       bind:this={docViewer}
-      imageUrl={appState.imageUrl}
-      lines={appState.htr.lines}
-      currentLine={appState.htr.currentLine}
+      imageUrl={activeDoc?.imageUrl ?? null}
+      lines={lines}
+      currentLine={-1}
       hoveredLine={appState.hoveredLine}
       onHoverLine={(i) => appState.hoveredLine = i}
       stage={appState.htr.stage}
@@ -185,20 +232,21 @@
       onSelectLine={handleSelectLine}
       onMarqueeSelect={handleMarqueeSelect}
       onRedetectRegion={(x, y, w, h) => {
-        const regionId = appState.htr.redetectRegion(x, y, w, h);
-        // Create group immediately — before YOLO even runs
-        appState.groupCounter++;
-        appState.groups = [...appState.groups, {
-          id: `group-${appState.groupCounter}`,
-          name: `Group ${appState.groupCounter}`,
+        if (!activeDoc) return '';
+        const regionId = appState.htr.redetectRegion(activeDoc.id, x, y, w, h);
+        activeDoc.groupCounter++;
+        activeDoc.groups = [...activeDoc.groups, {
+          id: `group-${activeDoc.groupCounter}`,
+          name: `Group ${activeDoc.groupCounter}`,
           lineIndices: [],
           collapsed: false,
           regionId,
           rect: { x, y, w, h },
         }];
+        appState.documents = [...appState.documents];
         return regionId;
       }}
-      groups={appState.groups}
+      groups={groups}
       selectMode={appState.selectMode}
     />
   </div>
@@ -212,14 +260,13 @@
   ></div>
   <div class="overflow-hidden border-l border-border" style="width: {100 - dividerX}%">
     <TranscriptionPanel
-      lines={appState.htr.lines}
-      currentLine={appState.htr.currentLine}
-      currentText={appState.htr.currentText}
+      documents={appState.documents}
+      activeDocumentId={appState.activeDocumentId}
+      onSwitchDocument={(id) => appState.switchDocument(id)}
       hoveredLine={appState.hoveredLine}
       onHoverLine={(i) => appState.hoveredLine = i}
       selectedLines={appState.selectedLines}
       onSelectLine={handleSelectLine}
-      groups={appState.groups}
       onToggleGroup={toggleGroup}
       onRenameGroup={renameGroup}
       onDeleteGroup={deleteGroup}
@@ -228,8 +275,14 @@
         else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
       }}
       onFocusLine={(i) => docViewer?.focusLines([i])}
-      onEditLine={(i, text) => { if (appState.htr.lines[i]) appState.htr.lines[i].text = text; }}
+      onEditLine={(i, text) => {
+        if (activeDoc?.lines[i]) {
+          activeDoc.lines[i].text = text;
+          appState.documents = [...appState.documents];
+        }
+      }}
       selectMode={appState.selectMode}
+      currentWork={appState.htr.currentWork}
     />
   </div>
 </div>
@@ -237,7 +290,7 @@
 {#if appState.htr.stage !== 'idle' || appState.htr.modelsReady}
   <StatusBar
     stage={appState.htr.stage}
-    currentLine={appState.htr.currentLine}
-    totalLines={appState.htr.lines.length}
+    documents={appState.documents}
+    currentWork={appState.htr.currentWork}
   />
 {/if}

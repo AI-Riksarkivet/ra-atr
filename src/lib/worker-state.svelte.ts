@@ -1,4 +1,4 @@
-import type { WorkerOutMessage, PipelineStage, Line } from './types';
+import type { WorkerOutMessage, PipelineStage, Line, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
 
 const MODEL_URLS = [
@@ -10,25 +10,28 @@ const MODEL_URLS = [
 
 export class HTRWorkerState {
   stage = $state<PipelineStage>('idle');
-  lines = $state<Line[]>([]);
-  currentLine = $state<number>(-1);
-  currentText = $state<string>('');
   modelsReady = $state<boolean>(false);
   error = $state<string | null>(null);
   modelProgress = $state<Record<string, number>>({});
-  /** True once we've checked the cache; false while checking */
   cacheChecked = $state<boolean>(false);
   imageReady = $state<boolean>(false);
+
+  /** Currently processing: { imageId, regionId } or null */
+  currentWork = $state<{ imageId: string; regionId: string } | null>(null);
 
   private worker!: Worker;
   private runId = 0;
   private regionCounter = 0;
-  onRegionDetected: ((regionId: string, startIndex: number, count: number) => void) | null = null;
+
+  // Callbacks for multi-image routing
+  onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => void) | null = null;
+  onRegionDone: ((imageId: string, regionId: string) => void) | null = null;
+  onLineDone: ((imageId: string, lineIndex: number, text: string, confidence: number) => void) | null = null;
+  onToken: ((imageId: string, lineIndex: number, token: string) => void) | null = null;
 
   constructor() {
     this.createWorker();
 
-    // Auto-load if all models are already cached
     areAllModelsCached(MODEL_URLS).then((cached) => {
       this.cacheChecked = true;
       if (cached) {
@@ -44,11 +47,13 @@ export class HTRWorkerState {
     };
   }
 
+  // Track which imageId is associated with each regionId
+  private regionToImage = new Map<string, string>();
+
   private handleMessage(msg: WorkerOutMessage) {
     const expectedRun = this.runId;
 
     switch (msg.type) {
-      // Model messages are always valid
       case 'ready':
         this.modelsReady = true;
         this.stage = 'idle';
@@ -66,69 +71,52 @@ export class HTRWorkerState {
         this.error = msg.payload.message;
         break;
 
-      // Pipeline messages — ignore if from a stale run
+      // Legacy pipeline messages (single-image flow)
       case 'segmentation':
         if (expectedRun !== this.runId) break;
         this.stage = 'transcribing';
-        this.lines = msg.payload.lines.map((bbox) => ({
-          bbox,
-          text: '',
-          confidence: 0,
-          complete: false,
-        }));
         break;
-      case 'token':
+      case 'token': {
         if (expectedRun !== this.runId) break;
-        this.currentLine = msg.payload.lineIndex;
-        this.currentText += msg.payload.token;
-        if (this.lines[msg.payload.lineIndex]) {
-          this.lines[msg.payload.lineIndex].text = this.currentText;
+        // Try to route via regionToImage for multi-image, fallback to legacy
+        const tokenImageId = this.currentWork?.imageId;
+        if (tokenImageId) {
+          this.onToken?.(tokenImageId, msg.payload.lineIndex, msg.payload.token);
         }
         break;
+      }
       case 'beam_update':
         if (expectedRun !== this.runId) break;
-        this.currentLine = msg.payload.lineIndex;
-        this.currentText = msg.payload.text;
-        if (this.lines[msg.payload.lineIndex]) {
-          this.lines[msg.payload.lineIndex].text = msg.payload.text;
-        }
         break;
-      case 'line_done':
+      case 'line_done': {
         if (expectedRun !== this.runId) break;
-        if (this.lines[msg.payload.lineIndex]) {
-          this.lines[msg.payload.lineIndex].text = msg.payload.text;
-          this.lines[msg.payload.lineIndex].confidence = msg.payload.confidence;
-          this.lines[msg.payload.lineIndex].complete = true;
+        const doneImageId = this.currentWork?.imageId;
+        if (doneImageId) {
+          this.onLineDone?.(doneImageId, msg.payload.lineIndex, msg.payload.text, msg.payload.confidence);
         }
-        this.currentText = '';
         break;
+      }
       case 'pipeline_done':
         if (expectedRun !== this.runId) break;
         this.stage = 'done';
-        this.currentLine = -1;
+        this.currentWork = null;
         break;
+
+      // Region messages (multi-image)
       case 'region_lines': {
-        // Append new detections to existing lines
-        const newLines = msg.payload.lines.map((bbox) => ({
-          bbox,
-          text: '',
-          confidence: 0,
-          complete: false,
-        }));
-        this.lines = [...this.lines, ...newLines];
+        const { imageId, regionId, startIndex, lines } = msg.payload;
+        this.currentWork = { imageId, regionId };
         if (this.stage === 'done' || this.stage === 'idle') {
           this.stage = 'transcribing';
         }
-        this.onRegionDetected?.(msg.payload.regionId, msg.payload.startIndex, newLines.length);
+        this.onRegionDetected?.(imageId, regionId, startIndex, lines);
         break;
       }
       case 'region_done': {
-        // Check if any lines are still incomplete (other regions in flight)
-        const anyIncomplete = this.lines.some(l => !l.complete && l.text === '');
-        if (!anyIncomplete && this.stage === 'transcribing') {
-          this.stage = 'done';
-          this.currentLine = -1;
-        }
+        const { imageId, regionId } = msg.payload;
+        this.onRegionDone?.(imageId, regionId);
+        this.currentWork = null;
+        // Stage will be updated by app state based on remaining work
         break;
       }
     }
@@ -139,13 +127,17 @@ export class HTRWorkerState {
     this.worker.postMessage({ type: 'load_models' });
   }
 
+  addImage(imageId: string, imageData: ArrayBuffer) {
+    this.worker.postMessage(
+      { type: 'add_image', payload: { imageId, imageData } },
+      [imageData]
+    );
+  }
+
   setImage(imageData: ArrayBuffer) {
     this.runId++;
     this.imageReady = false;
     this.stage = 'idle';
-    this.lines = [];
-    this.currentLine = -1;
-    this.currentText = '';
     this.error = null;
     this.worker.postMessage(
       { type: 'set_image', payload: { imageData } },
@@ -156,9 +148,6 @@ export class HTRWorkerState {
   runPipeline(imageData: ArrayBuffer) {
     this.runId++;
     this.stage = 'segmenting';
-    this.lines = [];
-    this.currentLine = -1;
-    this.currentText = '';
     this.error = null;
     this.worker.postMessage(
       { type: 'run_pipeline', payload: { imageData } },
@@ -170,25 +159,25 @@ export class HTRWorkerState {
     this.worker.postMessage({ type: 'prioritize', payload: { order } });
   }
 
-  redetectRegion(x: number, y: number, w: number, h: number): string {
+  redetectRegion(imageId: string, x: number, y: number, w: number, h: number): string {
     this.regionCounter++;
     const regionId = `region-${this.regionCounter}`;
-    this.worker.postMessage({ type: 'redetect_region', payload: { regionId, x, y, w, h } });
+    this.regionToImage.set(regionId, imageId);
+    this.worker.postMessage({ type: 'redetect_region', payload: { imageId, regionId, x, y, w, h } });
     return regionId;
   }
 
   cancelRegion(regionId: string) {
     this.worker.postMessage({ type: 'cancel_region', payload: { regionId } });
+    this.regionToImage.delete(regionId);
   }
 
   reset() {
     this.runId++;
     this.stage = 'idle';
-    this.lines = [];
-    this.currentLine = -1;
-    this.currentText = '';
     this.imageReady = false;
     this.error = null;
+    this.currentWork = null;
   }
 
   destroy() {

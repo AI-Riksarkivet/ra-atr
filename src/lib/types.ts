@@ -1,9 +1,10 @@
 export type WorkerInMessage =
   | { type: 'load_models' }
   | { type: 'set_image'; payload: { imageData: ArrayBuffer } }
+  | { type: 'add_image'; payload: { imageId: string; imageData: ArrayBuffer } }
   | { type: 'run_pipeline'; payload: { imageData: ArrayBuffer } }
   | { type: 'prioritize'; payload: { order: number[] } }
-  | { type: 'redetect_region'; payload: { regionId: string; x: number; y: number; w: number; h: number } }
+  | { type: 'redetect_region'; payload: { imageId: string; regionId: string; x: number; y: number; w: number; h: number } }
   | { type: 'cancel_region'; payload: { regionId: string } };
 
 export type WorkerOutMessage =
@@ -16,8 +17,8 @@ export type WorkerOutMessage =
   | { type: 'error'; payload: { message: string } }
   | { type: 'ready' }
   | { type: 'image_ready' }
-  | { type: 'region_lines'; payload: { regionId: string; startIndex: number; lines: BBox[] } }
-  | { type: 'region_done'; payload: { regionId: string } };
+  | { type: 'region_lines'; payload: { imageId: string; regionId: string; startIndex: number; lines: BBox[] } }
+  | { type: 'region_done'; payload: { imageId: string; regionId: string } };
 
 export interface Point {
   x: number;
@@ -51,4 +52,15 @@ export interface LineGroup {
   regionId?: string;
   /** Region bounds in image coordinates (persists until group deleted) */
   rect?: { x: number; y: number; w: number; h: number };
+}
+
+export interface ImageDocument {
+  id: string;
+  name: string;
+  imageUrl: string;
+  /** Kept for re-sending to worker if needed */
+  imageData: ArrayBuffer;
+  lines: Line[];
+  groups: LineGroup[];
+  groupCounter: number;
 }

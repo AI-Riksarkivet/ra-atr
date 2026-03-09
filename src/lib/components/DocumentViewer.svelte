@@ -371,6 +371,8 @@
 
   $effect(() => {
     if (imageUrl) {
+      // Clear pending regions from previous image
+      pendingRegions = new Map();
       const newImg = new Image();
       newImg.onload = () => {
         img = newImg;
@@ -381,6 +383,7 @@
   });
 
   $effect(() => {
+    void imageUrl;
     void lines;
     void currentLine;
     void hoveredLine;

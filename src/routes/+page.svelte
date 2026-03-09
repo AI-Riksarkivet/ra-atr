@@ -4,16 +4,16 @@
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import ModelManager from '$lib/components/ModelManager.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
-  import { onMount } from 'svelte';
 
-  onMount(() => {
-    return () => { /* cleanup if needed */ };
-  });
-
-  function handleUpload(imageData: ArrayBuffer, previewUrl: string) {
-    appState.imageUrl = previewUrl;
+  function handleUpload(files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) {
+    for (const file of files) {
+      const docId = appState.addDocument(file.name, file.previewUrl, file.imageData);
+      // Set first uploaded as active
+      if (!appState.activeDocumentId) {
+        appState.activeDocumentId = docId;
+      }
+    }
     appState.selectMode = true;
-    appState.htr.setImage(imageData);
     goto('/viewer');
   }
 </script>

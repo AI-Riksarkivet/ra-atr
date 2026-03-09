@@ -3,7 +3,7 @@
   import { cn } from '$lib/utils';
 
   interface Props {
-    onUpload: (imageData: ArrayBuffer, previewUrl: string) => void;
+    onUpload: (files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) => void;
     disabled: boolean;
   }
 
@@ -12,12 +12,16 @@
   let loadingDemo = $state(false);
   let fileInput: HTMLInputElement;
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.type.startsWith('image/')) return;
-    const previewUrl = URL.createObjectURL(file);
-    file.arrayBuffer().then((buf) => onUpload(buf, previewUrl));
+    const results: { name: string; imageData: ArrayBuffer; previewUrl: string }[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      const previewUrl = URL.createObjectURL(file);
+      const buf = await file.arrayBuffer();
+      results.push({ name: file.name, imageData: buf, previewUrl });
+    }
+    if (results.length > 0) onUpload(results);
   }
 
   async function loadDemoImage() {
@@ -27,7 +31,7 @@
       const buf = await res.arrayBuffer();
       const blob = new Blob([buf], { type: 'image/jpeg' });
       const previewUrl = URL.createObjectURL(blob);
-      onUpload(buf, previewUrl);
+      onUpload([{ name: 'demo.jpg', imageData: buf, previewUrl }]);
     } finally {
       loadingDemo = false;
     }
@@ -51,11 +55,12 @@
     bind:this={fileInput}
     type="file"
     accept="image/*"
+    multiple
     class="hidden"
     onchange={(e) => handleFiles(e.currentTarget.files)}
     {disabled}
   />
-  <p class="text-sm text-muted-foreground">Drop an image here or click to upload</p>
+  <p class="text-sm text-muted-foreground">Drop images here or click to upload</p>
   <Button
     variant="outline"
     size="sm"
