@@ -1,6 +1,7 @@
 export type WorkerInMessage =
   | { type: 'load_models' }
-  | { type: 'run_pipeline'; payload: { imageData: ArrayBuffer } };
+  | { type: 'run_pipeline'; payload: { imageData: ArrayBuffer } }
+  | { type: 'prioritize'; payload: { order: number[] } };
 
 export type WorkerOutMessage =
   | { type: 'model_status'; payload: { model: string; status: 'downloading' | 'cached' | 'loaded'; progress?: number } }
@@ -33,4 +34,11 @@ export interface Line {
   text: string;
   confidence: number;
   complete: boolean;
+}
+
+export interface LineGroup {
+  id: string;
+  name: string;
+  lineIndices: number[];
+  collapsed: boolean;
 }

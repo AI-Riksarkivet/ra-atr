@@ -29,6 +29,7 @@ export class CanvasController {
   private observer: IntersectionObserver | null = null;
   private visible = true;
   private resizeObserver: ResizeObserver | null = null;
+  panEnabled = true;
 
   constructor(canvas: HTMLCanvasElement, options: CanvasOptions = {}) {
     this.canvas = canvas;
@@ -134,6 +135,7 @@ export class CanvasController {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (!this.panEnabled) return;
     this.isDragging = true;
     this.velocity = { x: 0, y: 0 };
     this.dragStart = { x: e.clientX, y: e.clientY };
@@ -143,7 +145,7 @@ export class CanvasController {
   };
 
   private onPointerMove = (e: PointerEvent) => {
-    if (!this.isDragging) return;
+    if (!this.isDragging || !this.panEnabled) return;
     const dx = e.clientX - this.dragStart.x;
     const dy = e.clientY - this.dragStart.y;
     this.transform.x = this.dragTransformStart.x + dx;

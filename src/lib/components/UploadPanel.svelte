@@ -7,6 +7,7 @@
   let { onUpload, disabled }: Props = $props();
   let dragOver = $state(false);
   let loadingDemo = $state(false);
+  let fileInput: HTMLInputElement;
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -49,20 +50,19 @@
   ondrop={onDrop}
   ondragover={onDragOver}
   ondragleave={() => (dragOver = false)}
+  onclick={() => { if (!disabled) fileInput?.click(); }}
   role="button"
   tabindex="0"
 >
   <input
+    bind:this={fileInput}
     type="file"
     accept="image/*"
     onchange={(e) => handleFiles(e.currentTarget.files)}
     {disabled}
-    id="file-input"
   />
-  <label for="file-input">
-    <p>Drop an image here or click to upload</p>
-  </label>
-  <button class="demo-btn" onclick={loadDemoImage} disabled={disabled || loadingDemo}>
+  <p>Drop an image here or click to upload</p>
+  <button class="demo-btn" onclick={(e) => { e.stopPropagation(); loadDemoImage(); }} disabled={disabled || loadingDemo}>
     {loadingDemo ? 'Loading...' : 'Try demo image'}
   </button>
 </div>
@@ -94,11 +94,6 @@
 
   input[type='file'] {
     display: none;
-  }
-
-  label {
-    cursor: pointer;
-    text-align: center;
   }
 
   p {

@@ -122,6 +122,10 @@ export class HTRWorkerState {
     );
   }
 
+  prioritizeLines(order: number[]) {
+    this.worker.postMessage({ type: 'prioritize', payload: { order } });
+  }
+
   reset() {
     this.runId++;
     this.stage = 'idle';

@@ -23,6 +23,9 @@ let decoderSession: ort.InferenceSession | null = null;
 let tokenizer: BpeTokenizer | null = null;
 let ready = false;
 
+// Priority queue: updated via 'prioritize' messages, consumed by transcription loop
+let pendingOrder: number[] | null = null;
+
 self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
@@ -69,6 +72,12 @@ self.onmessage = async (e: MessageEvent) => {
 
         ready = true;
         self.postMessage({ type: 'ready' });
+        break;
+      }
+
+      case 'prioritize': {
+        pendingOrder = e.data.payload.order;
+        console.log('[worker] received priority order:', pendingOrder);
         break;
       }
 
@@ -122,7 +131,38 @@ self.onmessage = async (e: MessageEvent) => {
         self.postMessage({ type: 'segmentation', payload: { lines: detections } });
 
         // --- TrOCR transcription ---
-        for (let i = 0; i < detections.length; i++) {
+        // Build a queue of line indices; can be reordered by 'prioritize' messages
+        const queue: number[] = Array.from({ length: detections.length }, (_, i) => i);
+        const done = new Set<number>();
+        pendingOrder = null;
+
+        while (queue.length > 0) {
+          // Check if a new priority order arrived between iterations
+          if (pendingOrder !== null) {
+            const newOrder = pendingOrder;
+            pendingOrder = null;
+            // Rebuild queue: prioritized lines first (skip done), then remaining
+            const reordered: number[] = [];
+            for (const idx of newOrder) {
+              if (!done.has(idx) && idx >= 0 && idx < detections.length) {
+                reordered.push(idx);
+              }
+            }
+            // Add any remaining undone lines not in the new order
+            for (const idx of queue) {
+              if (!done.has(idx) && !reordered.includes(idx)) {
+                reordered.push(idx);
+              }
+            }
+            queue.length = 0;
+            queue.push(...reordered);
+            console.log('[worker] reordered queue:', queue);
+          }
+
+          const i = queue.shift()!;
+          if (done.has(i)) continue;
+          done.add(i);
+
           const det = detections[i];
           const x = Math.max(0, Math.round(det.x));
           const y = Math.max(0, Math.round(det.y));
