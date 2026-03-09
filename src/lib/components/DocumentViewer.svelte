@@ -45,9 +45,7 @@
   let marqueeStart = $state({ x: 0, y: 0 });
   let marqueeEnd = $state({ x: 0, y: 0 });
 
-  // Redetect popover state
-  let showRedetect = $state(false);
-  let redetectPos = $state({ x: 0, y: 0 });
+  // Region detection state
   let redetectRegion = $state({ x: 0, y: 0, w: 0, h: 0 });
   let redetecting = $state(false);
 
@@ -141,15 +139,16 @@
       if (indices.length > 0) {
         onMarqueeSelect(indices);
       } else {
-        // Empty selection — offer to re-run YOLO on this region
+        // Empty selection — detect lines in this region
         const minX = Math.min(marqueeStart.x, marqueeEnd.x);
         const minY = Math.min(marqueeStart.y, marqueeEnd.y);
         const w = Math.abs(marqueeEnd.x - marqueeStart.x);
         const h = Math.abs(marqueeEnd.y - marqueeStart.y);
         if (w > 10 && h > 10) {
           redetectRegion = { x: minX, y: minY, w, h };
-          redetectPos = { x: e.clientX, y: e.clientY };
-          showRedetect = true;
+          onRedetectRegion(minX, minY, w, h);
+          redetecting = true;
+          controller?.render();
         }
       }
       controller.render();
@@ -361,15 +360,6 @@
       <p>Detecting text lines...</p>
     </div>
   {/if}
-  {#if showRedetect}
-    <div class="redetect-popover" style="left: {redetectPos.x}px; top: {redetectPos.y}px;">
-      <span>No lines found.</span>
-      <button onclick={() => { onRedetectRegion(redetectRegion.x, redetectRegion.y, redetectRegion.w, redetectRegion.h); showRedetect = false; redetecting = true; controller?.render(); }}>
-        Re-detect here
-      </button>
-      <button class="dismiss" onclick={() => showRedetect = false}>x</button>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -421,47 +411,4 @@
     to { transform: rotate(360deg); }
   }
 
-  .redetect-popover {
-    position: fixed;
-    transform: translate(-50%, -100%) translateY(-8px);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    background: var(--bg-secondary, #1e1e1e);
-    border: 1px solid var(--border-color, #444);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    font-size: 0.8rem;
-    white-space: nowrap;
-    z-index: 10;
-  }
-
-  .redetect-popover span {
-    color: var(--text-muted, #888);
-  }
-
-  .redetect-popover button {
-    padding: 0.2rem 0.5rem;
-    background: #3b82f6;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    cursor: pointer;
-  }
-
-  .redetect-popover button:hover {
-    background: #2563eb;
-  }
-
-  .redetect-popover button.dismiss {
-    background: transparent;
-    color: var(--text-muted, #666);
-    padding: 0 0.2rem;
-  }
-
-  .redetect-popover button.dismiss:hover {
-    color: var(--text-primary, #fff);
-  }
 </style>

@@ -18,10 +18,11 @@ export class HTRWorkerState {
   modelProgress = $state<Record<string, number>>({});
   /** True once we've checked the cache; false while checking */
   cacheChecked = $state<boolean>(false);
+  imageReady = $state<boolean>(false);
 
   private worker!: Worker;
   private runId = 0;
-  onRegionDetected: (() => void) | null = null;
+  onRegionDetected: ((startIndex: number, count: number) => void) | null = null;
 
   constructor() {
     this.createWorker();
@@ -56,6 +57,9 @@ export class HTRWorkerState {
         if (msg.payload.progress !== undefined) {
           this.modelProgress[msg.payload.model] = msg.payload.progress;
         }
+        break;
+      case 'image_ready':
+        this.imageReady = true;
         break;
       case 'error':
         this.error = msg.payload.message;
@@ -110,8 +114,9 @@ export class HTRWorkerState {
           confidence: 0,
           complete: false,
         }));
+        const startIndex = this.lines.length;
         this.lines = [...this.lines, ...newLines];
-        this.onRegionDetected?.();
+        this.onRegionDetected?.(startIndex, newLines.length);
         break;
       }
     }
@@ -120,6 +125,18 @@ export class HTRWorkerState {
   loadModels() {
     this.stage = 'loading_models';
     this.worker.postMessage({ type: 'load_models' });
+  }
+
+  setImage(imageData: ArrayBuffer) {
+    this.imageReady = false;
+    this.lines = [];
+    this.currentLine = -1;
+    this.currentText = '';
+    this.error = null;
+    this.worker.postMessage(
+      { type: 'set_image', payload: { imageData } },
+      [imageData]
+    );
   }
 
   runPipeline(imageData: ArrayBuffer) {
@@ -150,6 +167,7 @@ export class HTRWorkerState {
     this.lines = [];
     this.currentLine = -1;
     this.currentText = '';
+    this.imageReady = false;
     this.error = null;
   }
 

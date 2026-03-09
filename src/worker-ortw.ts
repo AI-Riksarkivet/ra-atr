@@ -78,6 +78,13 @@ self.onmessage = async (e: MessageEvent) => {
         break;
       }
 
+      case 'set_image': {
+        lastImageData = await decodeImage(e.data.payload.imageData);
+        console.log(`[worker] image set: ${lastImageData.width}x${lastImageData.height}`);
+        self.postMessage({ type: 'image_ready' });
+        break;
+      }
+
       case 'prioritize': {
         pendingOrder = e.data.payload.order;
         console.log('[worker] received priority order:', pendingOrder);

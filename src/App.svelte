@@ -113,14 +113,27 @@
   }
 
   onMount(() => {
-    htr.onRegionDetected = () => docViewer?.clearRedetecting();
+    htr.onRegionDetected = (startIndex, count) => {
+      docViewer?.clearRedetecting();
+      if (count > 0) {
+        groupCounter++;
+        const lineIndices = Array.from({ length: count }, (_, i) => startIndex + i);
+        groups = [...groups, {
+          id: `group-${groupCounter}`,
+          name: `Group ${groupCounter}`,
+          lineIndices,
+          collapsed: false,
+        }];
+      }
+    };
     window.addEventListener('keydown', onKeyDown);
     return () => { htr.destroy(); window.removeEventListener('keydown', onKeyDown); };
   });
 
   function handleUpload(imageData: ArrayBuffer, previewUrl: string) {
     imageUrl = previewUrl;
-    htr.runPipeline(imageData);
+    selectMode = true;
+    htr.setImage(imageData);
   }
 
   function onDividerPointerDown(e: PointerEvent) {
@@ -148,7 +161,7 @@
     {#if htr.modelsReady}
       <span class="badge ready">Ready</span>
     {/if}
-    {#if imageUrl && htr.lines.length > 0}
+    {#if imageUrl}
       <button
         class="mode-btn"
         class:active={selectMode}

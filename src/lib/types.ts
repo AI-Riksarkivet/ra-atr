@@ -1,5 +1,6 @@
 export type WorkerInMessage =
   | { type: 'load_models' }
+  | { type: 'set_image'; payload: { imageData: ArrayBuffer } }
   | { type: 'run_pipeline'; payload: { imageData: ArrayBuffer } }
   | { type: 'prioritize'; payload: { order: number[] } }
   | { type: 'redetect_region'; payload: { x: number; y: number; w: number; h: number; startIndex: number } };
@@ -13,6 +14,7 @@ export type WorkerOutMessage =
   | { type: 'pipeline_done' }
   | { type: 'error'; payload: { message: string } }
   | { type: 'ready' }
+  | { type: 'image_ready' }
   | { type: 'region_lines'; payload: { lines: BBox[] } };
 
 export interface Point {
