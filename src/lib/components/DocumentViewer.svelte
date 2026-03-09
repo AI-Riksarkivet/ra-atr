@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Line } from '$lib/types';
+  import type { Line, PipelineStage } from '$lib/types';
   import { CanvasController } from '$lib/canvas';
   import { onMount } from 'svelte';
 
@@ -9,9 +9,10 @@
     currentLine: number;
     hoveredLine: number;
     onHoverLine: (index: number) => void;
+    stage: PipelineStage;
   }
 
-  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine }: Props = $props();
+  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
@@ -111,13 +112,58 @@
   });
 </script>
 
-<canvas bind:this={canvasEl} class="document-canvas"></canvas>
+<div class="viewer-container">
+  <canvas bind:this={canvasEl} class="document-canvas"></canvas>
+  {#if stage === 'segmenting'}
+    <div class="overlay">
+      <div class="spinner"></div>
+      <p>Detecting text lines...</p>
+    </div>
+  {/if}
+</div>
 
 <style>
+  .viewer-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
   .document-canvas {
     width: 100%;
     height: 100%;
     display: block;
     touch-action: none;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
+
+  .overlay p {
+    color: #fff;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>

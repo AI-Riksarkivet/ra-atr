@@ -47,6 +47,9 @@
     {#if htr.modelsReady}
       <span class="badge ready">Ready</span>
     {/if}
+    {#if imageUrl}
+      <button class="new-btn" onclick={() => { imageUrl = null; htr.reset(); }}>New image</button>
+    {/if}
   </header>
 
   {#if htr.error}
@@ -70,7 +73,7 @@
     {:else}
       <div class="panels">
         <div class="left-panel" style="width: {dividerX}%">
-          <DocumentViewer {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} />
+          <DocumentViewer {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} stage={htr.stage} />
         </div>
         <div
           class="divider"
@@ -126,6 +129,21 @@
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
+  }
+
+  .new-btn {
+    margin-left: auto;
+    padding: 0.3rem 0.75rem;
+    background: var(--bg-tertiary, #333);
+    color: var(--text-primary, #fff);
+    border: 1px solid var(--border-color, #444);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .new-btn:hover {
+    background: var(--bg-primary, #222);
   }
 
   .badge {

@@ -19,14 +19,11 @@ export class HTRWorkerState {
   /** True once we've checked the cache; false while checking */
   cacheChecked = $state<boolean>(false);
 
-  private worker: Worker;
+  private worker!: Worker;
+  private runId = 0;
 
   constructor() {
-    this.worker = new Worker(new URL('../worker-ortw.ts', import.meta.url), { type: 'module' });
-
-    this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
-      this.handleMessage(e.data);
-    };
+    this.createWorker();
 
     // Auto-load if all models are already cached
     areAllModelsCached(MODEL_URLS).then((cached) => {
@@ -37,8 +34,18 @@ export class HTRWorkerState {
     });
   }
 
+  private createWorker() {
+    this.worker = new Worker(new URL('../worker-ortw.ts', import.meta.url), { type: 'module' });
+    this.worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
+      this.handleMessage(e.data);
+    };
+  }
+
   private handleMessage(msg: WorkerOutMessage) {
+    const expectedRun = this.runId;
+
     switch (msg.type) {
+      // Model messages are always valid
       case 'ready':
         this.modelsReady = true;
         this.stage = 'idle';
@@ -49,7 +56,13 @@ export class HTRWorkerState {
           this.modelProgress[msg.payload.model] = msg.payload.progress;
         }
         break;
+      case 'error':
+        this.error = msg.payload.message;
+        break;
+
+      // Pipeline messages — ignore if from a stale run
       case 'segmentation':
+        if (expectedRun !== this.runId) break;
         this.stage = 'transcribing';
         this.lines = msg.payload.lines.map((bbox) => ({
           bbox,
@@ -59,6 +72,7 @@ export class HTRWorkerState {
         }));
         break;
       case 'token':
+        if (expectedRun !== this.runId) break;
         this.currentLine = msg.payload.lineIndex;
         this.currentText += msg.payload.token;
         if (this.lines[msg.payload.lineIndex]) {
@@ -66,6 +80,7 @@ export class HTRWorkerState {
         }
         break;
       case 'beam_update':
+        if (expectedRun !== this.runId) break;
         this.currentLine = msg.payload.lineIndex;
         this.currentText = msg.payload.text;
         if (this.lines[msg.payload.lineIndex]) {
@@ -73,6 +88,7 @@ export class HTRWorkerState {
         }
         break;
       case 'line_done':
+        if (expectedRun !== this.runId) break;
         if (this.lines[msg.payload.lineIndex]) {
           this.lines[msg.payload.lineIndex].text = msg.payload.text;
           this.lines[msg.payload.lineIndex].confidence = msg.payload.confidence;
@@ -81,11 +97,9 @@ export class HTRWorkerState {
         this.currentText = '';
         break;
       case 'pipeline_done':
+        if (expectedRun !== this.runId) break;
         this.stage = 'done';
         this.currentLine = -1;
-        break;
-      case 'error':
-        this.error = msg.payload.message;
         break;
     }
   }
@@ -96,6 +110,7 @@ export class HTRWorkerState {
   }
 
   runPipeline(imageData: ArrayBuffer) {
+    this.runId++;
     this.stage = 'segmenting';
     this.lines = [];
     this.currentLine = -1;
@@ -105,6 +120,15 @@ export class HTRWorkerState {
       { type: 'run_pipeline', payload: { imageData } },
       [imageData]
     );
+  }
+
+  reset() {
+    this.runId++;
+    this.stage = 'idle';
+    this.lines = [];
+    this.currentLine = -1;
+    this.currentText = '';
+    this.error = null;
   }
 
   destroy() {
