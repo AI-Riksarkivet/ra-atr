@@ -70,6 +70,29 @@
     }
   }
 
+  function deleteSelectedLines() {
+    if (selectedLines.size === 0) return;
+    const removed = selectedLines;
+    // Build index remapping: old index → new index
+    const remap = new Map<number, number>();
+    let newIdx = 0;
+    for (let i = 0; i < htr.lines.length; i++) {
+      if (!removed.has(i)) {
+        remap.set(i, newIdx++);
+      }
+    }
+    // Remove lines
+    htr.lines = htr.lines.filter((_, i) => !removed.has(i));
+    // Remap group indices, removing deleted ones
+    for (const g of groups) {
+      g.lineIndices = g.lineIndices
+        .filter(i => !removed.has(i))
+        .map(i => remap.get(i)!);
+    }
+    groups = groups.filter(g => g.lineIndices.length > 0);
+    selectedLines = new Set();
+  }
+
   function deleteGroup(groupId: string) {
     groups = groups.filter(g => g.id !== groupId);
   }
@@ -152,6 +175,7 @@
         <div class="toolbar">
           <span class="toolbar-info">{selectedLines.size} line{selectedLines.size > 1 ? 's' : ''} selected</span>
           <button class="toolbar-btn" onclick={createGroup}>Group selected</button>
+          <button class="toolbar-btn danger" onclick={deleteSelectedLines}>Delete</button>
           <button class="toolbar-btn secondary" onclick={() => selectedLines = new Set()}>Clear</button>
         </div>
       {/if}
@@ -332,6 +356,16 @@
 
   .toolbar-btn.secondary:hover {
     background: var(--bg-tertiary, #333);
+  }
+
+  .toolbar-btn.danger {
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .toolbar-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .panels {
