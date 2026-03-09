@@ -28,6 +28,12 @@
   export function zoomOut() { controller?.zoomBy(1 / 1.4); controller?.render(); }
   export function resetView() { controller?.fitToCanvas(); controller?.render(); }
 
+  export function focusRect(x: number, y: number, w: number, h: number) {
+    if (!controller) return;
+    controller.fitToRect(x, y, w, h);
+    controller.render();
+  }
+
   export function focusLines(indices: number[]) {
     if (!controller || indices.length === 0) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -284,22 +290,20 @@
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Group name label in center
+          // Group name label at top-left
           const fontSize = Math.max(12, Math.min(24, 16 / transform.scale));
           ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          // Background pill
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
           const text = g.name;
           const metrics = ctx.measureText(text);
-          const px = 6 / transform.scale;
+          const px = 5 / transform.scale;
           const py = 3 / transform.scale;
-          const labelX = x + w / 2;
-          const labelY = y + h / 2;
+          const labelX = x + px;
+          const labelY = y + py;
           ctx.fillStyle = hexToRgba(color, 0.85);
           ctx.beginPath();
-          const rr = (fontSize / 2 + py);
-          ctx.roundRect(labelX - metrics.width / 2 - px, labelY - fontSize / 2 - py, metrics.width + px * 2, fontSize + py * 2, rr / 2);
+          ctx.roundRect(labelX - px, labelY - py, metrics.width + px * 2, fontSize + py * 2, 3 / transform.scale);
           ctx.fill();
           ctx.fillStyle = '#fff';
           ctx.fillText(text, labelX, labelY);

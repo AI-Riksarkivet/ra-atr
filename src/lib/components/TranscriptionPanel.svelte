@@ -13,7 +13,7 @@
     onToggleGroup: (groupId: string) => void;
     onRenameGroup: (groupId: string, name: string) => void;
     onDeleteGroup: (groupId: string) => void;
-    onFocusGroup: (lineIndices: number[]) => void;
+    onFocusGroup: (lineIndices: number[], rect?: { x: number; y: number; w: number; h: number }) => void;
     onFocusLine: (index: number) => void;
     onEditLine: (index: number, text: string) => void;
     selectMode: boolean;
@@ -84,8 +84,8 @@
 <div class="overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed h-full" bind:this={panelEl}>
   {#each groups as group, gi}
     <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
-      <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white/[0.03] text-xs font-sans select-none">
-        <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={() => onToggleGroup(group.id)}>
+      <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white/[0.03] text-xs font-sans select-none cursor-pointer" onclick={() => onFocusGroup(group.lineIndices, group.rect)}>
+        <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); onToggleGroup(group.id); }}>
           {group.collapsed ? '\u25B6' : '\u25BC'}
         </button>
         {#if editingGroupId === group.id}
@@ -100,8 +100,8 @@
           <span class="font-semibold cursor-default" style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" ondblclick={() => startRename(group)}>{group.name}</span>
         {/if}
         <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIndices.length}</span>
-        <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" style="--hover-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" onclick={() => onFocusGroup(group.lineIndices)} title="Zoom to group">&#x2316;</button>
-        <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive" onclick={() => onDeleteGroup(group.id)} title="Ungroup">x</button>
+        <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" style="--hover-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIndices, group.rect); }} title="Zoom to group">&#x2316;</button>
+        <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title="Delete group">x</button>
       </div>
       {#if !group.collapsed}
         <div class="pl-1">
