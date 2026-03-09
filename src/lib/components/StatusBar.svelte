@@ -27,25 +27,44 @@
     done: 'Done',
   };
 
-  let elapsed = $state(0);
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let startTime = 0;
+  // ETA tracking: measure time per completed line
+  let lastCompletedCount = 0;
+  let lastCompletedTime = 0;
+  let avgSecondsPerLine = $state(0);
+  let etaSeconds = $state(0);
 
+  // Reset ETA when transcription starts
   $effect(() => {
-    if (stage === 'segmenting' || stage === 'transcribing') {
-      if (!timer) {
-        startTime = Date.now();
-        elapsed = 0;
-        timer = setInterval(() => {
-          elapsed = Math.floor((Date.now() - startTime) / 1000);
-        }, 1000);
-      }
-    } else {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
+    if (stage === 'transcribing' && lastCompletedTime === 0) {
+      lastCompletedCount = completedLines;
+      lastCompletedTime = Date.now();
+      avgSecondsPerLine = 0;
+      etaSeconds = 0;
+    } else if (stage === 'idle' || stage === 'done') {
+      lastCompletedTime = 0;
+      etaSeconds = 0;
     }
+  });
+
+  // Update ETA when completed lines changes
+  $effect(() => {
+    const now = Date.now();
+    const newlyDone = completedLines - lastCompletedCount;
+    if (newlyDone > 0 && lastCompletedTime > 0) {
+      const dt = (now - lastCompletedTime) / 1000;
+      const secPerLine = dt / newlyDone;
+      // EMA with alpha=0.3 for smoothing, bootstrap on first measurement
+      if (avgSecondsPerLine === 0) {
+        avgSecondsPerLine = secPerLine;
+      } else {
+        avgSecondsPerLine = 0.3 * secPerLine + 0.7 * avgSecondsPerLine;
+      }
+      // Account for parallel workers
+      const effectiveRate = avgSecondsPerLine / Math.max(1, poolSize);
+      etaSeconds = Math.round(pendingLines * effectiveRate);
+    }
+    lastCompletedCount = completedLines;
+    lastCompletedTime = now;
   });
 
   function formatTime(s: number): string {
@@ -77,7 +96,7 @@
     <span>{documents.length} images</span>
   {/if}
 
-  {#if elapsed > 0 && (stage === 'segmenting' || stage === 'transcribing' || stage === 'done')}
-    <span class="ml-auto font-mono">{formatTime(elapsed)}</span>
+  {#if etaSeconds > 0 && pendingLines > 0 && stage === 'transcribing'}
+    <span class="ml-auto font-mono">~{formatTime(etaSeconds)} left</span>
   {/if}
 </div>
