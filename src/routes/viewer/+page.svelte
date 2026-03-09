@@ -13,6 +13,9 @@
   let isDraggingDivider = $state(false);
   let docViewer: DocumentViewer;
 
+  // Track region rects by regionId so we can attach them to groups
+  const pendingRegionRects = new Map<string, { x: number; y: number; w: number; h: number }>();
+
   // Redirect to home if no image loaded
   $effect(() => {
     if (!appState.imageUrl) goto('/');
@@ -76,7 +79,27 @@
     appState.selectedLines = new Set();
   }
 
-  function deleteGroup(groupId: string) { appState.groups = appState.groups.filter(g => g.id !== groupId); }
+  function deleteGroup(groupId: string) {
+    const group = appState.groups.find(g => g.id === groupId);
+    if (group?.regionId) {
+      // Cancel in-flight transcription for this region
+      appState.htr.cancelRegion(group.regionId);
+      // Remove the lines belonging to this region and remap indices
+      const removed = new Set(group.lineIndices);
+      const remap = new Map<number, number>();
+      let newIdx = 0;
+      for (let i = 0; i < appState.htr.lines.length; i++) {
+        if (!removed.has(i)) remap.set(i, newIdx++);
+      }
+      appState.htr.lines = appState.htr.lines.filter((_, i) => !removed.has(i));
+      for (const g of appState.groups) {
+        if (g.id !== groupId) {
+          g.lineIndices = g.lineIndices.filter(i => !removed.has(i)).map(i => remap.get(i)!);
+        }
+      }
+    }
+    appState.groups = appState.groups.filter(g => g.id !== groupId);
+  }
   function renameGroup(groupId: string, name: string) { appState.groups = appState.groups.map(g => g.id === groupId ? { ...g, name } : g); }
   function toggleGroup(groupId: string) { appState.groups = appState.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g); }
 
@@ -93,18 +116,21 @@
   }
 
   onMount(() => {
-    appState.htr.onRegionDetected = (startIndex, count) => {
-      docViewer?.clearRedetecting();
-      if (count > 0) {
-        appState.groupCounter++;
-        const lineIndices = Array.from({ length: count }, (_, i) => startIndex + i);
-        appState.groups = [...appState.groups, {
-          id: `group-${appState.groupCounter}`,
-          name: `Group ${appState.groupCounter}`,
-          lineIndices,
-          collapsed: false,
-        }];
-      }
+    appState.htr.onRegionDetected = (regionId, startIndex, count) => {
+      docViewer?.clearRedetecting(regionId);
+      const rect = pendingRegionRects.get(regionId);
+      pendingRegionRects.delete(regionId);
+      // Always create a group — even with 0 lines, the region box persists
+      appState.groupCounter++;
+      const lineIndices = Array.from({ length: count }, (_, i) => startIndex + i);
+      appState.groups = [...appState.groups, {
+        id: `group-${appState.groupCounter}`,
+        name: `Group ${appState.groupCounter}`,
+        lineIndices,
+        collapsed: false,
+        regionId,
+        rect,
+      }];
     };
     window.addEventListener('keydown', onKeyDown);
     return () => { window.removeEventListener('keydown', onKeyDown); };
@@ -159,7 +185,11 @@
       selectedLines={appState.selectedLines}
       onSelectLine={handleSelectLine}
       onMarqueeSelect={handleMarqueeSelect}
-      onRedetectRegion={(x, y, w, h) => appState.htr.redetectRegion(x, y, w, h)}
+      onRedetectRegion={(x, y, w, h) => {
+        const regionId = appState.htr.redetectRegion(x, y, w, h);
+        pendingRegionRects.set(regionId, { x, y, w, h });
+        return regionId;
+      }}
       groups={appState.groups}
       selectMode={appState.selectMode}
     />

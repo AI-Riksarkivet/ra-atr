@@ -32,6 +32,15 @@ let lastImageData: ImageData | null = null;
 // Incremented on set_image to abort in-flight transcription
 let imageGeneration = 0;
 
+// Total lines sent to UI (for computing startIndex of new regions)
+let totalLinesSent = 0;
+
+// Region queue: serializes region detection + transcription
+type RegionRequest = { regionId: string; x: number; y: number; w: number; h: number };
+const regionQueue: RegionRequest[] = [];
+let processingRegion = false;
+const cancelledRegions = new Set<string>();
+
 self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
@@ -96,158 +105,18 @@ self.onmessage = async (e: MessageEvent) => {
       }
 
       case 'redetect_region': {
-        if (!ready || !yoloSession || !encoderSession || !decoderSession || !tokenizer || !lastImageData) {
-          throw new Error('Models not loaded or no image available');
-        }
+        const { regionId, x, y, w, h } = e.data.payload;
+        regionQueue.push({ regionId, x, y, w, h });
+        processNextRegion();
+        break;
+      }
 
-        const { x: rx, y: ry, w: rw, h: rh, startIndex } = e.data.payload;
-        const cx = Math.max(0, Math.round(rx));
-        const cy = Math.max(0, Math.round(ry));
-        const cw = Math.max(1, Math.min(Math.round(rw), lastImageData.width - cx));
-        const ch = Math.max(1, Math.min(Math.round(rh), lastImageData.height - cy));
-
-        console.time('[redetect] YOLO');
-        const cropped = cropImageData(lastImageData, cx, cy, cw, ch);
-        const { tensor: yoloInput, scale, padX, padY } = preprocessYolo(cropped, 640);
-        const yoloTensor = new ort.Tensor('float32', yoloInput, [1, 3, 640, 640]);
-
-        const yoloInputName = yoloSession.inputNames[0];
-        const yoloResult = await yoloSession.run({ [yoloInputName]: yoloTensor });
-        const yoloOutput = yoloResult[yoloSession.outputNames[0]];
-        const protoOutput = yoloSession.outputNames.length > 1
-          ? yoloResult[yoloSession.outputNames[1]]
-          : null;
-
-        let detections = parseYoloOutput(
-          yoloOutput.data as Float32Array,
-          yoloOutput.dims,
-          protoOutput ? protoOutput.data as Float32Array : null,
-          protoOutput ? protoOutput.dims : null,
-          cw, ch, scale, padX, padY, 0.25, 0.45,
-        );
-
-        // Offset coordinates back to full image space
-        for (const det of detections) {
-          det.x += cx;
-          det.y += cy;
-          if (det.polygon) {
-            for (const pt of det.polygon) {
-              pt.x += cx;
-              pt.y += cy;
-            }
-          }
-        }
-
-        detections.sort((a, b) => a.y - b.y || a.x - b.x);
-        console.timeEnd('[redetect] YOLO');
-        console.log(`[redetect] ${detections.length} lines found in region`);
-
-        self.postMessage({ type: 'region_lines', payload: { lines: detections } });
-
-        // Transcribe the newly detected lines using full image
-        const origW = lastImageData.width;
-        const origH = lastImageData.height;
-        const gen = imageGeneration;
-        for (let di = 0; di < detections.length; di++) {
-          if (imageGeneration !== gen) { console.log('[redetect] aborted — new image'); break; }
-          const det = detections[di];
-          const lineIndex = startIndex + di;
-          const lx = Math.max(0, Math.round(det.x));
-          const ly = Math.max(0, Math.round(det.y));
-          const lw = Math.max(1, Math.min(Math.round(det.w), origW - lx));
-          const lh = Math.max(1, Math.min(Math.round(det.h), origH - ly));
-
-          const lineCrop = cropImageData(lastImageData, lx, ly, lw, lh);
-          const encoderInput = preprocessTrOCR(lineCrop);
-
-          const pixelValues = new ort.Tensor('float32', encoderInput, [1, 3, 384, 384]);
-          const encResult = await encoderSession.run({
-            [encoderSession.inputNames[0]]: pixelValues,
-          });
-          const hiddenStatesRaw = encResult[encoderSession.outputNames[0]];
-
-          let hiddenStates: ort.Tensor;
-          if (hiddenStatesRaw.location === 'gpu-buffer') {
-            const cpuData = await hiddenStatesRaw.getData();
-            hiddenStates = new ort.Tensor('float32', cpuData as Float32Array, hiddenStatesRaw.dims);
-          } else {
-            hiddenStates = hiddenStatesRaw;
-          }
-
-          // Greedy decoding
-          const maxLength = 256;
-          const tokenIds: number[] = [0];
-
-          for (let step = 0; step < maxLength; step++) {
-            const seqLen = tokenIds.length;
-            const inputIds = new ort.Tensor('int64', BigInt64Array.from(tokenIds.map(id => BigInt(id))), [1, seqLen]);
-            const attentionMask = new ort.Tensor('int64', new BigInt64Array(seqLen).fill(1n), [1, seqLen]);
-
-            const decFeeds: Record<string, ort.Tensor> = {};
-            for (const name of decoderSession.inputNames) {
-              if (name === 'input_ids') decFeeds[name] = inputIds;
-              else if (name === 'attention_mask') decFeeds[name] = attentionMask;
-              else if (name === 'encoder_hidden_states') decFeeds[name] = hiddenStates;
-            }
-
-            let decResult;
-            try {
-              decResult = await decoderSession.run(decFeeds);
-            } catch (decErr: any) {
-              console.error(`[redetect line ${lineIndex}] decoder step ${step} failed:`, decErr.message);
-              break;
-            }
-
-            const logitsRaw = decResult['logits'];
-            let logitsData: Float32Array;
-            if (logitsRaw.location === 'gpu-buffer') {
-              logitsData = (await logitsRaw.getData()) as Float32Array;
-            } else {
-              logitsData = logitsRaw.data as Float32Array;
-            }
-            const vocabSize = logitsRaw.dims[2];
-            const offset = (seqLen - 1) * vocabSize;
-
-            const noRepeatNgramSize = 3;
-            const bannedTokens = new Set<number>();
-            bannedTokens.add(1);
-            if (tokenIds.length >= noRepeatNgramSize - 1) {
-              const prefix = tokenIds.slice(-(noRepeatNgramSize - 1));
-              for (let j = 0; j <= tokenIds.length - noRepeatNgramSize; j++) {
-                let match = true;
-                for (let k = 0; k < noRepeatNgramSize - 1; k++) {
-                  if (tokenIds[j + k] !== prefix[k]) { match = false; break; }
-                }
-                if (match) bannedTokens.add(tokenIds[j + noRepeatNgramSize - 1]);
-              }
-            }
-
-            let bestToken = 0;
-            let bestScore = -Infinity;
-            for (let v = 0; v < vocabSize; v++) {
-              if (bannedTokens.has(v)) continue;
-              if (logitsData[offset + v] > bestScore) {
-                bestScore = logitsData[offset + v];
-                bestToken = v;
-              }
-            }
-
-            if (bestToken === tokenizer.eosTokenId) break;
-            tokenIds.push(bestToken);
-
-            const tokenText = tokenizer.decodeToken(bestToken);
-            if (tokenText !== null) {
-              self.postMessage({ type: 'token', payload: { lineIndex, token: tokenText } });
-            }
-          }
-
-          const fullText = tokenizer.decode(tokenIds.slice(1));
-          console.log(`[redetect line ${lineIndex}] "${fullText}"`);
-          self.postMessage({
-            type: 'line_done',
-            payload: { lineIndex, text: fullText, confidence: det.confidence },
-          });
-        }
+      case 'cancel_region': {
+        const { regionId } = e.data.payload;
+        cancelledRegions.add(regionId);
+        const idx = regionQueue.findIndex(r => r.regionId === regionId);
+        if (idx >= 0) regionQueue.splice(idx, 1);
+        console.log(`[worker] cancelled region ${regionId}`);
         break;
       }
 
@@ -299,6 +168,7 @@ self.onmessage = async (e: MessageEvent) => {
             `polygon: ${d.polygon ? d.polygon.length + ' points' : 'none'}`,
             d.polygon ? `first: (${d.polygon[0].x.toFixed(0)}, ${d.polygon[0].y.toFixed(0)})` : '');
         }
+        totalLinesSent = detections.length;
         self.postMessage({ type: 'segmentation', payload: { lines: detections } });
 
         // --- TrOCR transcription ---
@@ -475,3 +345,188 @@ self.onmessage = async (e: MessageEvent) => {
     self.postMessage({ type: 'error', payload: { message: err.message ?? String(err) } });
   }
 };
+
+async function processNextRegion() {
+  if (processingRegion || regionQueue.length === 0) return;
+  processingRegion = true;
+
+  const region = regionQueue.shift()!;
+  const { regionId, x: rx, y: ry, w: rw, h: rh } = region;
+
+  if (cancelledRegions.has(regionId)) {
+    cancelledRegions.delete(regionId);
+    processingRegion = false;
+    processNextRegion();
+    return;
+  }
+
+  try {
+    if (!ready || !yoloSession || !encoderSession || !decoderSession || !tokenizer || !lastImageData) {
+      throw new Error('Models not loaded or no image available');
+    }
+
+    const cx = Math.max(0, Math.round(rx));
+    const cy = Math.max(0, Math.round(ry));
+    const cw = Math.max(1, Math.min(Math.round(rw), lastImageData.width - cx));
+    const ch = Math.max(1, Math.min(Math.round(rh), lastImageData.height - cy));
+
+    console.time(`[redetect ${regionId}] YOLO`);
+    const cropped = cropImageData(lastImageData, cx, cy, cw, ch);
+    const { tensor: yoloInput, scale, padX, padY } = preprocessYolo(cropped, 640);
+    const yoloTensor = new ort.Tensor('float32', yoloInput, [1, 3, 640, 640]);
+
+    const yoloInputName = yoloSession.inputNames[0];
+    const yoloResult = await yoloSession.run({ [yoloInputName]: yoloTensor });
+    const yoloOutput = yoloResult[yoloSession.outputNames[0]];
+    const protoOutput = yoloSession.outputNames.length > 1
+      ? yoloResult[yoloSession.outputNames[1]]
+      : null;
+
+    let detections = parseYoloOutput(
+      yoloOutput.data as Float32Array,
+      yoloOutput.dims,
+      protoOutput ? protoOutput.data as Float32Array : null,
+      protoOutput ? protoOutput.dims : null,
+      cw, ch, scale, padX, padY, 0.25, 0.45,
+    );
+
+    for (const det of detections) {
+      det.x += cx;
+      det.y += cy;
+      if (det.polygon) {
+        for (const pt of det.polygon) {
+          pt.x += cx;
+          pt.y += cy;
+        }
+      }
+    }
+
+    detections.sort((a, b) => a.y - b.y || a.x - b.x);
+    console.timeEnd(`[redetect ${regionId}] YOLO`);
+    console.log(`[redetect ${regionId}] ${detections.length} lines found`);
+
+    // Worker computes startIndex — no race with UI
+    const startIndex = totalLinesSent;
+    totalLinesSent += detections.length;
+    self.postMessage({ type: 'region_lines', payload: { regionId, startIndex, lines: detections } });
+
+    // Transcribe the newly detected lines
+    const origW = lastImageData.width;
+    const origH = lastImageData.height;
+    const gen = imageGeneration;
+
+    for (let di = 0; di < detections.length; di++) {
+      if (imageGeneration !== gen) { console.log(`[redetect ${regionId}] aborted — new image`); break; }
+      if (cancelledRegions.has(regionId)) { console.log(`[redetect ${regionId}] cancelled`); break; }
+
+      const det = detections[di];
+      const lineIndex = startIndex + di;
+      const lx = Math.max(0, Math.round(det.x));
+      const ly = Math.max(0, Math.round(det.y));
+      const lw = Math.max(1, Math.min(Math.round(det.w), origW - lx));
+      const lh = Math.max(1, Math.min(Math.round(det.h), origH - ly));
+
+      const lineCrop = cropImageData(lastImageData, lx, ly, lw, lh);
+      const encoderInput = preprocessTrOCR(lineCrop);
+
+      const pixelValues = new ort.Tensor('float32', encoderInput, [1, 3, 384, 384]);
+      const encResult = await encoderSession.run({
+        [encoderSession.inputNames[0]]: pixelValues,
+      });
+      const hiddenStatesRaw = encResult[encoderSession.outputNames[0]];
+
+      let hiddenStates: ort.Tensor;
+      if (hiddenStatesRaw.location === 'gpu-buffer') {
+        const cpuData = await hiddenStatesRaw.getData();
+        hiddenStates = new ort.Tensor('float32', cpuData as Float32Array, hiddenStatesRaw.dims);
+      } else {
+        hiddenStates = hiddenStatesRaw;
+      }
+
+      const maxLength = 256;
+      const tokenIds: number[] = [0];
+
+      for (let step = 0; step < maxLength; step++) {
+        if (cancelledRegions.has(regionId)) break;
+
+        const seqLen = tokenIds.length;
+        const inputIds = new ort.Tensor('int64', BigInt64Array.from(tokenIds.map(id => BigInt(id))), [1, seqLen]);
+        const attentionMask = new ort.Tensor('int64', new BigInt64Array(seqLen).fill(1n), [1, seqLen]);
+
+        const decFeeds: Record<string, ort.Tensor> = {};
+        for (const name of decoderSession.inputNames) {
+          if (name === 'input_ids') decFeeds[name] = inputIds;
+          else if (name === 'attention_mask') decFeeds[name] = attentionMask;
+          else if (name === 'encoder_hidden_states') decFeeds[name] = hiddenStates;
+        }
+
+        let decResult;
+        try {
+          decResult = await decoderSession.run(decFeeds);
+        } catch (decErr: any) {
+          console.error(`[redetect ${regionId} line ${lineIndex}] decoder step ${step} failed:`, decErr.message);
+          break;
+        }
+
+        const logitsRaw = decResult['logits'];
+        let logitsData: Float32Array;
+        if (logitsRaw.location === 'gpu-buffer') {
+          logitsData = (await logitsRaw.getData()) as Float32Array;
+        } else {
+          logitsData = logitsRaw.data as Float32Array;
+        }
+        const vocabSize = logitsRaw.dims[2];
+        const offset = (seqLen - 1) * vocabSize;
+
+        const noRepeatNgramSize = 3;
+        const bannedTokens = new Set<number>();
+        bannedTokens.add(1);
+        if (tokenIds.length >= noRepeatNgramSize - 1) {
+          const prefix = tokenIds.slice(-(noRepeatNgramSize - 1));
+          for (let j = 0; j <= tokenIds.length - noRepeatNgramSize; j++) {
+            let match = true;
+            for (let k = 0; k < noRepeatNgramSize - 1; k++) {
+              if (tokenIds[j + k] !== prefix[k]) { match = false; break; }
+            }
+            if (match) bannedTokens.add(tokenIds[j + noRepeatNgramSize - 1]);
+          }
+        }
+
+        let bestToken = 0;
+        let bestScore = -Infinity;
+        for (let v = 0; v < vocabSize; v++) {
+          if (bannedTokens.has(v)) continue;
+          if (logitsData[offset + v] > bestScore) {
+            bestScore = logitsData[offset + v];
+            bestToken = v;
+          }
+        }
+
+        if (bestToken === tokenizer.eosTokenId) break;
+        tokenIds.push(bestToken);
+
+        const tokenText = tokenizer.decodeToken(bestToken);
+        if (tokenText !== null) {
+          self.postMessage({ type: 'token', payload: { lineIndex, token: tokenText } });
+        }
+      }
+
+      if (!cancelledRegions.has(regionId)) {
+        const fullText = tokenizer.decode(tokenIds.slice(1));
+        console.log(`[redetect ${regionId} line ${lineIndex}] "${fullText}"`);
+        self.postMessage({
+          type: 'line_done',
+          payload: { lineIndex, text: fullText, confidence: det.confidence },
+        });
+      }
+    }
+
+    self.postMessage({ type: 'region_done', payload: { regionId } });
+  } catch (err: any) {
+    self.postMessage({ type: 'error', payload: { message: (err as Error).message ?? String(err) } });
+  }
+
+  cancelledRegions.delete(regionId);
+  processingRegion = false;
+  processNextRegion();
+}

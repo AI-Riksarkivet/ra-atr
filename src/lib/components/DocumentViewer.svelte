@@ -13,7 +13,7 @@
     selectedLines: Set<number>;
     onSelectLine: (index: number, additive: boolean) => void;
     onMarqueeSelect: (indices: number[]) => void;
-    onRedetectRegion: (x: number, y: number, w: number, h: number) => void;
+    onRedetectRegion: (x: number, y: number, w: number, h: number) => string;
     groups: LineGroup[];
     selectMode: boolean;
   }
@@ -49,13 +49,16 @@
   let marqueeStart = $state({ x: 0, y: 0 });
   let marqueeEnd = $state({ x: 0, y: 0 });
 
-  // Region detection state
-  let redetectRegion = $state({ x: 0, y: 0, w: 0, h: 0 });
-  let redetecting = $state(false);
+  // Region detection state — track multiple pending regions
+  let pendingRegions = $state<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
 
-  /** Call this when region_lines arrives to clear the loading state */
-  export function clearRedetecting() {
-    redetecting = false;
+  /** Call this when region_lines arrives to clear a specific region's spinner */
+  export function clearRedetecting(regionId?: string) {
+    if (regionId) {
+      pendingRegions.delete(regionId);
+    } else {
+      pendingRegions = new Map();
+    }
     controller?.render();
   }
 
@@ -149,9 +152,9 @@
         const w = Math.abs(marqueeEnd.x - marqueeStart.x);
         const h = Math.abs(marqueeEnd.y - marqueeStart.y);
         if (w > 10 && h > 10) {
-          redetectRegion = { x: minX, y: minY, w, h };
-          onRedetectRegion(minX, minY, w, h);
-          redetecting = true;
+          const regionId = onRedetectRegion(minX, minY, w, h);
+          pendingRegions.set(regionId, { x: minX, y: minY, w, h });
+          pendingRegions = new Map(pendingRegions); // trigger reactivity
           controller?.render();
         }
       }
@@ -263,6 +266,45 @@
           }
         }
 
+        // Draw persistent group region boxes with labels
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
+          if (!g.rect) continue;
+          const color = GROUP_COLORS[gi % GROUP_COLORS.length];
+          const { x, y, w, h } = g.rect;
+
+          // Region outline
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2 / transform.scale;
+          ctx.setLineDash([6 / transform.scale, 4 / transform.scale]);
+          ctx.fillStyle = hexToRgba(color, 0.04);
+          ctx.beginPath();
+          ctx.rect(x, y, w, h);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Group name label in center
+          const fontSize = Math.max(12, Math.min(24, 16 / transform.scale));
+          ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          // Background pill
+          const text = g.name;
+          const metrics = ctx.measureText(text);
+          const px = 6 / transform.scale;
+          const py = 3 / transform.scale;
+          const labelX = x + w / 2;
+          const labelY = y + h / 2;
+          ctx.fillStyle = hexToRgba(color, 0.85);
+          ctx.beginPath();
+          const rr = (fontSize / 2 + py);
+          ctx.roundRect(labelX - metrics.width / 2 - px, labelY - fontSize / 2 - py, metrics.width + px * 2, fontSize + py * 2, rr / 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.fillText(text, labelX, labelY);
+        }
+
         // Draw marquee rectangle
         if (isMarquee) {
           const x = Math.min(marqueeStart.x, marqueeEnd.x);
@@ -280,9 +322,9 @@
           ctx.setLineDash([]);
         }
 
-        // Draw redetecting region with animated dashes
-        if (redetecting) {
-          const { x, y, w, h } = redetectRegion;
+        // Draw pending region spinners (waiting for YOLO)
+        for (const [, region] of pendingRegions) {
+          const { x, y, w, h } = region;
           ctx.strokeStyle = '#3b82f6';
           ctx.lineWidth = 2 / transform.scale;
           ctx.setLineDash([8 / transform.scale, 4 / transform.scale]);
@@ -343,9 +385,9 @@
     controller?.render();
   });
 
-  // Animate spinner while redetecting
+  // Animate spinner while any region is pending
   $effect(() => {
-    if (!redetecting) return;
+    if (pendingRegions.size === 0) return;
     let animId = 0;
     function tick() {
       controller?.render();

@@ -3,7 +3,8 @@ export type WorkerInMessage =
   | { type: 'set_image'; payload: { imageData: ArrayBuffer } }
   | { type: 'run_pipeline'; payload: { imageData: ArrayBuffer } }
   | { type: 'prioritize'; payload: { order: number[] } }
-  | { type: 'redetect_region'; payload: { x: number; y: number; w: number; h: number; startIndex: number } };
+  | { type: 'redetect_region'; payload: { regionId: string; x: number; y: number; w: number; h: number } }
+  | { type: 'cancel_region'; payload: { regionId: string } };
 
 export type WorkerOutMessage =
   | { type: 'model_status'; payload: { model: string; status: 'downloading' | 'cached' | 'loaded'; progress?: number } }
@@ -15,7 +16,8 @@ export type WorkerOutMessage =
   | { type: 'error'; payload: { message: string } }
   | { type: 'ready' }
   | { type: 'image_ready' }
-  | { type: 'region_lines'; payload: { lines: BBox[] } };
+  | { type: 'region_lines'; payload: { regionId: string; startIndex: number; lines: BBox[] } }
+  | { type: 'region_done'; payload: { regionId: string } };
 
 export interface Point {
   x: number;
@@ -45,4 +47,8 @@ export interface LineGroup {
   name: string;
   lineIndices: number[];
   collapsed: boolean;
+  /** Links to in-flight region detection for cancellation */
+  regionId?: string;
+  /** Region bounds in image coordinates (persists until group deleted) */
+  rect?: { x: number; y: number; w: number; h: number };
 }

@@ -22,7 +22,8 @@ export class HTRWorkerState {
 
   private worker!: Worker;
   private runId = 0;
-  onRegionDetected: ((startIndex: number, count: number) => void) | null = null;
+  private regionCounter = 0;
+  onRegionDetected: ((regionId: string, startIndex: number, count: number) => void) | null = null;
 
   constructor() {
     this.createWorker();
@@ -114,9 +115,20 @@ export class HTRWorkerState {
           confidence: 0,
           complete: false,
         }));
-        const startIndex = this.lines.length;
         this.lines = [...this.lines, ...newLines];
-        this.onRegionDetected?.(startIndex, newLines.length);
+        if (this.stage === 'done' || this.stage === 'idle') {
+          this.stage = 'transcribing';
+        }
+        this.onRegionDetected?.(msg.payload.regionId, msg.payload.startIndex, newLines.length);
+        break;
+      }
+      case 'region_done': {
+        // Check if any lines are still incomplete (other regions in flight)
+        const anyIncomplete = this.lines.some(l => !l.complete && l.text === '');
+        if (!anyIncomplete && this.stage === 'transcribing') {
+          this.stage = 'done';
+          this.currentLine = -1;
+        }
         break;
       }
     }
@@ -158,9 +170,15 @@ export class HTRWorkerState {
     this.worker.postMessage({ type: 'prioritize', payload: { order } });
   }
 
-  redetectRegion(x: number, y: number, w: number, h: number) {
-    const startIndex = this.lines.length;
-    this.worker.postMessage({ type: 'redetect_region', payload: { x, y, w, h, startIndex } });
+  redetectRegion(x: number, y: number, w: number, h: number): string {
+    this.regionCounter++;
+    const regionId = `region-${this.regionCounter}`;
+    this.worker.postMessage({ type: 'redetect_region', payload: { regionId, x, y, w, h } });
+    return regionId;
+  }
+
+  cancelRegion(regionId: string) {
+    this.worker.postMessage({ type: 'cancel_region', payload: { regionId } });
   }
 
   reset() {
