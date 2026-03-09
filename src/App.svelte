@@ -232,6 +232,7 @@
             onDeleteGroup={deleteGroup}
             onFocusGroup={(indices) => docViewer?.focusLines(indices)}
             onFocusLine={(i) => docViewer?.focusLines([i])}
+            onEditLine={(i, text) => { if (htr.lines[i]) htr.lines[i].text = text; }}
             {selectMode}
           />
         </div>

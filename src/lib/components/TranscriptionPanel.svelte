@@ -15,16 +15,19 @@
     onDeleteGroup: (groupId: string) => void;
     onFocusGroup: (lineIndices: number[]) => void;
     onFocusLine: (index: number) => void;
+    onEditLine: (index: number, text: string) => void;
     selectMode: boolean;
   }
 
   let {
     lines, currentLine, currentText, hoveredLine, onHoverLine,
-    selectedLines, onSelectLine, groups, onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, selectMode,
+    selectedLines, onSelectLine, groups, onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine, selectMode,
   }: Props = $props();
   let panelEl: HTMLDivElement;
   let editingGroupId = $state<string | null>(null);
   let editName = $state('');
+  let editingLineIdx = $state<number>(-1);
+  let editLineText = $state('');
 
   // Auto-scroll to current line
   $effect(() => {
@@ -53,6 +56,18 @@
       onRenameGroup(groupId, editName.trim());
     }
     editingGroupId = null;
+  }
+
+  function startEditLine(idx: number) {
+    editingLineIdx = idx;
+    editLineText = lines[idx]?.text ?? '';
+  }
+
+  function finishEditLine() {
+    if (editingLineIdx >= 0) {
+      onEditLine(editingLineIdx, editLineText);
+      editingLineIdx = -1;
+    }
   }
 
   function handleLineClick(i: number, e: MouseEvent) {
@@ -101,13 +116,25 @@
                 onmouseenter={() => onHoverLine(lineIdx)}
                 onmouseleave={() => onHoverLine(-1)}
                 onclick={(e) => handleLineClick(lineIdx, e)}
+                ondblclick={() => startEditLine(lineIdx)}
               >
                 <span class="line-number">{lineIdx + 1}</span>
-                <span class="line-text">
-                  {lines[lineIdx].text}{#if lineIdx === currentLine && !lines[lineIdx].complete}<span class="cursor">|</span>{/if}
-                </span>
-                {#if lines[lineIdx].complete}
-                  <span class="confidence">{(lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+                {#if editingLineIdx === lineIdx}
+                  <input
+                    class="line-edit"
+                    bind:value={editLineText}
+                    onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
+                    onblur={finishEditLine}
+                    onclick={(e) => e.stopPropagation()}
+                    ondblclick={(e) => e.stopPropagation()}
+                  />
+                {:else}
+                  <span class="line-text">
+                    {lines[lineIdx].text}{#if lineIdx === currentLine && !lines[lineIdx].complete}<span class="cursor">|</span>{/if}
+                  </span>
+                  {#if lines[lineIdx].complete}
+                    <span class="confidence">{(lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+                  {/if}
                 {/if}
               </div>
             {/if}
@@ -133,13 +160,25 @@
           onmouseenter={() => onHoverLine(lineIdx)}
           onmouseleave={() => onHoverLine(-1)}
           onclick={(e) => handleLineClick(lineIdx, e)}
+          ondblclick={() => startEditLine(lineIdx)}
         >
           <span class="line-number">{lineIdx + 1}</span>
-          <span class="line-text">
-            {lines[lineIdx].text}{#if lineIdx === currentLine && !lines[lineIdx].complete}<span class="cursor">|</span>{/if}
-          </span>
-          {#if lines[lineIdx].complete}
-            <span class="confidence">{(lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+          {#if editingLineIdx === lineIdx}
+            <input
+              class="line-edit"
+              bind:value={editLineText}
+              onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
+              onblur={finishEditLine}
+              onclick={(e) => e.stopPropagation()}
+              ondblclick={(e) => e.stopPropagation()}
+            />
+          {:else}
+            <span class="line-text">
+              {lines[lineIdx].text}{#if lineIdx === currentLine && !lines[lineIdx].complete}<span class="cursor">|</span>{/if}
+            </span>
+            {#if lines[lineIdx].complete}
+              <span class="confidence">{(lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+            {/if}
           {/if}
         </div>
       {/if}
@@ -280,6 +319,22 @@
 
   .line-text {
     flex: 1;
+  }
+
+  .line-edit {
+    flex: 1;
+    background: var(--bg-tertiary, #333);
+    border: 1px solid var(--border-color, #555);
+    color: var(--text-primary, #fff);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    outline: none;
+  }
+
+  .line-edit:focus {
+    border-color: #3b82f6;
   }
 
   .confidence {
