@@ -13,11 +13,12 @@
     selectedLines: Set<number>;
     onSelectLine: (index: number, additive: boolean) => void;
     onMarqueeSelect: (indices: number[]) => void;
+    onRedetectRegion: (x: number, y: number, w: number, h: number) => void;
     groups: LineGroup[];
     selectMode: boolean;
   }
 
-  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, groups, selectMode }: Props = $props();
+  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
@@ -43,6 +44,18 @@
   let isMarquee = $state(false);
   let marqueeStart = $state({ x: 0, y: 0 });
   let marqueeEnd = $state({ x: 0, y: 0 });
+
+  // Redetect popover state
+  let showRedetect = $state(false);
+  let redetectPos = $state({ x: 0, y: 0 });
+  let redetectRegion = $state({ x: 0, y: 0, w: 0, h: 0 });
+  let redetecting = $state(false);
+
+  /** Call this when region_lines arrives to clear the loading state */
+  export function clearRedetecting() {
+    redetecting = false;
+    controller?.render();
+  }
 
   function pointInPolygon(px: number, py: number, poly: { x: number; y: number }[]): boolean {
     let inside = false;
@@ -127,6 +140,17 @@
       const indices = linesInRect(marqueeStart.x, marqueeStart.y, marqueeEnd.x, marqueeEnd.y);
       if (indices.length > 0) {
         onMarqueeSelect(indices);
+      } else {
+        // Empty selection — offer to re-run YOLO on this region
+        const minX = Math.min(marqueeStart.x, marqueeEnd.x);
+        const minY = Math.min(marqueeStart.y, marqueeEnd.y);
+        const w = Math.abs(marqueeEnd.x - marqueeStart.x);
+        const h = Math.abs(marqueeEnd.y - marqueeStart.y);
+        if (w > 10 && h > 10) {
+          redetectRegion = { x: minX, y: minY, w, h };
+          redetectPos = { x: e.clientX, y: e.clientY };
+          showRedetect = true;
+        }
       }
       controller.render();
       return;
@@ -252,6 +276,31 @@
           ctx.stroke();
           ctx.setLineDash([]);
         }
+
+        // Draw redetecting region with animated dashes
+        if (redetecting) {
+          const { x, y, w, h } = redetectRegion;
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2 / transform.scale;
+          ctx.setLineDash([8 / transform.scale, 4 / transform.scale]);
+          ctx.fillStyle = 'rgba(59, 130, 246, 0.08)';
+          ctx.beginPath();
+          ctx.rect(x, y, w, h);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Spinner circle in the center of the region
+          const spinCx = x + w / 2;
+          const spinCy = y + h / 2;
+          const r = Math.min(w, h, 60 / transform.scale) * 0.3;
+          const angle = (performance.now() / 600) % (Math.PI * 2);
+          ctx.beginPath();
+          ctx.arc(spinCx, spinCy, r, angle, angle + Math.PI * 1.5);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3 / transform.scale;
+          ctx.stroke();
+        }
       },
     });
 
@@ -290,6 +339,18 @@
     void groups;
     controller?.render();
   });
+
+  // Animate spinner while redetecting
+  $effect(() => {
+    if (!redetecting) return;
+    let animId = 0;
+    function tick() {
+      controller?.render();
+      animId = requestAnimationFrame(tick);
+    }
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  });
 </script>
 
 <div class="viewer-container">
@@ -298,6 +359,15 @@
     <div class="overlay">
       <div class="spinner"></div>
       <p>Detecting text lines...</p>
+    </div>
+  {/if}
+  {#if showRedetect}
+    <div class="redetect-popover" style="left: {redetectPos.x}px; top: {redetectPos.y}px;">
+      <span>No lines found.</span>
+      <button onclick={() => { onRedetectRegion(redetectRegion.x, redetectRegion.y, redetectRegion.w, redetectRegion.h); showRedetect = false; redetecting = true; controller?.render(); }}>
+        Re-detect here
+      </button>
+      <button class="dismiss" onclick={() => showRedetect = false}>x</button>
     </div>
   {/if}
 </div>
@@ -349,5 +419,49 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .redetect-popover {
+    position: fixed;
+    transform: translate(-50%, -100%) translateY(-8px);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--border-color, #444);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  .redetect-popover span {
+    color: var(--text-muted, #888);
+  }
+
+  .redetect-popover button {
+    padding: 0.2rem 0.5rem;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .redetect-popover button:hover {
+    background: #2563eb;
+  }
+
+  .redetect-popover button.dismiss {
+    background: transparent;
+    color: var(--text-muted, #666);
+    padding: 0 0.2rem;
+  }
+
+  .redetect-popover button.dismiss:hover {
+    color: var(--text-primary, #fff);
   }
 </style>

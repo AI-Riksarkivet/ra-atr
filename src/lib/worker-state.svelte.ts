@@ -21,6 +21,7 @@ export class HTRWorkerState {
 
   private worker!: Worker;
   private runId = 0;
+  onRegionDetected: (() => void) | null = null;
 
   constructor() {
     this.createWorker();
@@ -101,6 +102,18 @@ export class HTRWorkerState {
         this.stage = 'done';
         this.currentLine = -1;
         break;
+      case 'region_lines': {
+        // Append new detections to existing lines
+        const newLines = msg.payload.lines.map((bbox) => ({
+          bbox,
+          text: '',
+          confidence: 0,
+          complete: false,
+        }));
+        this.lines = [...this.lines, ...newLines];
+        this.onRegionDetected?.();
+        break;
+      }
     }
   }
 
@@ -124,6 +137,11 @@ export class HTRWorkerState {
 
   prioritizeLines(order: number[]) {
     this.worker.postMessage({ type: 'prioritize', payload: { order } });
+  }
+
+  redetectRegion(x: number, y: number, w: number, h: number) {
+    const startIndex = this.lines.length;
+    this.worker.postMessage({ type: 'redetect_region', payload: { x, y, w, h, startIndex } });
   }
 
   reset() {

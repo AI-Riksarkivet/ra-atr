@@ -83,6 +83,7 @@
   }
 
   onMount(() => {
+    htr.onRegionDetected = () => docViewer?.clearRedetecting();
     return () => htr.destroy();
   });
 
@@ -156,7 +157,7 @@
       {/if}
       <div class="panels">
         <div class="left-panel" style="width: {dividerX}%">
-          <DocumentViewer bind:this={docViewer} {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} stage={htr.stage} {selectedLines} onSelectLine={handleSelectLine} onMarqueeSelect={handleMarqueeSelect} {groups} {selectMode} />
+          <DocumentViewer bind:this={docViewer} {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} stage={htr.stage} {selectedLines} onSelectLine={handleSelectLine} onMarqueeSelect={handleMarqueeSelect} onRedetectRegion={(x, y, w, h) => htr.redetectRegion(x, y, w, h)} {groups} {selectMode} />
         </div>
         <div
           class="divider"
