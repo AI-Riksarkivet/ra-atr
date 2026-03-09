@@ -73,6 +73,19 @@ export class CanvasController {
     this.transform.y = (rect.height - this.img.naturalHeight * scale) / 2;
   }
 
+  /** Zoom and pan to fit a rectangle (in image coordinates) with padding */
+  fitToRect(x: number, y: number, w: number, h: number) {
+    const rect = this.canvas.getBoundingClientRect();
+    const pad = 40;
+    const scaleX = (rect.width - pad * 2) / w;
+    const scaleY = (rect.height - pad * 2) / h;
+    const scale = Math.min(scaleX, scaleY, MAX_SCALE);
+    this.transform.scale = scale;
+    this.targetScale = scale;
+    this.transform.x = (rect.width - w * scale) / 2 - x * scale;
+    this.transform.y = (rect.height - h * scale) / 2 - y * scale;
+  }
+
   render() {
     this.scheduleRender();
   }

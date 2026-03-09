@@ -17,6 +17,7 @@
   let groupCounter = $state(0);
   let selectMode = $state(false);
   let isDraggingDivider = $state(false);
+  let docViewer: DocumentViewer;
 
   function handleSelectLine(index: number, additive: boolean) {
     if (index < 0) {
@@ -155,7 +156,7 @@
       {/if}
       <div class="panels">
         <div class="left-panel" style="width: {dividerX}%">
-          <DocumentViewer {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} stage={htr.stage} {selectedLines} onSelectLine={handleSelectLine} onMarqueeSelect={handleMarqueeSelect} {groups} {selectMode} />
+          <DocumentViewer bind:this={docViewer} {imageUrl} lines={htr.lines} currentLine={htr.currentLine} {hoveredLine} onHoverLine={(i) => hoveredLine = i} stage={htr.stage} {selectedLines} onSelectLine={handleSelectLine} onMarqueeSelect={handleMarqueeSelect} {groups} {selectMode} />
         </div>
         <div
           class="divider"
@@ -178,6 +179,9 @@
             onToggleGroup={toggleGroup}
             onRenameGroup={renameGroup}
             onDeleteGroup={deleteGroup}
+            onFocusGroup={(indices) => docViewer?.focusLines(indices)}
+            onFocusLine={(i) => docViewer?.focusLines([i])}
+            {selectMode}
           />
         </div>
       </div>

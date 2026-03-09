@@ -22,6 +22,23 @@
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
 
+  /** Zoom to fit the bounding box of the given line indices */
+  export function focusLines(indices: number[]) {
+    if (!controller || indices.length === 0) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const idx of indices) {
+      const b = lines[idx]?.bbox;
+      if (!b) continue;
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.w);
+      maxY = Math.max(maxY, b.y + b.h);
+    }
+    if (minX === Infinity) return;
+    controller.fitToRect(minX, minY, maxX - minX, maxY - minY);
+    controller.render();
+  }
+
   // Marquee state
   let isMarquee = $state(false);
   let marqueeStart = $state({ x: 0, y: 0 });
@@ -121,10 +138,23 @@
     if (dx * dx + dy * dy < 25) {
       const idx = hitTestLine(e.clientX, e.clientY);
       if (idx >= 0) {
-        onSelectLine(idx, e.ctrlKey || e.metaKey);
-      } else {
+        if (selectMode) {
+          onSelectLine(idx, e.ctrlKey || e.metaKey);
+        } else {
+          // Pan mode: zoom to the clicked line
+          focusLines([idx]);
+        }
+      } else if (selectMode) {
         onSelectLine(-1, false);
       }
+    }
+  }
+
+  function onCanvasDblClick(e: MouseEvent) {
+    const idx = hitTestLine(e.clientX, e.clientY);
+    if (idx < 0) {
+      controller.fitToCanvas();
+      controller.render();
     }
   }
 
@@ -229,12 +259,14 @@
     canvasEl.addEventListener('pointermove', onCanvasPointerMove);
     canvasEl.addEventListener('pointerup', onCanvasPointerUp);
     canvasEl.addEventListener('pointerleave', onCanvasPointerLeave);
+    canvasEl.addEventListener('dblclick', onCanvasDblClick);
 
     return () => {
       canvasEl.removeEventListener('pointerdown', onCanvasPointerDown, true);
       canvasEl.removeEventListener('pointermove', onCanvasPointerMove);
       canvasEl.removeEventListener('pointerup', onCanvasPointerUp);
       canvasEl.removeEventListener('pointerleave', onCanvasPointerLeave);
+      canvasEl.removeEventListener('dblclick', onCanvasDblClick);
       controller.destroy();
     };
   });

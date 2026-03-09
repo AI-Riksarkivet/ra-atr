@@ -13,11 +13,14 @@
     onToggleGroup: (groupId: string) => void;
     onRenameGroup: (groupId: string, name: string) => void;
     onDeleteGroup: (groupId: string) => void;
+    onFocusGroup: (lineIndices: number[]) => void;
+    onFocusLine: (index: number) => void;
+    selectMode: boolean;
   }
 
   let {
     lines, currentLine, currentText, hoveredLine, onHoverLine,
-    selectedLines, onSelectLine, groups, onToggleGroup, onRenameGroup, onDeleteGroup,
+    selectedLines, onSelectLine, groups, onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, selectMode,
   }: Props = $props();
   let panelEl: HTMLDivElement;
   let editingGroupId = $state<string | null>(null);
@@ -53,7 +56,11 @@
   }
 
   function handleLineClick(i: number, e: MouseEvent) {
-    onSelectLine(i, e.shiftKey || e.ctrlKey || e.metaKey);
+    if (selectMode) {
+      onSelectLine(i, e.shiftKey || e.ctrlKey || e.metaKey);
+    } else {
+      onFocusLine(i);
+    }
   }
 
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
@@ -77,6 +84,7 @@
           <span class="group-name" ondblclick={() => startRename(group)}>{group.name}</span>
         {/if}
         <span class="group-count">{group.lineIndices.length}</span>
+        <button class="focus-btn" onclick={() => onFocusGroup(group.lineIndices)} title="Zoom to group">&#x2316;</button>
         <button class="delete-btn" onclick={() => onDeleteGroup(group.id)} title="Ungroup">x</button>
       </div>
       {#if !group.collapsed}
@@ -203,6 +211,7 @@
     margin-left: auto;
   }
 
+  .focus-btn,
   .delete-btn {
     background: none;
     border: none;
@@ -211,6 +220,11 @@
     padding: 0 0.2rem;
     font-size: 0.75rem;
     opacity: 0.5;
+  }
+
+  .focus-btn:hover {
+    opacity: 1;
+    color: var(--group-color, #3b82f6);
   }
 
   .delete-btn:hover {
