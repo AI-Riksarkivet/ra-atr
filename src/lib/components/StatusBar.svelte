@@ -5,9 +5,11 @@
     stage: PipelineStage;
     documents: ImageDocument[];
     currentWork: { imageId: string; regionId: string } | null;
+    activeTranscriptions: number;
+    poolSize: number;
   }
 
-  let { stage, documents, currentWork }: Props = $props();
+  let { stage, documents, currentWork, activeTranscriptions, poolSize }: Props = $props();
 
   let totalLines = $derived(documents.reduce((sum, d) => sum + d.lines.length, 0));
   let completedLines = $derived(documents.reduce((sum, d) => sum + d.lines.filter(l => l.complete).length, 0));
@@ -62,10 +64,14 @@
 
   {#if totalLines > 0}
     <span class="font-mono">{completedLines}/{totalLines} lines</span>
-    {#if pendingLines > 0 && stage === 'transcribing'}
+    {#if activeTranscriptions > 0}
+      <span class="text-orange-500">{activeTranscriptions} in-flight</span>
+    {:else if pendingLines > 0 && stage === 'transcribing'}
       <span class="text-orange-500">{pendingLines} pending</span>
     {/if}
   {/if}
+
+  <span>{poolSize} worker{poolSize !== 1 ? 's' : ''}</span>
 
   {#if documents.length > 1}
     <span>{documents.length} images</span>

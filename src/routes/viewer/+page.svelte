@@ -13,9 +13,9 @@
   let isDraggingDivider = $state(false);
   let docViewer: DocumentViewer;
 
-  // Redirect to home if no documents
+  // Redirect to home if no documents loaded
   $effect(() => {
-    if (appState.documents.length === 0) goto('/');
+    if (appState.documents.length === 0 && appState.htr.modelsReady) goto('/');
   });
 
   // Active document derived state
@@ -123,8 +123,7 @@
     }
   }
 
-  function handleNewImage() {
-    appState.reset();
+  function handleAddImages() {
     goto('/');
   }
 
@@ -202,7 +201,7 @@
   onZoomIn={() => docViewer?.zoomIn()}
   onZoomOut={() => docViewer?.zoomOut()}
   onResetView={() => docViewer?.resetView()}
-  onNewImage={handleNewImage}
+  onNewImage={handleAddImages}
 />
 
 {#if appState.htr.error}
@@ -292,5 +291,7 @@
     stage={appState.htr.stage}
     documents={appState.documents}
     currentWork={appState.htr.currentWork}
+    activeTranscriptions={appState.htr.activeTranscriptions}
+    poolSize={appState.htr.poolSize}
   />
 {/if}

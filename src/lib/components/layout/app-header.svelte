@@ -23,6 +23,8 @@
 
   {#if appState.htr.modelsReady}
     <Badge variant="success">Ready</Badge>
+  {:else if appState.htr.stage === 'loading_models'}
+    <Badge variant="outline" class="animate-pulse">Loading...</Badge>
   {/if}
 
   <div class="ml-auto flex items-center gap-2">
@@ -44,7 +46,7 @@
         <Button variant="outline" size="icon-sm" onclick={onResetView}><RotateCcw class="size-4" /></Button>
       </div>
 
-      <Button variant="outline" size="sm" onclick={onNewImage}>New image</Button>
+      <Button variant="outline" size="sm" onclick={onNewImage}>Add images</Button>
     {/if}
 
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>

@@ -48,7 +48,5 @@
 
   {#if !loading && !modelsReady && !autoLoading}
     <Button class="w-full" onclick={handleLoad}>Download Models</Button>
-  {:else if modelsReady}
-    <p class="text-center text-sm text-success">Models cached and ready.</p>
   {/if}
 </div>
