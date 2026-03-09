@@ -312,7 +312,7 @@ self.onmessage = async (e: MessageEvent) => {
           if (imageGeneration !== pipelineGen) { console.log('[pipeline] aborted — new image'); break; }
           // Check if a new priority order arrived between iterations
           if (pendingOrder !== null) {
-            const newOrder = pendingOrder;
+            const newOrder: number[] = pendingOrder;
             pendingOrder = null;
             // Rebuild queue: prioritized lines first (skip done), then remaining
             const reordered: number[] = [];

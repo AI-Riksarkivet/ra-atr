@@ -65,7 +65,7 @@ export async function downloadAndCacheModel(
     });
   }
 
-  const blob = new Blob(chunks);
+  const blob = new Blob(chunks as BlobPart[]);
   try {
     const cache = await caches.open(CACHE_NAME);
     await cache.put(url, new Response(blob.slice(0)));
