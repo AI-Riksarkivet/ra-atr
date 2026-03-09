@@ -31,7 +31,7 @@ Cargo.lock
 
 # Models
 models/
-public/models
+static/models
 *.onnx
-public/*.wasm
-public/ort-*.mjs
+static/*.wasm
+static/ort-*.mjs
