@@ -1,35 +1,26 @@
+import tailwindcss from '@tailwindcss/vite';
+import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
 import wasm from 'vite-plugin-wasm';
-import { viteSingleFile } from 'vite-plugin-singlefile';
-import path from 'path';
-
-const isMcp = process.env.VITE_MCP === 'true';
 
 export default defineConfig({
-  plugins: [
-    svelte(),
-    wasm(),
-    ...(isMcp ? [viteSingleFile()] : []),
-  ],
+  plugins: [tailwindcss(), sveltekit(), wasm()],
   worker: {
     plugins: () => [wasm()],
   },
-  resolve: {
-    alias: {
-      $lib: path.resolve('./src/lib'),
-    },
+  ssr: {
+    noExternal: ['svelte-sonner', 'mode-watcher', 'svelte-toolbelt'],
   },
   optimizeDeps: {
     exclude: ['onnxruntime-web'],
   },
   server: {
-    watch: {
-      ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**', '**/node_modules/**'],
-    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+    watch: {
+      ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**'],
     },
   },
 });
