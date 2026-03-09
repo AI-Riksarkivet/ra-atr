@@ -105,9 +105,17 @@
     groups = groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g);
   }
 
+  function onKeyDown(e: KeyboardEvent) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLines.size > 0) {
+      e.preventDefault();
+      deleteSelectedLines();
+    }
+  }
+
   onMount(() => {
     htr.onRegionDetected = () => docViewer?.clearRedetecting();
-    return () => htr.destroy();
+    window.addEventListener('keydown', onKeyDown);
+    return () => { htr.destroy(); window.removeEventListener('keydown', onKeyDown); };
   });
 
   function handleUpload(imageData: ArrayBuffer, previewUrl: string) {
