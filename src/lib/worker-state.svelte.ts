@@ -17,8 +17,10 @@ export class HTRWorkerState {
   imageReady = $state<boolean>(false);
   poolSize = $state(2);
 
-  /** Currently processing: { imageId, regionId } or null */
-  currentWork = $state<{ imageId: string; regionId: string } | null>(null);
+  /** All regions currently being transcribed */
+  activeRegions = $state<Set<string>>(new Set());
+  /** Image IDs with active transcription */
+  activeImageIds = $state<Set<string>>(new Set());
   /** Number of lines currently being transcribed across all workers */
   activeTranscriptions = $state(0);
 
@@ -112,7 +114,8 @@ export class HTRWorkerState {
         break;
       case 'region_lines': {
         const { imageId, regionId, startIndex, lines } = msg.payload;
-        this.currentWork = { imageId, regionId };
+        this.activeRegions = new Set([...this.activeRegions, regionId]);
+        this.activeImageIds = new Set([...this.activeImageIds, imageId]);
         if (this.stage === 'done' || this.stage === 'idle') {
           this.stage = 'transcribing';
         }
@@ -165,16 +168,27 @@ export class HTRWorkerState {
         break;
       }
       case 'line_done': {
-        const { imageId, lineIndex, text, confidence } = msg.payload;
+        const { imageId, regionId, lineIndex, text, confidence } = msg.payload;
         this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
         this.onLineDone?.(imageId, lineIndex, text, confidence);
 
-        for (const [regionId, info] of this.regionPending) {
+        for (const [rId, info] of this.regionPending) {
           if (info.imageId === imageId) {
             info.done++;
             if (info.done >= info.total) {
-              this.regionPending.delete(regionId);
-              this.onRegionDone?.(imageId, regionId);
+              this.regionPending.delete(rId);
+              // Remove from active sets
+              const nextRegions = new Set(this.activeRegions);
+              nextRegions.delete(rId);
+              this.activeRegions = nextRegions;
+              // Check if this image still has active regions
+              const imageStillActive = [...this.regionPending.values()].some(r => r.imageId === imageId);
+              if (!imageStillActive) {
+                const nextImages = new Set(this.activeImageIds);
+                nextImages.delete(imageId);
+                this.activeImageIds = nextImages;
+              }
+              this.onRegionDone?.(imageId, rId);
             }
             break;
           }
@@ -182,7 +196,8 @@ export class HTRWorkerState {
 
         if (this.activeTranscriptions === 0 && this.regionPending.size === 0) {
           this.stage = 'done';
-          this.currentWork = null;
+          this.activeRegions = new Set();
+          this.activeImageIds = new Set();
         }
         break;
       }
@@ -245,7 +260,8 @@ export class HTRWorkerState {
     this.stage = 'idle';
     this.imageReady = false;
     this.error = null;
-    this.currentWork = null;
+    this.activeRegions = new Set();
+    this.activeImageIds = new Set();
     this.activeTranscriptions = 0;
     this.regionPending.clear();
   }

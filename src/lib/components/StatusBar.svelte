@@ -4,19 +4,19 @@
   interface Props {
     stage: PipelineStage;
     documents: ImageDocument[];
-    currentWork: { imageId: string; regionId: string } | null;
+    activeImageIds: Set<string>;
     activeTranscriptions: number;
     poolSize: number;
   }
 
-  let { stage, documents, currentWork, activeTranscriptions, poolSize }: Props = $props();
+  let { stage, documents, activeImageIds, activeTranscriptions, poolSize }: Props = $props();
 
   let totalLines = $derived(documents.reduce((sum, d) => sum + d.lines.length, 0));
   let completedLines = $derived(documents.reduce((sum, d) => sum + d.lines.filter(l => l.complete).length, 0));
   let pendingLines = $derived(totalLines - completedLines);
 
-  let currentDocName = $derived(
-    currentWork ? documents.find(d => d.id === currentWork.imageId)?.name ?? '' : ''
+  let activeDocNames = $derived(
+    documents.filter(d => activeImageIds.has(d.id)).map(d => d.name)
   );
 
   const stageLabels: Record<PipelineStage, string> = {
@@ -59,9 +59,8 @@
       } else {
         avgSecondsPerLine = 0.3 * secPerLine + 0.7 * avgSecondsPerLine;
       }
-      // Account for parallel workers
-      const effectiveRate = avgSecondsPerLine / Math.max(1, poolSize);
-      etaSeconds = Math.round(pendingLines * effectiveRate);
+      // avgSecondsPerLine already reflects parallel throughput (observed rate)
+      etaSeconds = Math.round(pendingLines * avgSecondsPerLine);
     }
     lastCompletedCount = completedLines;
     lastCompletedTime = now;
@@ -77,8 +76,8 @@
 <div class="flex items-center gap-4 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
   <span class="font-medium">{stageLabels[stage]}</span>
 
-  {#if stage === 'transcribing' && currentDocName}
-    <span class="truncate max-w-[150px]">{currentDocName}</span>
+  {#if stage === 'transcribing' && activeDocNames.length > 0}
+    <span class="truncate max-w-[200px]">{activeDocNames.join(', ')}</span>
   {/if}
 
   {#if totalLines > 0}

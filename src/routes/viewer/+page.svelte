@@ -281,7 +281,8 @@
         }
       }}
       selectMode={appState.selectMode}
-      currentWork={appState.htr.currentWork}
+      activeRegions={appState.htr.activeRegions}
+    activeImageIds={appState.htr.activeImageIds}
     />
   </div>
 </div>
@@ -290,7 +291,7 @@
   <StatusBar
     stage={appState.htr.stage}
     documents={appState.documents}
-    currentWork={appState.htr.currentWork}
+    activeImageIds={appState.htr.activeImageIds}
     activeTranscriptions={appState.htr.activeTranscriptions}
     poolSize={appState.htr.poolSize}
   />

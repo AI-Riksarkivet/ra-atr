@@ -16,7 +16,8 @@
     onFocusLine: (index: number) => void;
     onEditLine: (index: number, text: string) => void;
     selectMode: boolean;
-    currentWork: { imageId: string; regionId: string } | null;
+    activeRegions: Set<string>;
+    activeImageIds: Set<string>;
   }
 
   let {
@@ -24,7 +25,7 @@
     hoveredLine, onHoverLine,
     selectedLines, onSelectLine,
     onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine,
-    selectMode, currentWork,
+    selectMode, activeRegions, activeImageIds,
   }: Props = $props();
 
   let panelEl: HTMLDivElement;
@@ -82,7 +83,7 @@
   {#each documents as doc}
     {@const isActive = doc.id === activeDocumentId}
     {@const isCollapsed = collapsedDocs.has(doc.id)}
-    {@const isWorking = currentWork?.imageId === doc.id}
+    {@const isWorking = activeImageIds.has(doc.id)}
     {@const totalLines = doc.lines.length}
     {@const completedLines = doc.lines.filter(l => l.complete).length}
 
@@ -113,7 +114,7 @@
 
       <div class="pl-2">
         {#each doc.groups as group, gi}
-          {@const groupWorking = currentWork?.regionId === group.regionId && currentWork?.imageId === doc.id}
+          {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
           <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
             <div
               class="flex items-center gap-1.5 px-2 py-1.5 bg-white/[0.03] text-xs font-sans select-none cursor-pointer"
@@ -138,7 +139,7 @@
               {/if}
               <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIndices.length}</span>
               <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIndices, group.rect); }} title="Zoom to group">&#x2316;</button>
-              <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title="Delete group">x</button>
+              <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'} disabled={groupWorking}>x</button>
             </div>
             {#if !group.collapsed}
               <div class="pl-1">

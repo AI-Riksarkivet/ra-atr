@@ -211,7 +211,7 @@ async function processNext() {
       if (tokenText !== null) {
         self.postMessage({
           type: 'token',
-          payload: { imageId, lineIndex, token: tokenText },
+          payload: { imageId, regionId, lineIndex, token: tokenText },
         });
       }
     }
@@ -221,7 +221,7 @@ async function processNext() {
       console.log(`[transcribe-${workerId} line ${lineIndex}] "${fullText}"`);
       self.postMessage({
         type: 'line_done',
-        payload: { imageId, lineIndex, text: fullText, confidence },
+        payload: { imageId, regionId, lineIndex, text: fullText, confidence },
       });
     }
   } catch (err: any) {
