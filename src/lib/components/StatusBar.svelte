@@ -45,38 +45,12 @@
   }
 </script>
 
-<div class="status-bar">
-  <span class="stage">{stageLabels[stage]}</span>
+<div class="flex items-center gap-4 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+  <span class="font-medium">{stageLabels[stage]}</span>
   {#if stage === 'transcribing' && totalLines > 0}
-    <span class="progress">Line {currentLine + 1} / {totalLines}</span>
+    <span class="font-mono">Line {currentLine + 1} / {totalLines}</span>
   {/if}
   {#if elapsed > 0 && (stage === 'segmenting' || stage === 'transcribing' || stage === 'done')}
-    <span class="elapsed">{formatTime(elapsed)}</span>
+    <span class="ml-auto font-mono">{formatTime(elapsed)}</span>
   {/if}
 </div>
-
-<style>
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.35rem 1rem;
-    font-size: 0.8rem;
-    border-top: 1px solid var(--border-color, #333);
-    color: var(--text-muted, #888);
-    background: var(--bg-secondary, #1a1a1a);
-  }
-
-  .stage {
-    font-weight: 500;
-  }
-
-  .progress {
-    font-family: monospace;
-  }
-
-  .elapsed {
-    margin-left: auto;
-    font-family: monospace;
-  }
-</style>

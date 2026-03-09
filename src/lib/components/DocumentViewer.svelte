@@ -356,63 +356,12 @@
   });
 </script>
 
-<div class="viewer-container">
-  <canvas bind:this={canvasEl} class="document-canvas" class:select-mode={selectMode}></canvas>
+<div class="relative h-full w-full">
+  <canvas bind:this={canvasEl} class="block h-full w-full touch-none" class:cursor-crosshair={selectMode}></canvas>
   {#if stage === 'segmenting'}
-    <div class="overlay">
-      <div class="spinner"></div>
-      <p>Detecting text lines...</p>
+    <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 pointer-events-none">
+      <div class="size-8 animate-spin rounded-full border-3 border-white/20 border-t-white"></div>
+      <p class="text-sm text-white">Detecting text lines...</p>
     </div>
   {/if}
 </div>
-
-<style>
-  .viewer-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-
-  .document-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-    touch-action: none;
-  }
-
-  .document-canvas.select-mode {
-    cursor: crosshair;
-  }
-
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    background: rgba(0, 0, 0, 0.5);
-    pointer-events: none;
-  }
-
-  .overlay p {
-    color: #fff;
-    font-size: 0.9rem;
-    margin: 0;
-  }
-
-  .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-</style>
