@@ -1,5 +1,6 @@
 import { HTRWorkerState } from '$lib/worker-state.svelte';
-import type { ImageDocument, LineGroup } from '$lib/types';
+import type { ImageDocument, Line, LineGroup } from '$lib/types';
+import type { TranscriptionGroup } from '$lib/api';
 
 class AppState {
   htr = $state(new HTRWorkerState());
@@ -82,6 +83,37 @@ class AppState {
       // Trigger reactivity
       this.documents = [...this.documents];
     }
+  }
+
+  /** Populate documents with existing transcriptions from backend */
+  populateFromBackend(manifestId: string, groups: TranscriptionGroup[]) {
+    for (const group of groups) {
+      const doc = this.documents.find(
+        d => d.manifestId === manifestId && d.pageNumber === group.page_number
+      );
+      if (!doc) continue;
+
+      const lines: Line[] = group.lines.map(l => ({
+        bbox: { ...l.bbox, confidence: l.confidence, polygon: undefined },
+        text: l.text,
+        confidence: l.confidence,
+        complete: true,
+      }));
+
+      const startIndex = doc.lines.length;
+      doc.lines.push(...lines);
+
+      doc.groupCounter++;
+      const lineGroup: LineGroup = {
+        id: `group-${doc.groupCounter}`,
+        name: group.group_name,
+        lineIndices: lines.map((_, i) => startIndex + i),
+        collapsed: false,
+        rect: group.group_rect,
+      };
+      doc.groups.push(lineGroup);
+    }
+    this.documents = [...this.documents];
   }
 
   reset() {

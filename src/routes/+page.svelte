@@ -27,7 +27,7 @@
     goto('/viewer');
   }
 
-  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
+  async function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
     for (const page of pages) {
       const padded = String(page).padStart(5, '0');
       const docId = appState.addPlaceholderDocument(
@@ -38,6 +38,14 @@
         appState.loadDocumentImage(docId);
       }
     }
+
+    // Pre-populate existing transcriptions from backend
+    const { fetchTranscriptions } = await import('$lib/api');
+    const existingGroups = await fetchTranscriptions(manifestId);
+    if (existingGroups.length > 0) {
+      appState.populateFromBackend(manifestId, existingGroups);
+    }
+
     appState.selectMode = true;
     goto('/viewer');
   }
