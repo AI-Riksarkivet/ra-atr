@@ -8,7 +8,7 @@
   }
 
   let { onResolved, disabled }: Props = $props();
-  let refCode = $state('');
+  let refCode = $state('SE/RA/756/756.1/O/I/O 8');
   let pageRange = $state('1-20');
   let loading = $state(false);
   let progress = $state<ImportProgress | null>(null);
