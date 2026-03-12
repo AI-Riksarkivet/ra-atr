@@ -18,14 +18,8 @@
   const isViewer = $derived(page.url.pathname === '/viewer');
 
   function handleContribute() {
-    const token = sessionStorage.getItem('hf_token');
-    if (!token) {
-      const input = prompt('Enter your Hugging Face token (hf_...):');
-      if (!input) return;
-      sessionStorage.setItem('hf_token', input);
-      appState.contribute(input);
-      return;
-    }
+    // In dev mode (no SPACE_ID), backend accepts any token
+    const token = sessionStorage.getItem('hf_token') || 'local';
     appState.contribute(token);
   }
 </script>

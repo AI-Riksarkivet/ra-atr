@@ -82,6 +82,16 @@ def init_db():
     global db, table
     db = lancedb.connect(DB_PATH)
 
+    # In dev mode, try to reuse existing local table
+    if not os.environ.get("SPACE_ID"):
+        try:
+            table = db.open_table(TABLE_NAME)
+            print(f"Opened local table with {table.count_rows()} rows")
+            return
+        except Exception:
+            pass
+
+    # In production, cold-start from HF Dataset repo
     try:
         local_path = hf_hub_download(
             repo_id=DATASET_REPO,
@@ -125,7 +135,9 @@ def _query(column: str, value: str) -> pa.Table:
 
 
 def _resolve_user(request: Request) -> str | None:
-    """Extract username from HF OAuth Bearer token. Returns None if invalid."""
+    """Extract username from HF OAuth Bearer token. Returns 'local' in dev mode."""
+    if not os.environ.get("SPACE_ID"):
+        return "local"
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
         return None

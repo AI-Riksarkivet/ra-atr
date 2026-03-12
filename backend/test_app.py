@@ -107,9 +107,17 @@ def test_get_returns_latest_version(client: TestClient):
 # --- POST /transcriptions ---
 
 
-def test_post_requires_auth(client: TestClient):
+def test_post_requires_auth_in_production(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("SPACE_ID", "test/space")
     r = client.post("/transcriptions/R0003221", json=SAMPLE_BODY)
     assert r.status_code == 401
+
+
+def test_post_allows_any_user_in_dev(client: TestClient):
+    """In dev mode (no SPACE_ID), auth is skipped and user is 'local'."""
+    r = client.post("/transcriptions/R0003221", json=SAMPLE_BODY)
+    assert r.status_code == 200
+    assert r.json()["contributor"] == "local"
 
 
 def test_post_rejects_bad_token(client: TestClient):
