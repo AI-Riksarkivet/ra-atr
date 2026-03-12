@@ -35,3 +35,6 @@ static/models
 *.onnx
 static/*.wasm
 static/ort-*.mjs
+
+# Worktrees
+.worktrees
