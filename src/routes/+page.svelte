@@ -74,7 +74,7 @@
     <div class="text-center text-xs text-muted-foreground uppercase tracking-wide">Riksarkivet</div>
     <RiksarkivetImport
       onResolved={handleRiksarkivetResolved}
-      disabled={!appState.htr.modelsReady}
+      disabled={false}
     />
 
     <div class="flex items-center gap-3 text-xs text-muted-foreground">
