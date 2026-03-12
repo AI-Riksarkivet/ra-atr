@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Plus, Minus, RotateCcw } from 'lucide-svelte';
+  import { Sun, Moon, Plus, Minus, RotateCcw, Upload } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { page } from '$app/state';
 
@@ -16,6 +16,17 @@
   let { onZoomIn, onZoomOut, onResetView, onNewImage }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
+
+  function handleContribute() {
+    const token = sessionStorage.getItem('hf_token');
+    if (!token) {
+      // Redirect to HF OAuth — the Space handles the flow
+      const redirectUrl = encodeURIComponent(window.location.href);
+      window.location.href = `/oauth/authorize?redirect_uri=${redirectUrl}`;
+      return;
+    }
+    appState.contribute(token);
+  }
 </script>
 
 <header class="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
@@ -47,6 +58,18 @@
       </div>
 
       <Button variant="outline" size="sm" onclick={onNewImage}>Add images</Button>
+
+      {#if appState.canContribute}
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={handleContribute}
+          disabled={appState.contributing}
+        >
+          <Upload class="size-3.5 mr-1" />
+          {appState.contributing ? 'Contributing...' : 'Contribute'}
+        </Button>
+      {/if}
     {/if}
 
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>

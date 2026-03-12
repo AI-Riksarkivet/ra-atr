@@ -209,6 +209,20 @@
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
 {/if}
 
+{#if appState.contributeSuccess}
+  <div class="bg-green-500/10 px-4 py-2 text-sm text-green-500 shrink-0 flex items-center justify-between">
+    <span>{appState.contributeSuccess}</span>
+    <button class="text-xs underline" onclick={() => appState.contributeSuccess = null}>dismiss</button>
+  </div>
+{/if}
+
+{#if appState.contributeError}
+  <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0 flex items-center justify-between">
+    <span>Contribute failed: {appState.contributeError}</span>
+    <button class="text-xs underline" onclick={() => appState.contributeError = null}>dismiss</button>
+  </div>
+{/if}
+
 {#if appState.selectedLines.size > 0}
   <div class="flex items-center gap-2 border-b border-yellow-400/20 bg-yellow-400/[0.08] px-4 py-1.5 shrink-0">
     <span class="text-xs text-yellow-400">{appState.selectedLines.size} line{appState.selectedLines.size > 1 ? 's' : ''} selected</span>

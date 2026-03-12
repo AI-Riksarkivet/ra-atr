@@ -9,6 +9,9 @@ class AppState {
   hoveredLine = $state(-1);
   selectedLines = $state(new Set<number>());
   selectMode = $state(false);
+  contributing = $state(false);
+  contributeError = $state<string | null>(null);
+  contributeSuccess = $state<string | null>(null);
   private docCounter = 0;
 
   get activeDocument(): ImageDocument | undefined {
@@ -114,6 +117,65 @@ class AppState {
       doc.groups.push(lineGroup);
     }
     this.documents = [...this.documents];
+  }
+
+  /** Check if there are any Riksarkivet documents with transcriptions to contribute */
+  get canContribute(): boolean {
+    return this.documents.some(d => d.manifestId && d.groups.length > 0);
+  }
+
+  /** Serialize current transcriptions for the backend API */
+  serializeForContribute(): { manifestId: string; referenceCode: string; groups: TranscriptionGroup[] } | null {
+    const docs = this.documents.filter(d => d.manifestId && d.groups.length > 0);
+    if (docs.length === 0) return null;
+
+    const manifestId = docs[0].manifestId!;
+    const groups: TranscriptionGroup[] = [];
+
+    for (const doc of docs) {
+      if (doc.manifestId !== manifestId) continue;
+      for (const group of doc.groups) {
+        groups.push({
+          page_number: doc.pageNumber ?? 0,
+          group_name: group.name,
+          group_rect: group.rect ?? { x: 0, y: 0, w: 0, h: 0 },
+          lines: group.lineIndices.map(i => {
+            const line = doc.lines[i];
+            return {
+              line_index: i,
+              bbox: { x: line.bbox.x, y: line.bbox.y, w: line.bbox.w, h: line.bbox.h },
+              text: line.text,
+              confidence: line.confidence,
+              source: line.complete ? 'htr' : 'human',
+              contributor: '',
+            };
+          }),
+        });
+      }
+    }
+
+    return { manifestId, referenceCode: '', groups };
+  }
+
+  async contribute(token: string) {
+    const data = this.serializeForContribute();
+    if (!data) return;
+
+    this.contributing = true;
+    this.contributeError = null;
+    this.contributeSuccess = null;
+
+    try {
+      const { contributeTranscriptions } = await import('$lib/api');
+      const result = await contributeTranscriptions(
+        data.manifestId, data.referenceCode, data.groups, token
+      );
+      this.contributeSuccess = `Contributed ${result.lines_added} lines as ${result.contributor}`;
+    } catch (err) {
+      this.contributeError = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.contributing = false;
+    }
   }
 
   reset() {
