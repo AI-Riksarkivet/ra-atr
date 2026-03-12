@@ -96,7 +96,7 @@ class AppState {
       );
       if (!doc) continue;
 
-      const lines: Line[] = group.lines.map(l => ({
+      const newLines: Line[] = group.lines.map(l => ({
         bbox: { ...l.bbox, confidence: l.confidence, polygon: undefined },
         text: l.text,
         confidence: l.confidence,
@@ -104,17 +104,18 @@ class AppState {
       }));
 
       const startIndex = doc.lines.length;
-      doc.lines.push(...lines);
-
       doc.groupCounter++;
       const lineGroup: LineGroup = {
         id: `group-${doc.groupCounter}`,
         name: group.group_name,
-        lineIndices: lines.map((_, i) => startIndex + i),
+        lineIndices: newLines.map((_, i) => startIndex + i),
         collapsed: false,
         rect: group.group_rect,
       };
-      doc.groups.push(lineGroup);
+
+      // Use assignment (not push) to trigger Svelte reactivity
+      doc.lines = [...doc.lines, ...newLines];
+      doc.groups = [...doc.groups, lineGroup];
     }
     this.documents = [...this.documents];
   }
