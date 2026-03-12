@@ -78,6 +78,7 @@
     activeDoc.groups = activeDoc.groups.filter(g => g.lineIndices.length > 0);
     appState.documents = [...appState.documents];
     appState.selectedLines = new Set();
+    if (activeDoc.manifestId) appState.scheduleAutoSave();
   }
 
   function deleteGroup(groupId: string) {
@@ -103,6 +104,7 @@
     }
     activeDoc.groups = activeDoc.groups.filter(g => g.id !== groupId);
     appState.documents = [...appState.documents];
+    if (activeDoc.manifestId) appState.scheduleAutoSave();
   }
 
   function renameGroup(groupId: string, name: string) {
@@ -176,6 +178,9 @@
       if (!anyIncomplete && appState.htr.stage === 'transcribing') {
         appState.htr.stage = 'done';
       }
+      // Auto-save when a region finishes transcribing
+      const doc = appState.documents.find(d => d.id === imageId);
+      if (doc?.manifestId) appState.scheduleAutoSave();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -209,17 +214,10 @@
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
 {/if}
 
-{#if appState.contributeSuccess}
-  <div class="bg-green-500/10 px-4 py-2 text-sm text-green-500 shrink-0 flex items-center justify-between">
-    <span>{appState.contributeSuccess}</span>
-    <button class="text-xs underline" onclick={() => appState.contributeSuccess = null}>dismiss</button>
-  </div>
-{/if}
-
-{#if appState.contributeError}
+{#if appState.saveError}
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0 flex items-center justify-between">
-    <span>Contribute failed: {appState.contributeError}</span>
-    <button class="text-xs underline" onclick={() => appState.contributeError = null}>dismiss</button>
+    <span>Save failed: {appState.saveError}</span>
+    <button class="text-xs underline" onclick={() => appState.saveError = null}>dismiss</button>
   </div>
 {/if}
 
@@ -293,6 +291,7 @@
         if (activeDoc?.lines[i]) {
           activeDoc.lines[i].text = text;
           appState.documents = [...appState.documents];
+          if (activeDoc.manifestId) appState.scheduleAutoSave();
         }
       }}
       selectMode={appState.selectMode}

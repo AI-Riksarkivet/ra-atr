@@ -125,13 +125,35 @@ def flush_to_parquet():
     pq.write_table(arrow_table, PARQUET_DIR / "transcriptions.parquet")
 
 
-def _query(column: str, value: str) -> pa.Table:
-    """Filter table rows by exact match on a string column."""
+def _match_mask(arrow_table: pa.Table, **filters: str):
+    """Build a boolean mask matching ALL filters (AND)."""
+    mask = None
+    for column, value in filters.items():
+        eq = pc.equal(arrow_table.column(column), value)
+        mask = eq if mask is None else pc.and_(mask, eq)
+    return mask
+
+
+def _query(**filters: str) -> pa.Table:
+    """Filter table rows by exact match on string columns."""
     all_rows = table.to_arrow()
     if len(all_rows) == 0:
         return all_rows
-    mask = pc.equal(all_rows.column(column), value)
-    return all_rows.filter(mask)
+    return all_rows.filter(_match_mask(all_rows, **filters))
+
+
+def _remove(**filters: str):
+    """Remove rows matching all filters, rebuild table with the rest."""
+    global table
+    all_rows = table.to_arrow()
+    if len(all_rows) == 0:
+        return
+    match = _match_mask(all_rows, **filters)
+    kept = all_rows.filter(pc.invert(match))
+    if len(kept) > 0:
+        table = db.create_table(TABLE_NAME, kept, mode="overwrite")
+    else:
+        table = db.create_table(TABLE_NAME, schema=SCHEMA, mode="overwrite")
 
 
 def _resolve_user(request: Request) -> str | None:
@@ -178,19 +200,22 @@ def health():
 
 
 @app.get("/transcriptions/{manifest_id}")
-def get_transcriptions(manifest_id: str):
+def get_transcriptions(manifest_id: str, request: Request):
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
-    rows = _query("manifest_id", manifest_id)
+    username = _resolve_user(request)
+    if username is None:
+        raise HTTPException(401, "Login with Hugging Face required")
+
+    rows = _query(manifest_id=manifest_id, contributor=username)
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "groups": []}
 
     df = rows.to_pandas()
-    latest = df.loc[df.groupby("id")["version"].idxmax()]
 
     groups = []
-    for (page, gname), gdf in latest.groupby(["page_number", "group_name"]):
+    for (page, gname), gdf in df.groupby(["page_number", "group_name"]):
         first = gdf.iloc[0]
         lines = []
         for _, row in gdf.sort_values("line_index").iterrows():
@@ -234,18 +259,16 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
 
     now = datetime.now(timezone.utc)
 
-    # Delete existing rows for this manifest, then insert fresh state
-    all_rows = table.to_arrow()
-    if len(all_rows) > 0:
-        mask = pc.not_equal(all_rows.column("manifest_id"), manifest_id)
-        kept = all_rows.filter(mask)
-    else:
-        kept = all_rows
+    # Remove only this user's rows for this manifest, keep everyone else's
+    before = table.count_rows()
+    _remove(manifest_id=manifest_id, contributor=username)
+    after = table.count_rows()
+    print(f"POST {manifest_id} by {username}: {before} rows before, {after} after remove")
 
     new_rows = []
     for group in body.groups:
         for line in group.lines:
-            line_id = f"{manifest_id}/{group.page_number}_{group.group_name}_{line.line_index}"
+            line_id = f"{manifest_id}/{username}/{group.page_number}_{group.group_name}_{line.line_index}"
             new_rows.append({
                 "id": line_id,
                 "version": 1,
@@ -269,22 +292,36 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
                 "created_at": now,
             })
 
-    # Rebuild table: kept rows from other manifests + new rows
     if new_rows:
         new_arrow = pa.Table.from_pylist(new_rows, schema=SCHEMA)
-        if len(kept) > 0:
-            combined = pa.concat_tables([kept, new_arrow])
+        all_rows = table.to_arrow()
+        if len(all_rows) > 0:
+            combined = pa.concat_tables([all_rows, new_arrow])
         else:
             combined = new_arrow
         table = db.create_table(TABLE_NAME, combined, mode="overwrite")
-    elif len(kept) > 0:
-        table = db.create_table(TABLE_NAME, kept, mode="overwrite")
-    else:
-        table = db.create_table(TABLE_NAME, schema=SCHEMA, mode="overwrite")
+
+    final = table.count_rows()
+    print(f"POST {manifest_id} by {username}: added {len(new_rows)}, total now {final}")
 
     flush_to_parquet()
 
     return {"status": "ok", "lines_added": len(new_rows), "contributor": username}
+
+
+@app.delete("/transcriptions/{manifest_id}")
+def delete_transcriptions(manifest_id: str, request: Request):
+    if table is None:
+        raise HTTPException(503, "Database not initialized")
+
+    username = _resolve_user(request)
+    if username is None:
+        raise HTTPException(401, "Login with Hugging Face required")
+
+    _remove(manifest_id=manifest_id, contributor=username)
+    flush_to_parquet()
+
+    return {"status": "ok", "manifest_id": manifest_id, "contributor": username}
 
 
 @app.get("/transcriptions/{manifest_id}/history")
@@ -292,7 +329,7 @@ def get_history(manifest_id: str):
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
-    rows = _query("manifest_id", manifest_id)
+    rows = _query(manifest_id=manifest_id)
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "contributions": []}
 

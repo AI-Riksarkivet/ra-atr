@@ -2,6 +2,8 @@ import { HTRWorkerState } from '$lib/worker-state.svelte';
 import type { ImageDocument, Line, LineGroup } from '$lib/types';
 import type { TranscriptionGroup } from '$lib/api';
 
+const AUTOSAVE_DELAY = 2000;
+
 class AppState {
   htr = $state(new HTRWorkerState());
   documents = $state<ImageDocument[]>([]);
@@ -9,10 +11,12 @@ class AppState {
   hoveredLine = $state(-1);
   selectedLines = $state(new Set<number>());
   selectMode = $state(false);
-  contributing = $state(false);
-  contributeError = $state<string | null>(null);
-  contributeSuccess = $state<string | null>(null);
+  saving = $state(false);
+  saveError = $state<string | null>(null);
+  lastSaved = $state<string | null>(null);
   private docCounter = 0;
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastSaveHash = '';
 
   get activeDocument(): ImageDocument | undefined {
     return this.documents.find(d => d.id === this.activeDocumentId);
@@ -85,6 +89,8 @@ class AppState {
       updater(doc);
       // Trigger reactivity
       this.documents = [...this.documents];
+      // Auto-save if this is a Riksarkivet document
+      if (doc.manifestId) this.scheduleAutoSave();
     }
   }
 
@@ -95,6 +101,9 @@ class AppState {
         d => d.manifestId === manifestId && d.pageNumber === group.page_number
       );
       if (!doc) continue;
+
+      // Skip if this doc already has groups (already populated or HTR ran)
+      if (doc.groups.length > 0) continue;
 
       const newLines: Line[] = group.lines.map(l => ({
         bbox: { ...l.bbox, confidence: l.confidence, polygon: undefined },
@@ -120,15 +129,8 @@ class AppState {
     this.documents = [...this.documents];
   }
 
-  /** Check if there are any Riksarkivet documents with completed transcriptions */
-  get canContribute(): boolean {
-    return this.documents.some(d =>
-      d.manifestId && d.lines.some(l => l.complete && l.text.trim() !== '')
-    );
-  }
-
-  /** Serialize current transcriptions for the backend API — only lines with text */
-  serializeForContribute(): { manifestId: string; referenceCode: string; groups: TranscriptionGroup[] } | null {
+  /** Serialize current transcriptions for the backend API — only complete lines with text */
+  serializeForSave(): { manifestId: string; referenceCode: string; groups: TranscriptionGroup[] } | null {
     const docs = this.documents.filter(d => d.manifestId && d.groups.length > 0);
     if (docs.length === 0) return null;
 
@@ -164,24 +166,36 @@ class AppState {
     return { manifestId, referenceCode: '', groups };
   }
 
-  async contribute(token: string) {
-    const data = this.serializeForContribute();
-    if (!data) return;
+  /** Schedule a debounced auto-save to backend */
+  scheduleAutoSave() {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => this.save(), AUTOSAVE_DELAY);
+  }
 
-    this.contributing = true;
-    this.contributeError = null;
-    this.contributeSuccess = null;
+  private async save() {
+    if (this.saving) { console.log('[autosave] skip: already saving'); return; }
+    const data = this.serializeForSave();
+    if (!data) { console.log('[autosave] skip: no data'); return; }
+
+    // Skip if nothing changed since last save
+    const hash = JSON.stringify(data.groups);
+    if (hash === this.lastSaveHash) { console.log('[autosave] skip: unchanged'); return; }
+    console.log(`[autosave] saving ${data.groups.reduce((n, g) => n + g.lines.length, 0)} lines`);
+
+    this.saving = true;
+    this.saveError = null;
 
     try {
-      const { contributeTranscriptions } = await import('$lib/api');
-      const result = await contributeTranscriptions(
-        data.manifestId, data.referenceCode, data.groups, token
+      const { saveTranscriptions } = await import('$lib/api');
+      const result = await saveTranscriptions(
+        data.manifestId, data.referenceCode, data.groups,
       );
-      this.contributeSuccess = `Contributed ${result.lines_added} lines as ${result.contributor}`;
+      this.lastSaveHash = hash;
+      this.lastSaved = `Saved ${result.lines_added} lines`;
     } catch (err) {
-      this.contributeError = err instanceof Error ? err.message : String(err);
+      this.saveError = err instanceof Error ? err.message : String(err);
     } finally {
-      this.contributing = false;
+      this.saving = false;
     }
   }
 

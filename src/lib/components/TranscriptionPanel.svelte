@@ -67,27 +67,192 @@
     }
   }
 
+  let copiedGroupId = $state<string | null>(null);
+
+  async function copyGroupLines(group: { id: string; lineIndices: number[]; rect?: { x: number; y: number; w: number; h: number } }) {
+    const doc = documents.find(d => d.id === activeDocumentId);
+    if (!doc) return;
+
+    const text = group.lineIndices
+      .map(i => doc.lines[i]?.text ?? '')
+      .filter(t => t.trim())
+      .join('\n');
+
+    const items: Record<string, Blob> = {
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+    };
+
+    // Include image cutout if available
+    if (doc.imageUrl && group.rect) {
+      try {
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = doc.imageUrl!;
+        });
+        const r = group.rect;
+        const canvas = document.createElement('canvas');
+        canvas.width = r.w;
+        canvas.height = r.h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+        const blob = await new Promise<Blob>((resolve) =>
+          canvas.toBlob(b => resolve(b!), 'image/png')
+        );
+        items['image/png'] = blob;
+      } catch { /* fall back to text-only */ }
+    }
+
+    await navigator.clipboard.write([new ClipboardItem(items)]);
+    copiedGroupId = group.id;
+    setTimeout(() => { if (copiedGroupId === group.id) copiedGroupId = null; }, 1500);
+  }
+
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
-  // Collapsed document state
+  // Collapsed state for volumes, pages, groups
+  let collapsedVolumes = $state(new Set<string>());
   let collapsedDocs = $state(new Set<string>());
+
+  function toggleVolume(id: string) {
+    const next = new Set(collapsedVolumes);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    collapsedVolumes = next;
+  }
 
   function toggleDoc(docId: string) {
     const next = new Set(collapsedDocs);
     if (next.has(docId)) next.delete(docId); else next.add(docId);
     collapsedDocs = next;
   }
+
+  // Group documents: volumes (by manifestId) and standalone uploads
+  interface Volume {
+    manifestId: string;
+    docs: ImageDocument[];
+  }
+
+  let volumes = $derived.by(() => {
+    const vols = new Map<string, ImageDocument[]>();
+    const standalone: ImageDocument[] = [];
+    for (const doc of documents) {
+      if (doc.manifestId) {
+        const list = vols.get(doc.manifestId);
+        if (list) list.push(doc); else vols.set(doc.manifestId, [doc]);
+      } else {
+        standalone.push(doc);
+      }
+    }
+    return {
+      volumes: [...vols.entries()].map(([manifestId, docs]) => ({ manifestId, docs })) as Volume[],
+      standalone,
+    };
+  });
 </script>
 
 <div class="overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed h-full" bind:this={panelEl}>
-  {#each documents as doc}
+
+  <!-- Volumes (Riksarkivet) -->
+  {#each volumes.volumes as vol}
+    {@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
+    {@const volLines = vol.docs.reduce((n, d) => n + d.lines.length, 0)}
+    {@const volCompleted = vol.docs.reduce((n, d) => n + d.lines.filter(l => l.complete).length, 0)}
+    {@const volWorking = vol.docs.some(d => activeImageIds.has(d.id))}
+
+    <!-- Volume header -->
+    <div
+      class="flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
+      onclick={() => toggleVolume(vol.manifestId)}
+    >
+      <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4">
+        {volCollapsed ? '\u25B6' : '\u25BC'}
+      </button>
+      {#if volWorking}
+        <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+      {/if}
+      <span class="font-semibold truncate flex-1">{vol.manifestId}</span>
+      <span class="text-[0.65rem] text-muted-foreground font-mono">{vol.docs.length} pg</span>
+      {#if volLines > 0}
+        <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
+      {/if}
+    </div>
+
+    {#if !volCollapsed}
+      <div class="pl-2">
+        {#each vol.docs as doc}
+          {@const isActive = doc.id === activeDocumentId}
+          {@const isCollapsed = collapsedDocs.has(doc.id)}
+          {@const isWorking = activeImageIds.has(doc.id)}
+          {@const totalLines = doc.lines.length}
+          {@const completedLines = doc.lines.filter(l => l.complete).length}
+
+          <!-- Page header -->
+          <div
+            class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none font-sans text-xs mb-0.5 {isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'}"
+            onclick={() => { onSwitchDocument(doc.id); if (isCollapsed) toggleDoc(doc.id); }}
+          >
+            <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); toggleDoc(doc.id); }}>
+              {isCollapsed ? '\u25B6' : '\u25BC'}
+            </button>
+            {#if isWorking}
+              <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+            {/if}
+            <span class="truncate flex-1">p. {doc.pageNumber ?? '?'}</span>
+            {#if totalLines > 0}
+              <span class="text-[0.7rem] font-mono">{completedLines}/{totalLines}</span>
+            {/if}
+          </div>
+
+          <!-- Page content -->
+          {#if !isCollapsed && isActive}
+            {@const ungroupedIndices = (() => {
+              const grouped = new Set<number>();
+              for (const g of doc.groups) for (const idx of g.lineIndices) grouped.add(idx);
+              return Array.from({ length: doc.lines.length }, (_, i) => i).filter(i => !grouped.has(i));
+            })()}
+
+            <div class="pl-3">
+              {#each doc.groups as group, gi}
+                {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
+                {@render groupBlock(doc, group, gi, groupWorking)}
+              {/each}
+
+              {#if ungroupedIndices.length > 0}
+                {#if doc.groups.length > 0}
+                  <div class="text-xs text-muted-foreground font-sans pt-2 px-2 pb-0.5 uppercase tracking-wide">Ungrouped</div>
+                {/if}
+                {#each ungroupedIndices as lineIdx}
+                  {@render lineRow(doc, lineIdx)}
+                {/each}
+              {/if}
+
+              {#if doc.lines.length === 0 && doc.groups.length === 0}
+                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Draw regions to detect text lines</p>
+              {/if}
+            </div>
+          {:else if !isCollapsed}
+            <div class="pl-6 pb-1">
+              {#if doc.lines.length === 0 && doc.groups.length === 0}
+                <p class="text-muted-foreground italic text-xs">No regions detected</p>
+              {:else}
+                <p class="text-muted-foreground text-xs">{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}</p>
+              {/if}
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  {/each}
+
+  <!-- Standalone uploads (no manifest) -->
+  {#each volumes.standalone as doc}
     {@const isActive = doc.id === activeDocumentId}
     {@const isCollapsed = collapsedDocs.has(doc.id)}
     {@const isWorking = activeImageIds.has(doc.id)}
     {@const totalLines = doc.lines.length}
     {@const completedLines = doc.lines.filter(l => l.complete).length}
 
-    <!-- Document header -->
     <div
       class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none font-sans text-xs mb-1 {isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'}"
       onclick={() => { onSwitchDocument(doc.id); if (isCollapsed) toggleDoc(doc.id); }}
@@ -104,7 +269,6 @@
       {/if}
     </div>
 
-    <!-- Document content (groups + ungrouped lines) -->
     {#if !isCollapsed && isActive}
       {@const ungroupedIndices = (() => {
         const grouped = new Set<number>();
@@ -115,68 +279,7 @@
       <div class="pl-2">
         {#each doc.groups as group, gi}
           {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
-          <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
-            <div
-              class="flex items-center gap-1.5 px-2 py-1.5 bg-white/[0.03] text-xs font-sans select-none cursor-pointer"
-              onclick={() => onFocusGroup(group.lineIndices, group.rect)}
-            >
-              <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); onToggleGroup(group.id); }}>
-                {group.collapsed ? '\u25B6' : '\u25BC'}
-              </button>
-              {#if groupWorking}
-                <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
-              {/if}
-              {#if editingGroupId === group.id}
-                <input
-                  class="bg-card border border-current text-foreground rounded px-1 py-0.5 text-xs w-32 outline-none"
-                  style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
-                  bind:value={editName}
-                  onkeydown={(e) => { if (e.key === 'Enter') finishRename(group.id); if (e.key === 'Escape') editingGroupId = null; }}
-                  onblur={() => finishRename(group.id)}
-                />
-              {:else}
-                <span class="font-semibold cursor-default" style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" ondblclick={() => startRename(group)}>{group.name}</span>
-              {/if}
-              <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIndices.length}</span>
-              <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIndices, group.rect); }} title="Zoom to group">&#x2316;</button>
-              <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'} disabled={groupWorking}>x</button>
-            </div>
-            {#if !group.collapsed}
-              <div class="pl-1">
-                {#each group.lineIndices as lineIdx}
-                  {#if doc.lines[lineIdx]}
-                    <div
-                      class="flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
-                      data-line={lineIdx}
-                      onmouseenter={() => onHoverLine(lineIdx)}
-                      onmouseleave={() => onHoverLine(-1)}
-                      onclick={(e) => handleLineClick(lineIdx, e)}
-                      ondblclick={() => startEditLine(lineIdx)}
-                    >
-                      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineIdx + 1}</span>
-                      {#if editingLineIdx === lineIdx}
-                        <input
-                          class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
-                          bind:value={editLineText}
-                          onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
-                          onblur={finishEditLine}
-                          onclick={(e) => e.stopPropagation()}
-                          ondblclick={(e) => e.stopPropagation()}
-                        />
-                      {:else}
-                        <span class="flex-1">
-                          {doc.lines[lineIdx].text}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
-                        </span>
-                        {#if doc.lines[lineIdx].complete}
-                          <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>
-                        {/if}
-                      {/if}
-                    </div>
-                  {/if}
-                {/each}
-              </div>
-            {/if}
-          </div>
+          {@render groupBlock(doc, group, gi, groupWorking)}
         {/each}
 
         {#if ungroupedIndices.length > 0}
@@ -184,35 +287,7 @@
             <div class="text-xs text-muted-foreground font-sans pt-2 px-2 pb-0.5 uppercase tracking-wide">Ungrouped</div>
           {/if}
           {#each ungroupedIndices as lineIdx}
-            {#if doc.lines[lineIdx]}
-              <div
-                class="flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
-                data-line={lineIdx}
-                onmouseenter={() => onHoverLine(lineIdx)}
-                onmouseleave={() => onHoverLine(-1)}
-                onclick={(e) => handleLineClick(lineIdx, e)}
-                ondblclick={() => startEditLine(lineIdx)}
-              >
-                <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineIdx + 1}</span>
-                {#if editingLineIdx === lineIdx}
-                  <input
-                    class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
-                    bind:value={editLineText}
-                    onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
-                    onblur={finishEditLine}
-                    onclick={(e) => e.stopPropagation()}
-                    ondblclick={(e) => e.stopPropagation()}
-                  />
-                {:else}
-                  <span class="flex-1">
-                    {doc.lines[lineIdx].text}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
-                  </span>
-                  {#if doc.lines[lineIdx].complete}
-                    <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>
-                  {/if}
-                {/if}
-              </div>
-            {/if}
+            {@render lineRow(doc, lineIdx)}
           {/each}
         {/if}
 
@@ -221,7 +296,6 @@
         {/if}
       </div>
     {:else if !isCollapsed}
-      <!-- Non-active document: show summary -->
       <div class="pl-6 pb-2">
         {#if doc.lines.length === 0 && doc.groups.length === 0}
           <p class="text-muted-foreground italic text-xs">No regions detected</p>
@@ -236,3 +310,75 @@
     <p class="text-muted-foreground italic text-center mt-8">No images loaded</p>
   {/if}
 </div>
+
+<!-- Shared snippets -->
+
+{#snippet groupBlock(doc: ImageDocument, group: import('$lib/types').LineGroup, gi: number, groupWorking: boolean)}
+  <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
+    <div
+      class="flex items-center gap-1.5 px-2 py-1.5 bg-white/[0.03] text-xs font-sans select-none cursor-pointer"
+      onclick={() => onFocusGroup(group.lineIndices, group.rect)}
+    >
+      <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); onToggleGroup(group.id); }}>
+        {group.collapsed ? '\u25B6' : '\u25BC'}
+      </button>
+      {#if groupWorking}
+        <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+      {/if}
+      {#if editingGroupId === group.id}
+        <input
+          class="bg-card border border-current text-foreground rounded px-1 py-0.5 text-xs w-32 outline-none"
+          style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
+          bind:value={editName}
+          onkeydown={(e) => { if (e.key === 'Enter') finishRename(group.id); if (e.key === 'Escape') editingGroupId = null; }}
+          onblur={() => finishRename(group.id)}
+        />
+      {:else}
+        <span class="font-semibold cursor-default" style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" ondblclick={() => startRename(group)}>{group.name}</span>
+      {/if}
+      <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIndices.length}</span>
+      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); copyGroupLines(group); }} title="Copy all lines">{copiedGroupId === group.id ? '\u2713' : '\u2398'}</button>
+      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIndices, group.rect); }} title="Zoom to group">&#x2316;</button>
+      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'} disabled={groupWorking}>x</button>
+    </div>
+    {#if !group.collapsed}
+      <div class="pl-1">
+        {#each group.lineIndices as lineIdx}
+          {@render lineRow(doc, lineIdx)}
+        {/each}
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet lineRow(doc: ImageDocument, lineIdx: number)}
+  {#if doc.lines[lineIdx]}
+    <div
+      class="flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
+      data-line={lineIdx}
+      onmouseenter={() => onHoverLine(lineIdx)}
+      onmouseleave={() => onHoverLine(-1)}
+      onclick={(e) => handleLineClick(lineIdx, e)}
+      ondblclick={() => startEditLine(lineIdx)}
+    >
+      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineIdx + 1}</span>
+      {#if editingLineIdx === lineIdx}
+        <input
+          class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
+          bind:value={editLineText}
+          onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
+          onblur={finishEditLine}
+          onclick={(e) => e.stopPropagation()}
+          ondblclick={(e) => e.stopPropagation()}
+        />
+      {:else}
+        <span class="flex-1">
+          {doc.lines[lineIdx].text}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
+        </span>
+        {#if doc.lines[lineIdx].complete}
+          <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+        {/if}
+      {/if}
+    </div>
+  {/if}
+{/snippet}

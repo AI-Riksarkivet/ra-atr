@@ -28,7 +28,13 @@
   }
 
   function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
-    for (const page of pages) {
+    // Skip pages that are already loaded (user navigated back to add more)
+    const existingPages = new Set(
+      appState.documents.filter(d => d.manifestId === manifestId).map(d => d.pageNumber)
+    );
+    const newPages = pages.filter(p => !existingPages.has(p));
+
+    for (const page of newPages) {
       const padded = String(page).padStart(5, '0');
       const docId = appState.addPlaceholderDocument(
         `${manifestId}_${padded}.jpg`, manifestId, page
@@ -43,11 +49,14 @@
     goto('/viewer');
 
     // Pre-populate existing transcriptions from backend (non-blocking)
-    import('$lib/api').then(({ fetchTranscriptions }) =>
-      fetchTranscriptions(manifestId).then(groups => {
-        if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
-      }).catch(() => {})
-    );
+    // Only fetch if we added new pages (avoid re-populating existing ones)
+    if (newPages.length > 0) {
+      import('$lib/api').then(({ fetchTranscriptions }) =>
+        fetchTranscriptions(manifestId).then(groups => {
+          if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
+        }).catch(() => {})
+      );
+    }
   }
 
   function continueWorkspace() {

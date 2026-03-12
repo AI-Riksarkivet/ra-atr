@@ -31,6 +31,8 @@ def client():
     return TestClient(app, raise_server_exceptions=False)
 
 
+AUTH_HEADERS = {"Authorization": "Bearer fake"}
+
 SAMPLE_BODY = {
     "reference_code": "SE/RA/420177/02/A I a/3",
     "groups": [
@@ -79,29 +81,34 @@ def test_get_empty(client: TestClient):
     assert data["groups"] == []
 
 
-def test_get_returns_latest_version(client: TestClient):
-    """When multiple versions exist, only the latest is returned."""
-    with _mock_auth("testuser"):
-        # Contribute v1
-        client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
-        # Contribute v2 with updated text
-        body_v2 = _with_text(SAMPLE_BODY, "Anno 1723 den 16 Martii")
-        client.post(
-            "/transcriptions/R0003221",
-            json=body_v2,
-            headers={"Authorization": "Bearer fake"},
-        )
+def test_get_returns_own_data(client: TestClient):
+    """GET returns only the requesting user's data."""
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    with _mock_auth("bob"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
 
-    r = client.get("/transcriptions/R0003221")
-    assert r.status_code == 200
+    with _mock_auth("alice"):
+        r = client.get("/transcriptions/R0003221", headers=AUTH_HEADERS)
     groups = r.json()["groups"]
     assert len(groups) == 1
-    # First line should have updated text
-    assert groups[0]["lines"][0]["text"] == "Anno 1723 den 16 Martii"
+    assert groups[0]["lines"][0]["contributor"] == "alice"
+
+
+def test_get_does_not_return_other_users(client: TestClient):
+    """GET filters out other users' data."""
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+
+    with _mock_auth("bob"):
+        r = client.get("/transcriptions/R0003221", headers=AUTH_HEADERS)
+    assert r.json()["groups"] == []
+
+
+def test_get_requires_auth_in_production(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("SPACE_ID", "test/space")
+    r = client.get("/transcriptions/R0003221")
+    assert r.status_code == 401
 
 
 # --- POST /transcriptions ---
@@ -125,72 +132,61 @@ def test_post_rejects_bad_token(client: TestClient):
         r = client.post(
             "/transcriptions/R0003221",
             json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer bad_token"},
+            headers=AUTH_HEADERS,
         )
     assert r.status_code == 401
 
 
 def test_post_contributes_lines(client: TestClient):
     with _mock_auth("researcher1"):
-        r = client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
+        r = client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
     assert r.status_code == 200
     data = r.json()
     assert data["lines_added"] == 2
     assert data["contributor"] == "researcher1"
 
     # Verify via GET
-    r = client.get("/transcriptions/R0003221")
+    with _mock_auth("researcher1"):
+        r = client.get("/transcriptions/R0003221", headers=AUTH_HEADERS)
     groups = r.json()["groups"]
     assert len(groups) == 1
     assert len(groups[0]["lines"]) == 2
     assert groups[0]["lines"][0]["contributor"] == "researcher1"
 
 
-def test_post_replaces_existing(client: TestClient):
-    """Second POST replaces all rows for that manifest."""
-    with _mock_auth("user1"):
-        client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
-    with _mock_auth("user2"):
-        r = client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
-    assert r.json()["lines_added"] == 2
+def test_post_replaces_own_data_only(client: TestClient):
+    """Second POST replaces only the same user's rows, keeps others."""
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    with _mock_auth("bob"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
 
-    # Old rows replaced, only latest contribution remains
-    total_rows = app_module.table.count_rows()
-    assert total_rows == 2  # 2 lines, not 4
+    # Both have 2 lines = 4 total
+    assert app_module.table.count_rows() == 4
+
+    # Alice re-posts — only her rows get replaced
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+
+    assert app_module.table.count_rows() == 4  # still 4 (2 alice + 2 bob)
 
 
-def test_post_delete_by_contributing_empty(client: TestClient):
-    """Contributing empty groups removes all lines for that manifest."""
-    with _mock_auth("user1"):
-        client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
-    assert app_module.table.count_rows() == 2
+def test_post_empty_groups_removes_own_data(client: TestClient):
+    """Contributing empty groups removes only this user's lines."""
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    with _mock_auth("bob"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    assert app_module.table.count_rows() == 4
 
-    with _mock_auth("user1"):
+    with _mock_auth("alice"):
         client.post(
             "/transcriptions/R0003221",
             json={"reference_code": "test", "groups": []},
-            headers={"Authorization": "Bearer fake"},
+            headers=AUTH_HEADERS,
         )
-    assert app_module.table.count_rows() == 0
-
-    r = client.get("/transcriptions/R0003221")
-    assert r.json()["groups"] == []
+    # Only bob's 2 lines remain
+    assert app_module.table.count_rows() == 2
 
 
 def test_post_empty_groups(client: TestClient):
@@ -198,10 +194,38 @@ def test_post_empty_groups(client: TestClient):
         r = client.post(
             "/transcriptions/R0003221",
             json={"reference_code": "test", "groups": []},
-            headers={"Authorization": "Bearer fake"},
+            headers=AUTH_HEADERS,
         )
     assert r.status_code == 200
     assert r.json()["lines_added"] == 0
+
+
+# --- DELETE /transcriptions ---
+
+
+def test_delete_removes_own_data(client: TestClient):
+    with _mock_auth("alice"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    with _mock_auth("bob"):
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
+    assert app_module.table.count_rows() == 4
+
+    with _mock_auth("alice"):
+        r = client.delete("/transcriptions/R0003221", headers=AUTH_HEADERS)
+    assert r.status_code == 200
+    assert app_module.table.count_rows() == 2  # only bob's remain
+
+
+def test_delete_requires_auth(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("SPACE_ID", "test/space")
+    r = client.delete("/transcriptions/R0003221")
+    assert r.status_code == 401
+
+
+def test_delete_empty_is_ok(client: TestClient):
+    """Deleting when no data exists is fine."""
+    r = client.delete("/transcriptions/R0003221")
+    assert r.status_code == 200
 
 
 # --- GET /transcriptions/{id}/history ---
@@ -215,11 +239,7 @@ def test_history_empty(client: TestClient):
 
 def test_history_shows_contributions(client: TestClient):
     with _mock_auth("alice"):
-        client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
 
     r = client.get("/transcriptions/R0003221/history")
     assert r.status_code == 200
@@ -234,11 +254,7 @@ def test_history_shows_contributions(client: TestClient):
 
 def test_flush_creates_parquet(client: TestClient):
     with _mock_auth("user1"):
-        client.post(
-            "/transcriptions/R0003221",
-            json=SAMPLE_BODY,
-            headers={"Authorization": "Bearer fake"},
-        )
+        client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
     parquet_file = app_module.PARQUET_DIR / "transcriptions.parquet"
     assert parquet_file.exists()
 
