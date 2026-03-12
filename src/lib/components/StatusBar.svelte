@@ -73,7 +73,7 @@
   }
 </script>
 
-<div class="flex items-center gap-4 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+<span class="inline-flex items-center gap-3">
   <span class="font-medium">{stageLabels[stage]}</span>
 
   {#if stage === 'transcribing' && activeDocNames.length > 0}
@@ -96,6 +96,6 @@
   {/if}
 
   {#if etaSeconds > 0 && pendingLines > 0 && stage === 'transcribing'}
-    <span class="ml-auto font-mono">~{formatTime(etaSeconds)} left</span>
+    <span class="font-mono">~{formatTime(etaSeconds)} left</span>
   {/if}
-</div>
+</span>

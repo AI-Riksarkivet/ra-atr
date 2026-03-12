@@ -120,10 +120,18 @@
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    // Skip when focused on an input/textarea
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
     if ((e.key === 'Delete' || e.key === 'Backspace') && appState.selectedLines.size > 0) {
       e.preventDefault();
       deleteSelectedLines();
     }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); appState.navigatePage(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); appState.navigatePage(1); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); appState.navigateLine(-1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); appState.navigateLine(1); }
   }
 
   function handleAddImages() {
@@ -214,12 +222,6 @@
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
 {/if}
 
-{#if appState.saveError}
-  <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0 flex items-center justify-between">
-    <span>Save failed: {appState.saveError}</span>
-    <button class="text-xs underline" onclick={() => appState.saveError = null}>dismiss</button>
-  </div>
-{/if}
 
 {#if appState.selectedLines.size > 0}
   <div class="flex items-center gap-2 border-b border-yellow-400/20 bg-yellow-400/[0.08] px-4 py-1.5 shrink-0">
@@ -306,12 +308,35 @@
   bbox={appState.hoveredLine >= 0 ? (activeDoc?.lines[appState.hoveredLine]?.bbox ?? null) : null}
 />
 
-{#if appState.htr.stage !== 'idle' || appState.htr.modelsReady}
-  <StatusBar
-    stage={appState.htr.stage}
-    documents={appState.documents}
-    activeImageIds={appState.htr.activeImageIds}
-    activeTranscriptions={appState.htr.activeTranscriptions}
-    poolSize={appState.htr.poolSize}
-  />
-{/if}
+<footer class="flex items-center gap-3 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground shrink-0">
+  {#if activeDoc?.manifestId}
+    {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
+    {@const pageIdx = siblings.sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0)).findIndex(d => d.id === activeDoc.id)}
+    <span class="font-mono">p. {activeDoc.pageNumber ?? '?'} / {siblings.length}</span>
+    <span class="text-muted-foreground/50">|</span>
+    <span>{activeDoc.manifestId}</span>
+    <span class="text-muted-foreground/50">|</span>
+    <span class="text-[0.65rem]">&larr;&rarr; pages &uarr;&darr; lines</span>
+  {/if}
+
+  <span class="ml-auto">
+    {#if appState.saving}
+      <span class="animate-pulse">Saving...</span>
+    {:else if appState.saveError}
+      <span class="text-destructive">{appState.saveError}</span>
+    {:else if appState.lastSaved}
+      <span>{appState.lastSaved}</span>
+    {/if}
+  </span>
+
+  {#if appState.htr.stage !== 'idle' || appState.htr.modelsReady}
+    <span class="text-muted-foreground/50">|</span>
+    <StatusBar
+      stage={appState.htr.stage}
+      documents={appState.documents}
+      activeImageIds={appState.htr.activeImageIds}
+      activeTranscriptions={appState.htr.activeTranscriptions}
+      poolSize={appState.htr.poolSize}
+    />
+  {/if}
+</footer>

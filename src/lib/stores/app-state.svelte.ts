@@ -82,6 +82,31 @@ class AppState {
     this.loadDocumentImage(docId);
   }
 
+  /** Navigate to adjacent page within the same volume */
+  navigatePage(delta: -1 | 1) {
+    const doc = this.activeDocument;
+    if (!doc?.manifestId) return;
+    const siblings = this.documents
+      .filter(d => d.manifestId === doc.manifestId)
+      .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
+    const idx = siblings.findIndex(d => d.id === doc.id);
+    const next = siblings[idx + delta];
+    if (next) this.switchDocument(next.id);
+  }
+
+  /** Navigate to adjacent line within the active document */
+  navigateLine(delta: -1 | 1) {
+    const doc = this.activeDocument;
+    if (!doc || doc.lines.length === 0) return;
+    const current = this.hoveredLine;
+    if (current < 0) {
+      this.hoveredLine = delta === 1 ? 0 : doc.lines.length - 1;
+    } else {
+      const next = current + delta;
+      if (next >= 0 && next < doc.lines.length) this.hoveredLine = next;
+    }
+  }
+
   /** Update a document's lines (called from worker callbacks) */
   updateDocumentLines(docId: string, updater: (doc: ImageDocument) => void) {
     const doc = this.documents.find(d => d.id === docId);

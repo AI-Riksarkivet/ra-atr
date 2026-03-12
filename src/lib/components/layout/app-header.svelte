@@ -47,14 +47,6 @@
       </div>
 
       <Button variant="outline" size="sm" onclick={onNewImage}>Add images</Button>
-
-      {#if appState.saving}
-        <span class="text-xs text-muted-foreground animate-pulse">Saving...</span>
-      {:else if appState.saveError}
-        <span class="text-xs text-destructive">{appState.saveError}</span>
-      {:else if appState.lastSaved}
-        <span class="text-xs text-muted-foreground">{appState.lastSaved}</span>
-      {/if}
     {/if}
 
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>
