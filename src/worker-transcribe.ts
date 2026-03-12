@@ -55,12 +55,15 @@ self.onmessage = async (e: MessageEvent) => {
           downloadAndCacheModel(MODEL_URLS.tokenizer, 'tokenizer', progress),
         ]);
 
-        const wasmOpts: ort.InferenceSession.SessionOptions = { executionProviders: ['wasm'] };
+        const sessionOpts: ort.InferenceSession.SessionOptions = {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all',
+        };
 
-        encoderSession = await ort.InferenceSession.create(encoderBytes, wasmOpts);
+        encoderSession = await ort.InferenceSession.create(encoderBytes, sessionOpts);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-encoder', status: 'loaded' } });
 
-        decoderSession = await ort.InferenceSession.create(decoderBytes, wasmOpts);
+        decoderSession = await ort.InferenceSession.create(decoderBytes, sessionOpts);
         self.postMessage({ type: 'model_status', payload: { model: 'trocr-decoder', status: 'loaded' } });
 
         tokenizer = new BpeTokenizer(new TextDecoder().decode(tokenizerBytes));
@@ -136,15 +139,7 @@ async function processNext() {
     const encResult = await encoderSession.run({
       [encoderSession.inputNames[0]]: pixelValues,
     });
-    const hiddenStatesRaw = encResult[encoderSession.outputNames[0]];
-
-    let hiddenStates: ort.Tensor;
-    if (hiddenStatesRaw.location === 'gpu-buffer') {
-      const cpuData = await hiddenStatesRaw.getData();
-      hiddenStates = new ort.Tensor('float32', cpuData as Float32Array, hiddenStatesRaw.dims);
-    } else {
-      hiddenStates = hiddenStatesRaw;
-    }
+    const hiddenStates = encResult[encoderSession.outputNames[0]];
 
     // Greedy decoding
     const maxLength = 256;
@@ -173,12 +168,7 @@ async function processNext() {
       }
 
       const logitsRaw = decResult['logits'];
-      let logitsData: Float32Array;
-      if (logitsRaw.location === 'gpu-buffer') {
-        logitsData = (await logitsRaw.getData()) as Float32Array;
-      } else {
-        logitsData = logitsRaw.data as Float32Array;
-      }
+      const logitsData = logitsRaw.data as Float32Array;
       const vocabSize = logitsRaw.dims[2];
       const offset = (seqLen - 1) * vocabSize;
 

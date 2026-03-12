@@ -15,7 +15,7 @@ export class HTRWorkerState {
   modelProgress = $state<Record<string, number>>({});
   cacheChecked = $state<boolean>(false);
   imageReady = $state<boolean>(false);
-  poolSize = $state(2);
+  poolSize = $state(1);
 
   /** All regions currently being transcribed */
   activeRegions = $state<Set<string>>(new Set());

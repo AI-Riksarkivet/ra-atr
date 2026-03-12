@@ -35,7 +35,10 @@ self.onmessage = async (e: MessageEvent) => {
         };
 
         const yoloBytes = await downloadAndCacheModel(MODEL_URL, 'yolo', progress);
-        yoloSession = await ort.InferenceSession.create(yoloBytes, { executionProviders: ['wasm'] });
+        yoloSession = await ort.InferenceSession.create(yoloBytes, {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all',
+        });
         console.log('[detect] YOLO loaded, inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 

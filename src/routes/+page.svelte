@@ -4,6 +4,17 @@
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import ModelManager from '$lib/components/ModelManager.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
+  import RiksarkivetImport from '$lib/components/RiksarkivetImport.svelte';
+
+  let videoEl = $state<HTMLVideoElement>();
+  let videoStarted = false;
+
+  $effect(() => {
+    if (appState.htr.modelsReady && videoEl && !videoStarted) {
+      videoStarted = true;
+      videoEl.play();
+    }
+  });
 
   function handleUpload(files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) {
     for (const file of files) {
@@ -16,6 +27,18 @@
     goto('/viewer');
   }
 
+  function handleRiksarkivetPage(file: { name: string; imageData: ArrayBuffer; previewUrl: string }) {
+    const docId = appState.addDocument(file.name, file.previewUrl, file.imageData);
+    if (!appState.activeDocumentId) {
+      appState.activeDocumentId = docId;
+    }
+  }
+
+  function handleRiksarkivetDone() {
+    appState.selectMode = true;
+    goto('/viewer');
+  }
+
   function continueWorkspace() {
     goto('/viewer');
   }
@@ -23,8 +46,9 @@
 
 <AppHeader />
 
-<div class="flex flex-1 items-center justify-center overflow-hidden">
-  <div class="w-full max-w-lg space-y-6 p-8">
+<div class="relative flex flex-1 items-center justify-center overflow-hidden">
+  <video bind:this={videoEl} class="absolute inset-0 w-full h-full object-cover opacity-15 pointer-events-none" src="/flying-papers.mp4" loop muted playsinline></video>
+  <div class="relative w-full max-w-lg space-y-6 p-8">
     {#if !appState.htr.cacheChecked}
       <p class="text-center text-muted-foreground">Checking cached models...</p>
     {:else}
@@ -35,6 +59,19 @@
         autoLoading={appState.htr.stage === 'loading_models'}
       />
     {/if}
+
+    <div class="text-center text-xs text-muted-foreground uppercase tracking-wide">Riksarkivet</div>
+    <RiksarkivetImport
+      onPage={handleRiksarkivetPage}
+      onDone={handleRiksarkivetDone}
+      disabled={!appState.htr.modelsReady}
+    />
+
+    <div class="flex items-center gap-3 text-xs text-muted-foreground">
+      <div class="flex-1 border-t border-border"></div>
+      <span>or upload from disk</span>
+      <div class="flex-1 border-t border-border"></div>
+    </div>
 
     <UploadPanel
       onUpload={handleUpload}
