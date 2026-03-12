@@ -119,12 +119,14 @@ class AppState {
     this.documents = [...this.documents];
   }
 
-  /** Check if there are any Riksarkivet documents with transcriptions to contribute */
+  /** Check if there are any Riksarkivet documents with completed transcriptions */
   get canContribute(): boolean {
-    return this.documents.some(d => d.manifestId && d.groups.length > 0);
+    return this.documents.some(d =>
+      d.manifestId && d.lines.some(l => l.text.trim() !== '')
+    );
   }
 
-  /** Serialize current transcriptions for the backend API */
+  /** Serialize current transcriptions for the backend API — only lines with text */
   serializeForContribute(): { manifestId: string; referenceCode: string; groups: TranscriptionGroup[] } | null {
     const docs = this.documents.filter(d => d.manifestId && d.groups.length > 0);
     if (docs.length === 0) return null;
@@ -135,25 +137,29 @@ class AppState {
     for (const doc of docs) {
       if (doc.manifestId !== manifestId) continue;
       for (const group of doc.groups) {
-        groups.push({
-          page_number: doc.pageNumber ?? 0,
-          group_name: group.name,
-          group_rect: group.rect ?? { x: 0, y: 0, w: 0, h: 0 },
-          lines: group.lineIndices.map(i => {
-            const line = doc.lines[i];
-            return {
-              line_index: i,
-              bbox: { x: line.bbox.x, y: line.bbox.y, w: line.bbox.w, h: line.bbox.h },
-              text: line.text,
-              confidence: line.confidence,
-              source: line.complete ? 'htr' : 'human',
-              contributor: '',
-            };
-          }),
-        });
+        const lines = group.lineIndices
+          .map(i => doc.lines[i])
+          .filter(line => line && line.text.trim() !== '')
+          .map((line, idx) => ({
+            line_index: idx,
+            bbox: { x: line.bbox.x, y: line.bbox.y, w: line.bbox.w, h: line.bbox.h },
+            text: line.text,
+            confidence: line.confidence,
+            source: line.complete ? 'htr' as const : 'human' as const,
+            contributor: '',
+          }));
+        if (lines.length > 0) {
+          groups.push({
+            page_number: doc.pageNumber ?? 0,
+            group_name: group.name,
+            group_rect: group.rect ?? { x: 0, y: 0, w: 0, h: 0 },
+            lines,
+          });
+        }
       }
     }
 
+    if (groups.length === 0) return null;
     return { manifestId, referenceCode: '', groups };
   }
 
