@@ -20,9 +20,10 @@
   function handleContribute() {
     const token = sessionStorage.getItem('hf_token');
     if (!token) {
-      // Redirect to HF OAuth — the Space handles the flow
-      const redirectUrl = encodeURIComponent(window.location.href);
-      window.location.href = `/oauth/authorize?redirect_uri=${redirectUrl}`;
+      const input = prompt('Enter your Hugging Face token (hf_...):');
+      if (!input) return;
+      sessionStorage.setItem('hf_token', input);
+      appState.contribute(input);
       return;
     }
     appState.contribute(token);
