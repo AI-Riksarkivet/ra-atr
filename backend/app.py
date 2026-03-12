@@ -5,6 +5,7 @@ from pathlib import Path
 
 import lancedb
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,8 +14,8 @@ from pydantic import BaseModel
 
 DATASET_REPO = os.environ.get("DATASET_REPO", "lejonet/transcriptions")
 TABLE_NAME = "transcriptions"
-DB_PATH = "/tmp/lancedb"
-PARQUET_DIR = Path("/tmp/parquet_export")
+DB_PATH = os.environ.get("LANCEDB_PATH", "/tmp/lancedb")
+PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "/tmp/parquet_export"))
 
 SCHEMA = pa.schema([
     pa.field("id", pa.string()),
@@ -36,7 +37,7 @@ SCHEMA = pa.schema([
     pa.field("confidence", pa.float32()),
     pa.field("source", pa.string()),
     pa.field("contributor", pa.string()),
-    pa.field("created_at", pa.timestamp("ms")),
+    pa.field("created_at", pa.timestamp("us", tz="UTC")),
 ])
 
 db = None
@@ -114,9 +115,30 @@ def flush_to_parquet():
     pq.write_table(arrow_table, PARQUET_DIR / "transcriptions.parquet")
 
 
-def _sanitize(value: str) -> str:
-    """Strip single quotes to prevent injection in LanceDB where clauses."""
-    return value.replace("'", "")
+def _query(column: str, value: str) -> pa.Table:
+    """Filter table rows by exact match on a string column."""
+    all_rows = table.to_arrow()
+    if len(all_rows) == 0:
+        return all_rows
+    mask = pc.equal(all_rows.column(column), value)
+    return all_rows.filter(mask)
+
+
+def _resolve_user(request: Request) -> str | None:
+    """Extract username from HF OAuth Bearer token. Returns None if invalid."""
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth.removeprefix("Bearer ").strip()
+    if not token:
+        return None
+    try:
+        from huggingface_hub import HfApi
+
+        api = HfApi(token=token)
+        return api.whoami()["name"]
+    except Exception:
+        return None
 
 
 @asynccontextmanager
@@ -148,10 +170,7 @@ def get_transcriptions(manifest_id: str):
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
-    safe_id = _sanitize(manifest_id)
-    rows = table.search().where(
-        f"manifest_id = '{safe_id}'", prefilter=True
-    ).to_arrow()
+    rows = _query("manifest_id", manifest_id)
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "groups": []}
 
@@ -196,23 +215,9 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
-    # Check for HF OAuth token
-    auth = request.headers.get("authorization", "")
-    if not auth.startswith("Bearer "):
+    username = _resolve_user(request)
+    if username is None:
         raise HTTPException(401, "Login with Hugging Face required")
-
-    token = auth.removeprefix("Bearer ").strip()
-    if not token:
-        raise HTTPException(401, "Login with Hugging Face required")
-
-    # Resolve username from HF token
-    try:
-        from huggingface_hub import HfApi
-
-        api = HfApi(token=token)
-        username = api.whoami()["name"]
-    except Exception:
-        raise HTTPException(401, "Invalid Hugging Face token")
 
     now = datetime.now(timezone.utc)
 
@@ -220,12 +225,9 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     for group in body.groups:
         for line in group.lines:
             line_id = f"{manifest_id}/{group.page_number}_{group.group_name}_{line.line_index}"
-            safe_line_id = _sanitize(line_id)
 
             # Get current max version for this id
-            existing = table.search().where(
-                f"id = '{safe_line_id}'", prefilter=True
-            ).to_arrow()
+            existing = _query("id", line_id)
             max_version = 0
             if len(existing) > 0:
                 versions = existing.column("version").to_pylist()
@@ -266,10 +268,7 @@ def get_history(manifest_id: str):
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
-    safe_id = _sanitize(manifest_id)
-    rows = table.search().where(
-        f"manifest_id = '{safe_id}'", prefilter=True
-    ).to_arrow()
+    rows = _query("manifest_id", manifest_id)
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "contributions": []}
 
