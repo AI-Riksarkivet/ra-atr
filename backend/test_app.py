@@ -150,7 +150,8 @@ def test_post_contributes_lines(client: TestClient):
     assert groups[0]["lines"][0]["contributor"] == "researcher1"
 
 
-def test_post_increments_version(client: TestClient):
+def test_post_replaces_existing(client: TestClient):
+    """Second POST replaces all rows for that manifest."""
     with _mock_auth("user1"):
         client.post(
             "/transcriptions/R0003221",
@@ -165,9 +166,31 @@ def test_post_increments_version(client: TestClient):
         )
     assert r.json()["lines_added"] == 2
 
-    # Both versions exist in DB, but GET returns only latest
+    # Old rows replaced, only latest contribution remains
     total_rows = app_module.table.count_rows()
-    assert total_rows == 4  # 2 lines x 2 versions
+    assert total_rows == 2  # 2 lines, not 4
+
+
+def test_post_delete_by_contributing_empty(client: TestClient):
+    """Contributing empty groups removes all lines for that manifest."""
+    with _mock_auth("user1"):
+        client.post(
+            "/transcriptions/R0003221",
+            json=SAMPLE_BODY,
+            headers={"Authorization": "Bearer fake"},
+        )
+    assert app_module.table.count_rows() == 2
+
+    with _mock_auth("user1"):
+        client.post(
+            "/transcriptions/R0003221",
+            json={"reference_code": "test", "groups": []},
+            headers={"Authorization": "Bearer fake"},
+        )
+    assert app_module.table.count_rows() == 0
+
+    r = client.get("/transcriptions/R0003221")
+    assert r.json()["groups"] == []
 
 
 def test_post_empty_groups(client: TestClient):

@@ -224,6 +224,7 @@ def get_transcriptions(manifest_id: str):
 
 @app.post("/transcriptions/{manifest_id}")
 def contribute(manifest_id: str, body: ContributeRequest, request: Request):
+    global table
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
@@ -233,21 +234,21 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
 
     now = datetime.now(timezone.utc)
 
+    # Delete existing rows for this manifest, then insert fresh state
+    all_rows = table.to_arrow()
+    if len(all_rows) > 0:
+        mask = pc.not_equal(all_rows.column("manifest_id"), manifest_id)
+        kept = all_rows.filter(mask)
+    else:
+        kept = all_rows
+
     new_rows = []
     for group in body.groups:
         for line in group.lines:
             line_id = f"{manifest_id}/{group.page_number}_{group.group_name}_{line.line_index}"
-
-            # Get current max version for this id
-            existing = _query("id", line_id)
-            max_version = 0
-            if len(existing) > 0:
-                versions = existing.column("version").to_pylist()
-                max_version = max(versions) if versions else 0
-
             new_rows.append({
                 "id": line_id,
-                "version": max_version + 1,
+                "version": 1,
                 "reference_code": body.reference_code,
                 "manifest_id": manifest_id,
                 "page_number": group.page_number,
@@ -268,9 +269,20 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
                 "created_at": now,
             })
 
+    # Rebuild table: kept rows from other manifests + new rows
     if new_rows:
-        table.add(new_rows)
-        flush_to_parquet()
+        new_arrow = pa.Table.from_pylist(new_rows, schema=SCHEMA)
+        if len(kept) > 0:
+            combined = pa.concat_tables([kept, new_arrow])
+        else:
+            combined = new_arrow
+        table = db.create_table(TABLE_NAME, combined, mode="overwrite")
+    elif len(kept) > 0:
+        table = db.create_table(TABLE_NAME, kept, mode="overwrite")
+    else:
+        table = db.create_table(TABLE_NAME, schema=SCHEMA, mode="overwrite")
+
+    flush_to_parquet()
 
     return {"status": "ok", "lines_added": len(new_rows), "contributor": username}
 
