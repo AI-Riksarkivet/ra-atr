@@ -63,4 +63,9 @@ export interface ImageDocument {
   lines: Line[];
   groups: LineGroup[];
   groupCounter: number;
+  /** Riksarkivet metadata for lazy loading */
+  manifestId?: string;
+  pageNumber?: number;
+  /** True if image has not been fetched yet */
+  placeholder?: boolean;
 }

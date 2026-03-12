@@ -27,14 +27,17 @@
     goto('/viewer');
   }
 
-  function handleRiksarkivetPage(file: { name: string; imageData: ArrayBuffer; previewUrl: string }) {
-    const docId = appState.addDocument(file.name, file.previewUrl, file.imageData);
-    if (!appState.activeDocumentId) {
-      appState.activeDocumentId = docId;
+  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
+    for (const page of pages) {
+      const padded = String(page).padStart(5, '0');
+      const docId = appState.addPlaceholderDocument(
+        `${manifestId}_${padded}.jpg`, manifestId, page
+      );
+      if (!appState.activeDocumentId) {
+        appState.activeDocumentId = docId;
+        appState.loadDocumentImage(docId);
+      }
     }
-  }
-
-  function handleRiksarkivetDone() {
     appState.selectMode = true;
     goto('/viewer');
   }
@@ -62,8 +65,7 @@
 
     <div class="text-center text-xs text-muted-foreground uppercase tracking-wide">Riksarkivet</div>
     <RiksarkivetImport
-      onPage={handleRiksarkivetPage}
-      onDone={handleRiksarkivetDone}
+      onResolved={handleRiksarkivetResolved}
       disabled={!appState.htr.modelsReady}
     />
 

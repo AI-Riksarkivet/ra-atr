@@ -76,6 +76,31 @@ export interface ImportProgress {
 }
 
 /**
+ * Resolve a volume without fetching images — returns manifest ID and page numbers.
+ * Used for lazy loading where images are fetched on demand.
+ */
+export async function resolveVolume(
+  referenceCode: string,
+  onProgress: (progress: ImportProgress) => void,
+  pageRange?: { start: number; end: number },
+): Promise<{ manifestId: string; pages: number[] }> {
+  onProgress({ stage: 'resolving', currentPage: 0, totalPages: 0, manifestId: '' });
+  const manifestId = await resolveManifestId(referenceCode);
+
+  onProgress({ stage: 'manifest', currentPage: 0, totalPages: 0, manifestId });
+  const volumePages = await getPageCount(manifestId);
+
+  if (volumePages === 0) throw new Error('No pages found in this volume');
+
+  const start = pageRange ? Math.max(1, pageRange.start) : 1;
+  const end = pageRange ? Math.min(pageRange.end, volumePages) : volumePages;
+  const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+
+  onProgress({ stage: 'done', currentPage: pages.length, totalPages: pages.length, manifestId });
+  return { manifestId, pages };
+}
+
+/**
  * Import all pages from a Riksarkivet volume.
  * Calls onPage for each successfully fetched page.
  * Calls onProgress for status updates.

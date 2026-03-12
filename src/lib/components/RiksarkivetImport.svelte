@@ -1,14 +1,13 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { importVolume, type ImportProgress } from '$lib/riksarkivet';
+  import { resolveVolume, type ImportProgress } from '$lib/riksarkivet';
 
   interface Props {
-    onPage: (file: { name: string; imageData: ArrayBuffer; previewUrl: string }) => void;
-    onDone: () => void;
+    onResolved: (manifestId: string, pages: number[]) => void;
     disabled: boolean;
   }
 
-  let { onPage, onDone, disabled }: Props = $props();
+  let { onResolved, disabled }: Props = $props();
   let refCode = $state('');
   let pageRange = $state('1-20');
   let loading = $state(false);
@@ -29,14 +28,12 @@
     loading = true;
     progress = null;
     try {
-      await importVolume(
+      const { manifestId, pages } = await resolveVolume(
         refCode.trim(),
-        onPage,
         (p) => { progress = p; },
-        3,
         range,
       );
-      onDone();
+      onResolved(manifestId, pages);
     } catch {
       // error already in progress state
     } finally {
