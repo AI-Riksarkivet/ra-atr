@@ -57,7 +57,7 @@
     <input
       type="text"
       bind:value={refCode}
-      placeholder="Reference code, e.g. SE/RA/420177/02/A I a/3"
+      placeholder="Reference code or bild ID, e.g. R0003221"
       class="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
       disabled={disabled || loading}
       onkeydown={(e) => { if (e.key === 'Enter') handleImport(); }}

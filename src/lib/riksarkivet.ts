@@ -79,6 +79,11 @@ export interface ImportProgress {
  * Resolve a volume without fetching images — returns manifest ID and page numbers.
  * Used for lazy loading where images are fetched on demand.
  */
+/** Check if input looks like a manifest/bild ID (e.g. R0003221, C0102576) */
+function looksLikeManifestId(input: string): boolean {
+  return /^[A-Z]\d{5,}$/i.test(input.trim());
+}
+
 export async function resolveVolume(
   referenceCode: string,
   onProgress: (progress: ImportProgress) => void,
@@ -86,8 +91,13 @@ export async function resolveVolume(
 ): Promise<{ manifestId: string; pages: number[] }> {
   let manifestId = '';
   try {
-    onProgress({ stage: 'resolving', currentPage: 0, totalPages: 0, manifestId: '' });
-    manifestId = await resolveManifestId(referenceCode);
+    if (looksLikeManifestId(referenceCode)) {
+      manifestId = referenceCode.trim();
+      onProgress({ stage: 'manifest', currentPage: 0, totalPages: 0, manifestId });
+    } else {
+      onProgress({ stage: 'resolving', currentPage: 0, totalPages: 0, manifestId: '' });
+      manifestId = await resolveManifestId(referenceCode);
+    }
 
     onProgress({ stage: 'manifest', currentPage: 0, totalPages: 0, manifestId });
     const volumePages = await getPageCount(manifestId);
