@@ -122,7 +122,7 @@ class AppState {
   /** Check if there are any Riksarkivet documents with completed transcriptions */
   get canContribute(): boolean {
     return this.documents.some(d =>
-      d.manifestId && d.lines.some(l => l.text.trim() !== '')
+      d.manifestId && d.lines.some(l => l.complete && l.text.trim() !== '')
     );
   }
 
@@ -139,7 +139,7 @@ class AppState {
       for (const group of doc.groups) {
         const lines = group.lineIndices
           .map(i => doc.lines[i])
-          .filter(line => line && line.text.trim() !== '')
+          .filter(line => line && line.complete && line.text.trim() !== '')
           .map((line, idx) => ({
             line_index: idx,
             bbox: { x: line.bbox.x, y: line.bbox.y, w: line.bbox.w, h: line.bbox.h },
