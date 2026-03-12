@@ -27,7 +27,7 @@
     goto('/viewer');
   }
 
-  async function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
+  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
     for (const page of pages) {
       const padded = String(page).padStart(5, '0');
       const docId = appState.addPlaceholderDocument(
@@ -39,15 +39,15 @@
       }
     }
 
-    // Pre-populate existing transcriptions from backend
-    const { fetchTranscriptions } = await import('$lib/api');
-    const existingGroups = await fetchTranscriptions(manifestId);
-    if (existingGroups.length > 0) {
-      appState.populateFromBackend(manifestId, existingGroups);
-    }
-
     appState.selectMode = true;
     goto('/viewer');
+
+    // Pre-populate existing transcriptions from backend (non-blocking)
+    import('$lib/api').then(({ fetchTranscriptions }) =>
+      fetchTranscriptions(manifestId).then(groups => {
+        if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
+      }).catch(() => {})
+    );
   }
 
   function continueWorkspace() {
