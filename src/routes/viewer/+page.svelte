@@ -10,7 +10,7 @@
   import { Button } from '$lib/components/ui/button';
   import type { LineGroup, Line, BBox } from '$lib/types';
 
-  let dividerX = $state(60);
+  let dividerX = $state(30);
   let isDraggingDivider = $state(false);
   let docViewer: DocumentViewer;
 
@@ -233,7 +233,44 @@
 {/if}
 
 <div class="flex flex-1 overflow-hidden">
-  <div class="relative overflow-hidden" style="width: {dividerX}%">
+  <div class="overflow-hidden border-r border-border" style="width: {dividerX}%">
+    <TranscriptionPanel
+      documents={appState.documents}
+      activeDocumentId={appState.activeDocumentId}
+      onSwitchDocument={(id) => appState.switchDocument(id)}
+      hoveredLine={appState.hoveredLine}
+      onHoverLine={(i) => appState.hoveredLine = i}
+      selectedLines={appState.selectedLines}
+      onSelectLine={handleSelectLine}
+      onToggleGroup={toggleGroup}
+      onRenameGroup={renameGroup}
+      onDeleteGroup={deleteGroup}
+      onFocusGroup={(indices, rect) => {
+        if (indices.length > 0) docViewer?.focusLines(indices);
+        else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
+      }}
+      onFocusLine={(i) => docViewer?.focusLines([i])}
+      onEditLine={(i, text) => {
+        if (activeDoc?.lines[i]) {
+          activeDoc.lines[i].text = text;
+          appState.documents = [...appState.documents];
+          if (activeDoc.manifestId) appState.scheduleAutoSave();
+        }
+      }}
+      selectMode={appState.selectMode}
+      activeRegions={appState.htr.activeRegions}
+      activeImageIds={appState.htr.activeImageIds}
+    />
+  </div>
+  <div
+    class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
+    class:bg-primary={isDraggingDivider}
+    onpointerdown={onDividerPointerDown}
+    onpointermove={onDividerPointerMove}
+    onpointerup={onDividerPointerUp}
+    role="separator"
+  ></div>
+  <div class="relative overflow-hidden" style="width: {100 - dividerX}%">
     <DocumentViewer
       bind:this={docViewer}
       imageUrl={activeDoc?.imageUrl ?? null}
@@ -262,43 +299,6 @@
       }}
       groups={groups}
       selectMode={appState.selectMode}
-    />
-  </div>
-  <div
-    class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
-    class:bg-primary={isDraggingDivider}
-    onpointerdown={onDividerPointerDown}
-    onpointermove={onDividerPointerMove}
-    onpointerup={onDividerPointerUp}
-    role="separator"
-  ></div>
-  <div class="overflow-hidden border-l border-border" style="width: {100 - dividerX}%">
-    <TranscriptionPanel
-      documents={appState.documents}
-      activeDocumentId={appState.activeDocumentId}
-      onSwitchDocument={(id) => appState.switchDocument(id)}
-      hoveredLine={appState.hoveredLine}
-      onHoverLine={(i) => appState.hoveredLine = i}
-      selectedLines={appState.selectedLines}
-      onSelectLine={handleSelectLine}
-      onToggleGroup={toggleGroup}
-      onRenameGroup={renameGroup}
-      onDeleteGroup={deleteGroup}
-      onFocusGroup={(indices, rect) => {
-        if (indices.length > 0) docViewer?.focusLines(indices);
-        else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
-      }}
-      onFocusLine={(i) => docViewer?.focusLines([i])}
-      onEditLine={(i, text) => {
-        if (activeDoc?.lines[i]) {
-          activeDoc.lines[i].text = text;
-          appState.documents = [...appState.documents];
-          if (activeDoc.manifestId) appState.scheduleAutoSave();
-        }
-      }}
-      selectMode={appState.selectMode}
-      activeRegions={appState.htr.activeRegions}
-    activeImageIds={appState.htr.activeImageIds}
     />
   </div>
 </div>

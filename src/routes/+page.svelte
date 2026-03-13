@@ -108,5 +108,6 @@
         Continue workspace ({appState.documents.length} image{appState.documents.length !== 1 ? 's' : ''})
       </button>
     {/if}
+
   </div>
 </div>

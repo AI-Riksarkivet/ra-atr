@@ -22,9 +22,10 @@ export interface TranscriptionGroup {
   }[];
 }
 
-export async function fetchTranscriptions(manifestId: string): Promise<TranscriptionGroup[]> {
+export async function fetchTranscriptions(manifestId: string, query?: string): Promise<TranscriptionGroup[]> {
   if (!API_BASE) return [];
-  const res = await fetch(`${API_BASE}/transcriptions/${manifestId}`, {
+  const params = query ? `?q=${encodeURIComponent(query)}` : '';
+  const res = await fetch(`${API_BASE}/transcriptions/${manifestId}${params}`, {
     headers: authHeaders(),
   });
   if (!res.ok) return [];
@@ -48,6 +49,26 @@ export async function saveTranscriptions(
   });
   if (!res.ok) throw new Error(`Save failed: ${res.status}`);
   return res.json();
+}
+
+export interface SavedManifest {
+  manifest_id: string;
+  reference_code: string;
+  lines: number;
+  groups: number;
+  pages: number;
+  last_saved: string;
+}
+
+export async function listTranscriptions(query?: string): Promise<SavedManifest[]> {
+  if (!API_BASE) return [];
+  const params = query ? `?q=${encodeURIComponent(query)}` : '';
+  const res = await fetch(`${API_BASE}/transcriptions${params}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.manifests ?? [];
 }
 
 export async function deleteTranscriptions(manifestId: string): Promise<void> {

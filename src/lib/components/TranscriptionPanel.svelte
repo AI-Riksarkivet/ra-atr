@@ -111,6 +111,25 @@
 
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
+  // Search filter
+  let searchQuery = $state('');
+  let filter = $derived(searchQuery.trim().toLowerCase());
+
+  function lineMatches(doc: ImageDocument, lineIdx: number): boolean {
+    if (!filter) return true;
+    return doc.lines[lineIdx]?.text?.toLowerCase().includes(filter) ?? false;
+  }
+
+  function groupHasMatches(doc: ImageDocument, lineIndices: number[]): boolean {
+    if (!filter) return true;
+    return lineIndices.some(i => lineMatches(doc, i));
+  }
+
+  function docHasMatches(doc: ImageDocument): boolean {
+    if (!filter) return true;
+    return doc.lines.some((l) => l.text?.toLowerCase().includes(filter));
+  }
+
   // Collapsed state for volumes, pages, groups
   let collapsedVolumes = $state(new Set<string>());
   let collapsedDocs = $state(new Set<string>());
@@ -153,8 +172,24 @@
 
 <div class="overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed h-full" bind:this={panelEl}>
 
+  <!-- Search -->
+  <div class="mb-3">
+    <input
+      type="text"
+      bind:value={searchQuery}
+      placeholder="Filter transcriptions..."
+      class="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-sans text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+    />
+  </div>
+
+  {#if filter && !documents.some(d => docHasMatches(d))}
+    <div class="mb-3 text-xs text-muted-foreground font-sans italic px-1">No matches</div>
+  {/if}
+
   <!-- Volumes (Riksarkivet) -->
   {#each volumes.volumes as vol}
+    {@const volHasMatches = !filter || vol.docs.some(d => docHasMatches(d))}
+    {#if volHasMatches}
     {@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
     {@const volLines = vol.docs.reduce((n, d) => n + d.lines.length, 0)}
     {@const volCompleted = vol.docs.reduce((n, d) => n + d.lines.filter(l => l.complete).length, 0)}
@@ -181,6 +216,7 @@
     {#if !volCollapsed}
       <div class="pl-2">
         {#each vol.docs as doc}
+          {#if !filter || docHasMatches(doc)}
           {@const isActive = doc.id === activeDocumentId}
           {@const isCollapsed = collapsedDocs.has(doc.id)}
           {@const isWorking = activeImageIds.has(doc.id)}
@@ -214,8 +250,10 @@
 
             <div class="pl-3">
               {#each doc.groups as group, gi}
-                {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
-                {@render groupBlock(doc, group, gi, groupWorking)}
+                {#if !filter || groupHasMatches(doc, group.lineIndices)}
+                  {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
+                  {@render groupBlock(doc, group, gi, groupWorking)}
+                {/if}
               {/each}
 
               {#if ungroupedIndices.length > 0}
@@ -227,7 +265,7 @@
                 {/each}
               {/if}
 
-              {#if doc.lines.length === 0 && doc.groups.length === 0}
+              {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
                 <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Draw regions to detect text lines</p>
               {/if}
             </div>
@@ -240,13 +278,16 @@
               {/if}
             </div>
           {/if}
+          {/if}
         {/each}
       </div>
+    {/if}
     {/if}
   {/each}
 
   <!-- Standalone uploads (no manifest) -->
   {#each volumes.standalone as doc}
+    {#if !filter || docHasMatches(doc)}
     {@const isActive = doc.id === activeDocumentId}
     {@const isCollapsed = collapsedDocs.has(doc.id)}
     {@const isWorking = activeImageIds.has(doc.id)}
@@ -278,8 +319,10 @@
 
       <div class="pl-2">
         {#each doc.groups as group, gi}
-          {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
-          {@render groupBlock(doc, group, gi, groupWorking)}
+          {#if !filter || groupHasMatches(doc, group.lineIndices)}
+            {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
+            {@render groupBlock(doc, group, gi, groupWorking)}
+          {/if}
         {/each}
 
         {#if ungroupedIndices.length > 0}
@@ -291,7 +334,7 @@
           {/each}
         {/if}
 
-        {#if doc.lines.length === 0 && doc.groups.length === 0}
+        {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
           <p class="text-muted-foreground italic text-center text-sm mt-4">Draw regions to detect text lines</p>
         {/if}
       </div>
@@ -303,6 +346,7 @@
           <p class="text-muted-foreground text-xs">{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}</p>
         {/if}
       </div>
+    {/if}
     {/if}
   {/each}
 
@@ -352,7 +396,7 @@
 {/snippet}
 
 {#snippet lineRow(doc: ImageDocument, lineIdx: number)}
-  {#if doc.lines[lineIdx]}
+  {#if doc.lines[lineIdx] && lineMatches(doc, lineIdx)}
     <div
       class="flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
       data-line={lineIdx}

@@ -106,6 +106,51 @@ def init_db():
         table = db.create_table(TABLE_NAME, schema=SCHEMA, mode="overwrite")
 
 
+def _rebuild_fts():
+    """Rebuild ngram prefix index on the text column for substring search."""
+    try:
+        if table is not None and table.count_rows() > 0:
+            table.create_fts_index(
+                "text", replace=True,
+                base_tokenizer="ngram", ngram_min_length=2, prefix_only=True,
+            )
+    except Exception as e:
+        print(f"FTS index build skipped: {e}")
+
+
+def _search_fts(q: str, contributor: str) -> pa.Table:
+    """Search using FTS on text + pyarrow substring match on metadata columns."""
+    all_rows = _query(contributor=contributor)
+    if len(all_rows) == 0:
+        return all_rows
+
+    # FTS on text column
+    fts_ids: set[str] = set()
+    try:
+        fts_results = table.search(q, query_type="fts").limit(10000).to_arrow()
+        if len(fts_results) > 0:
+            fts_ids = set(fts_results.column("id").to_pylist())
+    except Exception:
+        pass
+
+    # Substring match on metadata columns via pyarrow
+    q_lower = q.lower()
+    mid_match = pc.match_substring(pc.utf8_lower(all_rows.column("manifest_id")), q_lower)
+    ref_match = pc.match_substring(pc.utf8_lower(all_rows.column("reference_code")), q_lower)
+    grp_match = pc.match_substring(pc.utf8_lower(all_rows.column("group_name")), q_lower)
+
+    col_mask = pc.or_(pc.or_(mid_match, ref_match), grp_match)
+    col_hits = all_rows.filter(col_mask)
+
+    # Merge: FTS hits + column hits
+    if fts_ids:
+        id_match = pc.is_in(all_rows.column("id"), pa.array(list(fts_ids)))
+        combined_mask = pc.or_(col_mask, id_match)
+        return all_rows.filter(combined_mask)
+
+    return col_hits
+
+
 def init_scheduler():
     global scheduler
     PARQUET_DIR.mkdir(parents=True, exist_ok=True)
@@ -178,6 +223,8 @@ def _resolve_user(request: Request) -> str | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _rebuild_fts()
+
     init_scheduler()
     yield
 
@@ -199,8 +246,9 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/transcriptions/{manifest_id}")
-def get_transcriptions(manifest_id: str, request: Request):
+@app.get("/transcriptions")
+def list_transcriptions(request: Request, q: str | None = None):
+    """List all manifests for the current user, optionally filtered by search query."""
     if table is None:
         raise HTTPException(503, "Database not initialized")
 
@@ -208,38 +256,106 @@ def get_transcriptions(manifest_id: str, request: Request):
     if username is None:
         raise HTTPException(401, "Login with Hugging Face required")
 
-    rows = _query(manifest_id=manifest_id, contributor=username)
+    rows = _search_fts(q, username) if q else _query(contributor=username)
+    if len(rows) == 0:
+        return {"manifests": []}
+
+    # Group by manifest_id using pyarrow
+    manifest_ids = rows.column("manifest_id")
+    unique_mids = pc.unique(manifest_ids).to_pylist()
+
+    manifests = []
+    for mid in unique_mids:
+        mask = pc.equal(manifest_ids, mid)
+        subset = rows.filter(mask)
+        manifests.append({
+            "manifest_id": mid,
+            "reference_code": subset.column("reference_code")[0].as_py(),
+            "lines": len(subset),
+            "groups": len(pc.unique(subset.column("group_name")).to_pylist()),
+            "pages": len(pc.unique(subset.column("page_number")).to_pylist()),
+            "last_saved": pc.max(subset.column("created_at")).as_py().isoformat(),
+        })
+
+    manifests.sort(key=lambda m: m["last_saved"], reverse=True)
+    return {"manifests": manifests}
+
+
+@app.get("/transcriptions/{manifest_id}")
+def get_transcriptions(manifest_id: str, request: Request, q: str | None = None):
+    if table is None:
+        raise HTTPException(503, "Database not initialized")
+
+    username = _resolve_user(request)
+    if username is None:
+        raise HTTPException(401, "Login with Hugging Face required")
+
+    if q:
+        # Filter: FTS on text + substring on metadata, scoped to this manifest & user
+        all_user = _query(manifest_id=manifest_id, contributor=username)
+        if len(all_user) == 0:
+            return {"manifest_id": manifest_id, "groups": []}
+        # FTS hits
+        fts_ids: set[str] = set()
+        try:
+            fts_results = table.search(q, query_type="fts").limit(10000).to_arrow()
+            if len(fts_results) > 0:
+                fts_ids = set(fts_results.column("id").to_pylist())
+        except Exception:
+            pass
+        # Substring on metadata
+        q_lower = q.lower()
+        grp_match = pc.match_substring(pc.utf8_lower(all_user.column("group_name")), q_lower)
+        txt_match = pc.match_substring(pc.utf8_lower(all_user.column("text")), q_lower)
+        col_mask = pc.or_(grp_match, txt_match)
+        if fts_ids:
+            id_match = pc.is_in(all_user.column("id"), pa.array(list(fts_ids)))
+            rows = all_user.filter(pc.or_(col_mask, id_match))
+        else:
+            rows = all_user.filter(col_mask)
+    else:
+        rows = _query(manifest_id=manifest_id, contributor=username)
+
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "groups": []}
 
-    df = rows.to_pandas()
+    # Group by (page_number, group_name) using pyarrow
+    pages = rows.column("page_number")
+    gnames = rows.column("group_name")
+    # Build unique (page, group) pairs
+    seen: dict[tuple, list[int]] = {}
+    for i in range(len(rows)):
+        key = (pages[i].as_py(), gnames[i].as_py())
+        seen.setdefault(key, []).append(i)
 
     groups = []
-    for (page, gname), gdf in df.groupby(["page_number", "group_name"]):
-        first = gdf.iloc[0]
+    for (page, gname), indices in seen.items():
+        # Sort by line_index
+        indices.sort(key=lambda i: rows.column("line_index")[i].as_py())
+        first = indices[0]
         lines = []
-        for _, row in gdf.sort_values("line_index").iterrows():
+        for i in indices:
             lines.append({
-                "line_index": int(row["line_index"]),
+                "line_index": rows.column("line_index")[i].as_py(),
                 "bbox": {
-                    "x": float(row["bbox_x"]),
-                    "y": float(row["bbox_y"]),
-                    "w": float(row["bbox_w"]),
-                    "h": float(row["bbox_h"]),
+                    "x": rows.column("bbox_x")[i].as_py(),
+                    "y": rows.column("bbox_y")[i].as_py(),
+                    "w": rows.column("bbox_w")[i].as_py(),
+                    "h": rows.column("bbox_h")[i].as_py(),
                 },
-                "text": row["text"],
-                "confidence": float(row["confidence"]),
-                "source": row["source"],
-                "contributor": row["contributor"],
+                "text": rows.column("text")[i].as_py(),
+                "confidence": rows.column("confidence")[i].as_py(),
+                "source": rows.column("source")[i].as_py(),
+                "contributor": rows.column("contributor")[i].as_py(),
             })
         groups.append({
-            "page_number": int(page),
+            "page_number": page,
             "group_name": gname,
             "group_rect": {
-                "x": float(first["group_rect_x"]),
-                "y": float(first["group_rect_y"]),
-                "w": float(first["group_rect_w"]),
-                "h": float(first["group_rect_h"]),
+                "x": rows.column("group_rect_x")[first].as_py(),
+                "y": rows.column("group_rect_y")[first].as_py(),
+                "w": rows.column("group_rect_w")[first].as_py(),
+                "h": rows.column("group_rect_h")[first].as_py(),
             },
             "lines": lines,
         })
@@ -305,6 +421,7 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     print(f"POST {manifest_id} by {username}: added {len(new_rows)}, total now {final}")
 
     flush_to_parquet()
+    _rebuild_fts()
 
     return {"status": "ok", "lines_added": len(new_rows), "contributor": username}
 
@@ -320,6 +437,7 @@ def delete_transcriptions(manifest_id: str, request: Request):
 
     _remove(manifest_id=manifest_id, contributor=username)
     flush_to_parquet()
+    _rebuild_fts()
 
     return {"status": "ok", "manifest_id": manifest_id, "contributor": username}
 
@@ -333,22 +451,18 @@ def get_history(manifest_id: str):
     if len(rows) == 0:
         return {"manifest_id": manifest_id, "contributions": []}
 
-    df = rows.to_pandas()
-    contributions = (
-        df.groupby(["contributor", "created_at"])
-        .agg(lines=("id", "count"))
-        .reset_index()
-        .sort_values("created_at", ascending=False)
-    )
+    # Group by (contributor, created_at) using pyarrow
+    contributors = rows.column("contributor")
+    timestamps = rows.column("created_at")
+    seen: dict[tuple, int] = {}
+    for i in range(len(rows)):
+        key = (contributors[i].as_py(), timestamps[i].as_py())
+        seen[key] = seen.get(key, 0) + 1
 
-    return {
-        "manifest_id": manifest_id,
-        "contributions": [
-            {
-                "contributor": r["contributor"],
-                "created_at": r["created_at"].isoformat(),
-                "lines": int(r["lines"]),
-            }
-            for _, r in contributions.iterrows()
-        ],
-    }
+    contributions = [
+        {"contributor": k[0], "created_at": k[1].isoformat(), "lines": count}
+        for k, count in seen.items()
+    ]
+    contributions.sort(key=lambda c: c["created_at"], reverse=True)
+
+    return {"manifest_id": manifest_id, "contributions": contributions}
