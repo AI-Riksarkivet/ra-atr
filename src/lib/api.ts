@@ -79,3 +79,40 @@ export async function deleteTranscriptions(manifestId: string): Promise<void> {
   });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
+
+export interface CatalogResult {
+  reference_code: string;
+  fonds_title: string;
+  series_title: string;
+  volume_id: string;
+  date_text: string;
+  description: string;
+  digitized: boolean;
+}
+
+export async function searchCatalog(params: {
+  q: string;
+  digitized?: boolean;
+  date_start?: number;
+  date_end?: number;
+  archive?: string;
+  mode?: 'fts' | 'vector' | 'hybrid';
+  limit?: number;
+  offset?: number;
+}): Promise<{ results: CatalogResult[]; total: number }> {
+  if (!API_BASE) return { results: [], total: 0 };
+  const searchParams = new URLSearchParams();
+  searchParams.set('q', params.q);
+  if (params.digitized !== undefined) searchParams.set('digitized', String(params.digitized));
+  if (params.date_start !== undefined) searchParams.set('date_start', String(params.date_start));
+  if (params.date_end !== undefined) searchParams.set('date_end', String(params.date_end));
+  if (params.archive) searchParams.set('archive', params.archive);
+  if (params.mode) searchParams.set('mode', params.mode);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  if (params.offset) searchParams.set('offset', String(params.offset));
+  const res = await fetch(`${API_BASE}/catalog/search?${searchParams}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return { results: [], total: 0 };
+  return res.json();
+}

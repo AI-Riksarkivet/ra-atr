@@ -1,10 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { appState } from '$lib/stores/app-state.svelte';
+  import { resolveVolume } from '$lib/riksarkivet';
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import ModelManager from '$lib/components/ModelManager.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import RiksarkivetImport from '$lib/components/RiksarkivetImport.svelte';
+  import CatalogSearch from '$lib/components/CatalogSearch.svelte';
 
   let videoEl = $state<HTMLVideoElement>();
   let videoStarted = false;
@@ -59,6 +61,23 @@
     }
   }
 
+  let catalogLoading = $state(false);
+  let catalogError = $state('');
+
+  async function handleCatalogLoad(referenceCode: string) {
+    if (catalogLoading) return;
+    catalogLoading = true;
+    catalogError = '';
+    try {
+      const { manifestId, pages } = await resolveVolume(referenceCode, () => {});
+      handleRiksarkivetResolved(manifestId, pages);
+    } catch (e) {
+      catalogError = e instanceof Error ? e.message : 'Failed to load volume';
+    } finally {
+      catalogLoading = false;
+    }
+  }
+
   function continueWorkspace() {
     goto('/viewer');
   }
@@ -81,6 +100,13 @@
     {/if}
 
     <div class="text-center text-xs text-muted-foreground uppercase tracking-wide">Riksarkivet</div>
+    <CatalogSearch onLoad={handleCatalogLoad} />
+    {#if catalogLoading}
+      <p class="text-xs text-muted-foreground animate-pulse text-center">Loading volume...</p>
+    {/if}
+    {#if catalogError}
+      <p class="text-xs text-destructive text-center">{catalogError}</p>
+    {/if}
     <RiksarkivetImport
       onResolved={handleRiksarkivetResolved}
       disabled={false}
