@@ -4,6 +4,33 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+import pyarrow as pa
+import lancedb
+
+CATALOG_TABLE = "archive_catalog"
+EMBED_MODEL = "intfloat/multilingual-e5-small"
+EMBED_DIM = 384
+
+CATALOG_SCHEMA = pa.schema([
+    pa.field("id", pa.string()),
+    pa.field("reference_code", pa.string()),
+    pa.field("archive_code", pa.string()),
+    pa.field("fonds_id", pa.string()),
+    pa.field("fonds_title", pa.string()),
+    pa.field("fonds_description", pa.string()),
+    pa.field("creator", pa.string()),
+    pa.field("series_id", pa.string()),
+    pa.field("series_title", pa.string()),
+    pa.field("volume_id", pa.string()),
+    pa.field("date_text", pa.string()),
+    pa.field("date_start", pa.int32()),
+    pa.field("date_end", pa.int32()),
+    pa.field("description", pa.string()),
+    pa.field("digitized", pa.bool_()),
+    pa.field("search_text", pa.string()),
+    pa.field("vector", pa.list_(pa.float32(), EMBED_DIM)),
+])
+
 NS = "http://xml.ra.se/EAD"
 
 
@@ -149,3 +176,51 @@ def walk_archive_dir(directory: str, limit: int | None = None):
             count += 1
         except ET.ParseError as e:
             print(f"Skipping {fname}: {e}")
+
+
+def create_embedder():
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer(EMBED_MODEL)
+
+
+def embed_batch(embedder, texts: list[str]) -> list[list[float]]:
+    # e5 models expect "query: " or "passage: " prefix
+    prefixed = [f"passage: {t}" for t in texts]
+    vecs = embedder.encode(prefixed, normalize_embeddings=True)
+    return [v.tolist() for v in vecs]
+
+
+def ingest_rows(
+    rows: list[dict],
+    db_path: str,
+    batch_size: int = 10_000,
+    embed: bool = True,
+) -> dict:
+    """Write rows to LanceDB archive_catalog table in batches."""
+    db = lancedb.connect(db_path)
+    embedder = create_embedder() if embed else None
+
+    written = 0
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i : i + batch_size]
+
+        if embedder:
+            vectors = embed_batch(embedder, [r["search_text"] for r in batch])
+            for row, vec in zip(batch, vectors):
+                row["vector"] = vec
+        else:
+            for row in batch:
+                row["vector"] = [0.0] * EMBED_DIM
+
+        arrow_batch = pa.Table.from_pylist(batch, schema=CATALOG_SCHEMA)
+
+        if written == 0:
+            table = db.create_table(CATALOG_TABLE, arrow_batch, mode="overwrite")
+        else:
+            table = db.open_table(CATALOG_TABLE)
+            table.add(arrow_batch)
+
+        written += len(batch)
+        print(f"  Written {written} rows...")
+
+    return {"rows_written": written}

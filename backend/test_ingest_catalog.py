@@ -99,3 +99,44 @@ def test_walk_directory():
     assert len(rows) > 0
     # Each row is a dict with expected keys
     assert "reference_code" in rows[0]
+
+
+def test_embed_texts():
+    from ingest_catalog import create_embedder, embed_batch
+
+    embedder = create_embedder()
+    texts = ["Swedish council protocols", "Krigsarkivet military records"]
+    vectors = embed_batch(embedder, texts)
+    assert len(vectors) == 2
+    assert len(vectors[0]) == 384  # e5-small output dim
+
+
+def test_ingest_to_lancedb(tmp_path):
+    from ingest_catalog import parse_ead_file, ingest_rows
+
+    rows = parse_ead_file(SAMPLE_FILE)[:20]  # Small sample
+    db_path = str(tmp_path / "test_lance")
+    stats = ingest_rows(rows, db_path, batch_size=10, embed=False)
+    assert stats["rows_written"] == 20
+
+    import lancedb
+    db = lancedb.connect(db_path)
+    table = db.open_table("archive_catalog")
+    assert table.count_rows() == 20
+
+
+def test_ingest_with_embeddings(tmp_path):
+    from ingest_catalog import parse_ead_file, ingest_rows
+
+    rows = parse_ead_file(SAMPLE_FILE)[:5]
+    db_path = str(tmp_path / "test_lance_vec")
+    stats = ingest_rows(rows, db_path, batch_size=5, embed=True)
+    assert stats["rows_written"] == 5
+
+    import lancedb
+    db = lancedb.connect(db_path)
+    table = db.open_table("archive_catalog")
+    assert table.count_rows() == 5
+    # Vector column exists
+    arrow = table.to_arrow()
+    assert "vector" in arrow.column_names
