@@ -19,11 +19,13 @@ def _setup_db(tmp_path: Path):
     tbl = db.create_table("transcriptions", schema=SCHEMA, mode="overwrite")
     app_module.db = db
     app_module.table = tbl
+    app_module.catalog_table = None
     app_module.PARQUET_DIR = tmp_path / "parquet"
     app_module.PARQUET_DIR.mkdir()
     yield
     app_module.db = None
     app_module.table = None
+    app_module.catalog_table = None
 
 
 @pytest.fixture()
@@ -257,6 +259,38 @@ def test_flush_creates_parquet(client: TestClient):
         client.post("/transcriptions/R0003221", json=SAMPLE_BODY, headers=AUTH_HEADERS)
     parquet_file = app_module.PARQUET_DIR / "transcriptions.parquet"
     assert parquet_file.exists()
+
+
+# --- Catalog search ---
+
+
+def test_catalog_search_fts(client):
+    """GET /catalog/search?q=... returns FTS results."""
+    res = client.get("/catalog/search", params={"q": "protokoll", "limit": 5})
+    assert res.status_code == 200
+    data = res.json()
+    assert "results" in data
+    assert "total" in data
+
+
+def test_catalog_search_filters(client):
+    """Filters: digitized, date range, archive."""
+    res = client.get("/catalog/search", params={
+        "q": "protokoll",
+        "digitized": "true",
+        "date_start": 1600,
+        "date_end": 1700,
+        "archive": "SE_RA",
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert "results" in data
+
+
+def test_catalog_search_requires_query(client):
+    """Empty query returns 400."""
+    res = client.get("/catalog/search")
+    assert res.status_code == 400
 
 
 # --- Helpers ---

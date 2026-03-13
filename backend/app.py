@@ -42,6 +42,7 @@ SCHEMA = pa.schema([
 
 db = None
 table = None
+catalog_table = None
 scheduler = None
 
 
@@ -151,6 +152,15 @@ def _search_fts(q: str, contributor: str) -> pa.Table:
     return col_hits
 
 
+def init_catalog():
+    global catalog_table
+    try:
+        catalog_table = db.open_table("archive_catalog")
+        print(f"Catalog table: {catalog_table.count_rows()} rows")
+    except Exception:
+        print("No catalog table found — run ingest_catalog.py first")
+
+
 def init_scheduler():
     global scheduler
     PARQUET_DIR.mkdir(parents=True, exist_ok=True)
@@ -224,6 +234,7 @@ def _resolve_user(request: Request) -> str | None:
 async def lifespan(app: FastAPI):
     init_db()
     _rebuild_fts()
+    init_catalog()
 
     init_scheduler()
     yield
@@ -440,6 +451,101 @@ def delete_transcriptions(manifest_id: str, request: Request):
     _rebuild_fts()
 
     return {"status": "ok", "manifest_id": manifest_id, "contributor": username}
+
+
+@app.get("/catalog/search")
+def catalog_search(
+    q: str = "",
+    digitized: bool | None = None,
+    date_start: int | None = None,
+    date_end: int | None = None,
+    archive: str | None = None,
+    mode: str = "fts",
+    limit: int = 50,
+    offset: int = 0,
+):
+    if not q:
+        raise HTTPException(400, "Query required")
+
+    if catalog_table is None:
+        # No catalog loaded — return empty results (not an error)
+        return {"results": [], "total": 0}
+
+    if mode == "vector":
+        results = _catalog_vector_search(q, limit + offset)
+    elif mode == "hybrid":
+        results = _catalog_hybrid_search(q, limit + offset)
+    else:
+        results = _catalog_fts_search(q, limit + offset)
+
+    # Apply filters with pyarrow
+    if len(results) > 0 and digitized is not None:
+        mask = pc.equal(results.column("digitized"), digitized)
+        results = results.filter(mask)
+    if len(results) > 0 and date_start is not None:
+        not_null = pc.is_valid(results.column("date_end"))
+        gte = pc.greater_equal(results.column("date_end"), date_start)
+        results = results.filter(pc.and_(not_null, gte))
+    if len(results) > 0 and date_end is not None:
+        not_null = pc.is_valid(results.column("date_start"))
+        lte = pc.less_equal(results.column("date_start"), date_end)
+        results = results.filter(pc.and_(not_null, lte))
+    if len(results) > 0 and archive:
+        mask = pc.equal(results.column("archive_code"), archive)
+        results = results.filter(mask)
+
+    total = len(results)
+    results = results.slice(offset, limit)
+
+    return {
+        "results": [
+            {
+                "reference_code": results.column("reference_code")[i].as_py(),
+                "fonds_title": results.column("fonds_title")[i].as_py(),
+                "series_title": results.column("series_title")[i].as_py(),
+                "volume_id": results.column("volume_id")[i].as_py(),
+                "date_text": results.column("date_text")[i].as_py(),
+                "description": results.column("description")[i].as_py(),
+                "digitized": results.column("digitized")[i].as_py(),
+            }
+            for i in range(len(results))
+        ],
+        "total": total,
+    }
+
+
+def _catalog_fts_search(q: str, limit: int) -> pa.Table:
+    try:
+        return catalog_table.search(q, query_type="fts").limit(limit).to_arrow()
+    except Exception:
+        return catalog_table.to_arrow().slice(0, 0)  # empty with correct schema
+
+
+def _catalog_vector_search(q: str, limit: int) -> pa.Table:
+    try:
+        from ingest_catalog import create_embedder, embed_batch
+        # Lazy-load embedder
+        if not hasattr(_catalog_vector_search, "_embedder"):
+            _catalog_vector_search._embedder = create_embedder()
+        vec = embed_batch(_catalog_vector_search._embedder, [q])[0]
+        return catalog_table.search(vec).limit(limit).to_arrow()
+    except Exception:
+        return catalog_table.to_arrow().slice(0, 0)
+
+
+def _catalog_hybrid_search(q: str, limit: int) -> pa.Table:
+    fts = _catalog_fts_search(q, limit)
+    vec = _catalog_vector_search(q, limit)
+    if len(fts) == 0:
+        return vec
+    if len(vec) == 0:
+        return fts
+    vec_ids = set(vec.column("id").to_pylist())
+    fts_only_mask = pc.invert(pc.is_in(fts.column("id"), pa.array(list(vec_ids))))
+    fts_only = fts.filter(fts_only_mask)
+    if len(fts_only) > 0:
+        return pa.concat_tables([vec, fts_only])
+    return vec
 
 
 @app.get("/transcriptions/{manifest_id}/history")
