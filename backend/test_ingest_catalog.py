@@ -53,3 +53,49 @@ def test_parse_date_range():
     assert parse_date_range("1300-talets början--1400-talets slut") == (1300, 1400)
     assert parse_date_range(None) == (None, None)
     assert parse_date_range("") == (None, None)
+
+
+SAMPLE_FILES = [
+    os.path.join(DATA_DIR, "SE_RA", "SE_RA_1111.xml"),
+    os.path.join(DATA_DIR, "SE_LLA", "SE_LLA_10001.xml"),
+    os.path.join(DATA_DIR, "SE_KrA", "SE_KrA_0001.xml"),
+    os.path.join(DATA_DIR, "SE_GLA", "SE_GLA_10001.xml"),
+    os.path.join(DATA_DIR, "SE_ViLA", "SE_ViLA_10008.xml"),
+]
+
+
+def test_parse_multiple_archives():
+    """Parser handles different archive structures consistently."""
+    from ingest_catalog import parse_ead_file
+
+    for path in SAMPLE_FILES:
+        if not os.path.exists(path):
+            pytest.skip(f"Missing: {path}")
+        rows = parse_ead_file(path)
+        assert len(rows) > 0, f"No volumes in {path}"
+        for row in rows[:5]:
+            assert row["reference_code"], f"Empty ref code in {path}"
+            assert row["archive_code"], f"Empty archive code in {path}"
+            assert row["search_text"], f"Empty search text in {path}"
+
+
+def test_parse_file_with_no_volumes():
+    """Files with only fonds/series (no volumes) return empty list."""
+    from ingest_catalog import parse_ead_file
+
+    # SE_RA_0104 has only fonds-level components
+    path = os.path.join(DATA_DIR, "SE_RA", "SE_RA_0104.xml")
+    if not os.path.exists(path):
+        pytest.skip("Missing sample file")
+    rows = parse_ead_file(path)
+    assert rows == []
+
+
+def test_walk_directory():
+    """walk_archive_dir yields rows from all XML files."""
+    from ingest_catalog import walk_archive_dir
+
+    rows = list(walk_archive_dir(os.path.join(DATA_DIR, "SE_ViLA"), limit=5))
+    assert len(rows) > 0
+    # Each row is a dict with expected keys
+    assert "reference_code" in rows[0]

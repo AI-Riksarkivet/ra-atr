@@ -132,3 +132,20 @@ def parse_ead_file(path: str) -> list[dict]:
             })
 
     return rows
+
+
+def walk_archive_dir(directory: str, limit: int | None = None):
+    """Yield volume dicts from all XML files in a directory."""
+    count = 0
+    for fname in sorted(os.listdir(directory)):
+        if not fname.endswith(".xml"):
+            continue
+        if limit is not None and count >= limit:
+            break
+        try:
+            rows = parse_ead_file(os.path.join(directory, fname))
+            for row in rows:
+                yield row
+            count += 1
+        except ET.ParseError as e:
+            print(f"Skipping {fname}: {e}")
