@@ -224,3 +224,67 @@ def ingest_rows(
         print(f"  Written {written} rows...")
 
     return {"rows_written": written}
+
+
+def build_fts_index(db_path: str):
+    """Build FTS ngram index on search_text column."""
+    db = lancedb.connect(db_path)
+    table = db.open_table(CATALOG_TABLE)
+    try:
+        table.create_fts_index(
+            "search_text", replace=True,
+            base_tokenizer="ngram", ngram_min_length=2, prefix_only=True,
+        )
+        print(f"FTS index built on {table.count_rows()} rows")
+    except Exception as e:
+        print(f"FTS index failed: {e}")
+
+
+def main():
+    import argparse
+    import time
+
+    parser = argparse.ArgumentParser(description="Ingest Riksarkivet EAD metadata into LanceDB")
+    parser.add_argument("data_dir", help="Path to Riksarkivet-2022-12-16 directory")
+    parser.add_argument("--db-path", default="/tmp/lancedb", help="LanceDB directory")
+    parser.add_argument("--sample", type=int, default=0, help="Only process N files per archive (0=all)")
+    parser.add_argument("--batch-size", type=int, default=10_000)
+    parser.add_argument("--no-embed", action="store_true", help="Skip embedding (for testing)")
+    args = parser.parse_args()
+
+    t0 = time.time()
+    all_rows = []
+
+    for archive_dir in sorted(os.listdir(args.data_dir)):
+        full_path = os.path.join(args.data_dir, archive_dir)
+        if not os.path.isdir(full_path):
+            continue
+        print(f"Parsing {archive_dir}...")
+        count = 0
+        for row in walk_archive_dir(full_path, limit=args.sample or None):
+            all_rows.append(row)
+            count += 1
+        print(f"  {count} volumes from {archive_dir}")
+
+    print(f"Total: {len(all_rows)} volumes parsed in {time.time() - t0:.1f}s")
+
+    if not all_rows:
+        print("No volumes found, exiting.")
+        return
+
+    print("Ingesting into LanceDB...")
+    stats = ingest_rows(
+        all_rows, args.db_path,
+        batch_size=args.batch_size,
+        embed=not args.no_embed,
+    )
+    print(f"Wrote {stats['rows_written']} rows to {args.db_path}")
+
+    print("Building FTS index...")
+    build_fts_index(args.db_path)
+
+    print(f"Done in {time.time() - t0:.1f}s total")
+
+
+if __name__ == "__main__":
+    main()
