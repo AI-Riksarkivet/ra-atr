@@ -1,22 +1,17 @@
 import * as ort from 'onnxruntime-web';
 import { downloadAndCacheModel } from './lib/model-cache';
 import { decodeImage } from './lib/preprocessing';
+import { parseRTMDetOutput } from './lib/rtmdet';
 
-// Layout detection worker: PP-DocLayout-L
+// Layout detection worker: Riksarkivet RTMDet regions
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4)) : 1;
 
-const MODEL_URL = '/models/pp-doclayout-l.onnx';
+const MODEL_URL = '/models/rtmdet-regions.onnx';
 const INPUT_SIZE = 640;
-const CONF_THRESHOLD = 0.5;
-
-const LABELS = [
-  'paragraph_title', 'image', 'text', 'number', 'abstract', 'content',
-  'figure_title', 'formula', 'table', 'table_title', 'reference',
-  'doc_title', 'footnote', 'header', 'algorithm', 'footer', 'seal',
-  'chart_title', 'chart', 'formula_number', 'header_image', 'footer_image',
-  'aside_text',
-];
+const CONF_THRESHOLD = 0.3;
+const IOU_THRESHOLD = 0.45;
+const LABELS = ['text_region'];
 
 let session: ort.InferenceSession | null = null;
 const imageStore = new Map<string, ImageData>();
@@ -33,7 +28,7 @@ self.onmessage = async (e: MessageEvent) => {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
-        console.log('[layout] model loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
+        console.log('[layout] RTMDet loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'layout', status: 'loaded' } });
         self.postMessage({ type: 'ready' });
         break;
@@ -54,7 +49,7 @@ self.onmessage = async (e: MessageEvent) => {
 
         const { width: origW, height: origH } = imgData;
 
-        // Preprocess: resize to 640x640 with letterbox, normalize to [0,1]
+        // Preprocess: letterbox resize to 640x640 (gray padding, same as YOLO)
         const canvas = new OffscreenCanvas(INPUT_SIZE, INPUT_SIZE);
         const ctx = canvas.getContext('2d')!;
         const scale = Math.min(INPUT_SIZE / origW, INPUT_SIZE / origH);
@@ -63,7 +58,7 @@ self.onmessage = async (e: MessageEvent) => {
         const padX = Math.round((INPUT_SIZE - newW) / 2);
         const padY = Math.round((INPUT_SIZE - newH) / 2);
 
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = '#727272';
         ctx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
         const srcCanvas = new OffscreenCanvas(origW, origH);
         srcCanvas.getContext('2d')!.putImageData(imgData, 0, 0);
@@ -80,46 +75,37 @@ self.onmessage = async (e: MessageEvent) => {
 
         console.time(`[layout] inference`);
         const imageTensor = new ort.Tensor('float32', chw, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-        const imShapeTensor = new ort.Tensor('float32', new Float32Array([origH, origW]), [1, 2]);
-        const scaleFactorTensor = new ort.Tensor('float32', new Float32Array([INPUT_SIZE / origH, INPUT_SIZE / origW]), [1, 2]);
 
-        const result = await session.run({
-          image: imageTensor,
-          im_shape: imShapeTensor,
-          scale_factor: scaleFactorTensor,
-        });
-
-        const detections = result[session.outputNames[0]].data as Float32Array;
-        const numDets = (result[session.outputNames[1]].data as Int32Array)[0];
+        const result = await session.run({ image: imageTensor });
+        const clsScores = result['cls_scores'].data as Float32Array;
+        const bboxPreds = result['bbox_preds'].data as Float32Array;
+        const numAnchors = result['cls_scores'].dims[1];
+        const numClasses = result['cls_scores'].dims[2];
         console.timeEnd(`[layout] inference`);
 
-        // Parse detections: [class_id, score, x1, y1, x2, y2]
-        const regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[] = [];
-        for (let i = 0; i < numDets; i++) {
-          const offset = i * 6;
-          const classId = detections[offset];
-          const score = detections[offset + 1];
-          if (score < CONF_THRESHOLD) continue;
+        // Decode with letterbox compensation: pass padded size, then adjust
+        const rawRegions = parseRTMDetOutput(
+          clsScores, bboxPreds,
+          numAnchors, numClasses,
+          INPUT_SIZE,
+          INPUT_SIZE, INPUT_SIZE, // decode in padded space first
+          CONF_THRESHOLD, IOU_THRESHOLD,
+          LABELS,
+        );
 
-          const x1 = detections[offset + 2];
-          const y1 = detections[offset + 3];
-          const x2 = detections[offset + 4];
-          const y2 = detections[offset + 5];
+        // Map from padded 640x640 back to original image coords
+        const regions = rawRegions.map(r => ({
+          ...r,
+          x: Math.max(0, (r.x - padX) / scale),
+          y: Math.max(0, (r.y - padY) / scale),
+          w: r.w / scale,
+          h: r.h / scale,
+        }));
 
-          regions.push({
-            label: LABELS[Math.round(classId)] ?? `class_${Math.round(classId)}`,
-            confidence: score,
-            x: Math.max(0, x1),
-            y: Math.max(0, y1),
-            w: Math.max(0, x2 - x1),
-            h: Math.max(0, y2 - y1),
-          });
+        console.log(`[layout] ${regions.length} regions detected, image ${origW}x${origH}`);
+        for (const r of regions.slice(0, 5)) {
+          console.log(`[layout]   ${r.label} ${(r.confidence * 100).toFixed(0)}% [${r.x.toFixed(0)},${r.y.toFixed(0)} ${r.w.toFixed(0)}x${r.h.toFixed(0)}]`);
         }
-
-        // Sort by Y then X (reading order)
-        regions.sort((a, b) => a.y - b.y || a.x - b.x);
-
-        console.log(`[layout] ${regions.length} regions detected (from ${numDets} raw, threshold ${CONF_THRESHOLD})`);
         self.postMessage({ type: 'layout_result', payload: { imageId, regions } });
         break;
       }
