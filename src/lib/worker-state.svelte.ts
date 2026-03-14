@@ -6,6 +6,7 @@ const MODEL_URLS = [
   '/models/encoder.onnx',
   '/models/decoder.onnx',
   '/models/tokenizer.json',
+  '/models/rtmdet-regions.onnx',
 ];
 
 export class HTRWorkerState {
@@ -207,7 +208,7 @@ export class HTRWorkerState {
   }
 
   private checkAllReady() {
-    if (this.detectReady && this.transcribeReadyCount >= this.poolSize) {
+    if (this.detectReady && this.layoutReady && this.transcribeReadyCount >= this.poolSize) {
       this.modelsReady = true;
       this.stage = 'idle';
     }
@@ -221,7 +222,17 @@ export class HTRWorkerState {
       this.createTranscribeWorkers(this.poolSize);
     }
 
+    // Create layout worker eagerly
+    if (!this.layoutWorker) {
+      this.layoutWorker = new Worker(
+        new URL('../worker-layout.ts', import.meta.url),
+        { type: 'module' },
+      );
+      this.layoutWorker.onmessage = (e: MessageEvent) => this.handleLayoutMessage(e.data);
+    }
+
     this.detectWorker.postMessage({ type: 'load_models' });
+    this.layoutWorker.postMessage({ type: 'load_model' });
     for (const w of this.transcribeWorkers) {
       w.postMessage({ type: 'load_models' });
     }
@@ -250,39 +261,29 @@ export class HTRWorkerState {
     return regionId;
   }
 
-  /** Load and run layout detection on an image */
+  /** Run layout detection on an image */
   async detectLayout(imageId: string) {
-    if (this.layoutRunning) return;
+    if (this.layoutRunning || !this.layoutWorker || !this.layoutReady) return;
     this.layoutRunning = true;
 
-    // Create layout worker on first use (lazy)
-    if (!this.layoutWorker) {
-      this.layoutWorker = new Worker(
-        new URL('../worker-layout.ts', import.meta.url),
-        { type: 'module' },
-      );
-      this.layoutWorker.onmessage = (e: MessageEvent) => this.handleLayoutMessage(e.data);
-    }
-
-    // Load model if not ready
-    if (!this.layoutReady) {
-      this.layoutWorker.postMessage({ type: 'load_model' });
-      // Wait for ready
-      await new Promise<void>((resolve) => {
-        const check = () => {
-          if (this.layoutReady) { resolve(); return; }
-          setTimeout(check, 100);
-        };
-        check();
-      });
-    }
-
-    // Send image if not already sent
+    // Send image and wait for it to be decoded before detecting
     const imageData = this.storedImages.get(imageId);
     if (imageData) {
       this.layoutWorker.postMessage(
         { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
       );
+      // Wait for image_ready
+      await new Promise<void>((resolve) => {
+        const origHandler = this.layoutWorker!.onmessage;
+        this.layoutWorker!.onmessage = (e: MessageEvent) => {
+          if (e.data.type === 'image_ready' && e.data.payload?.imageId === imageId) {
+            this.layoutWorker!.onmessage = origHandler;
+            resolve();
+          } else {
+            this.handleLayoutMessage(e.data);
+          }
+        };
+      });
     }
 
     this.layoutWorker.postMessage({ type: 'detect_layout', payload: { imageId } });
@@ -292,8 +293,10 @@ export class HTRWorkerState {
     switch (msg.type) {
       case 'ready':
         this.layoutReady = true;
+        this.checkAllReady();
         break;
       case 'model_status':
+        this.stage = 'loading_models';
         if (msg.payload.progress !== undefined) {
           this.modelProgress['layout'] = msg.payload.progress;
         }

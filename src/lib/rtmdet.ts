@@ -25,8 +25,8 @@ function generateAnchors(inputSize: number): { cx: number; cy: number; stride: n
     for (let y = 0; y < gridSize; y++) {
       for (let x = 0; x < gridSize; x++) {
         anchors.push({
-          cx: (x + 0.5) * stride,
-          cy: (y + 0.5) * stride,
+          cx: x * stride,
+          cy: y * stride,
           stride,
         });
       }
@@ -67,15 +67,13 @@ export function parseRTMDetOutput(
   numAnchors: number,
   numClasses: number,
   inputSize: number,
-  origW: number,
-  origH: number,
+  resizeScale: number,       // scale used to resize original → inputSize
   confThreshold: number,
   iouThreshold: number,
   labels: string[],
 ): LayoutRegion[] {
   const anchors = generateAnchors(inputSize);
-  const scaleX = origW / inputSize;
-  const scaleY = origH / inputSize;
+  const invScale = 1 / resizeScale;  // map from resized space back to original
 
   // Class 0 = TextRegion (the only trained class)
   const classIdx = 0;
@@ -87,15 +85,15 @@ export function parseRTMDetOutput(
     if (score < confThreshold) continue;
 
     const anchor = anchors[i];
-    const left = bboxPreds[i * 4] * anchor.stride;
-    const top = bboxPreds[i * 4 + 1] * anchor.stride;
-    const right = bboxPreds[i * 4 + 2] * anchor.stride;
-    const bottom = bboxPreds[i * 4 + 3] * anchor.stride;
+    const left = bboxPreds[i * 4];
+    const top = bboxPreds[i * 4 + 1];
+    const right = bboxPreds[i * 4 + 2];
+    const bottom = bboxPreds[i * 4 + 3];
 
-    const x1 = (anchor.cx - left) * scaleX;
-    const y1 = (anchor.cy - top) * scaleY;
-    const x2 = (anchor.cx + right) * scaleX;
-    const y2 = (anchor.cy + bottom) * scaleY;
+    const x1 = (anchor.cx - left) * invScale;
+    const y1 = (anchor.cy - top) * invScale;
+    const x2 = (anchor.cx + right) * invScale;
+    const y2 = (anchor.cy + bottom) * invScale;
 
     candidates.push({ x1, y1, x2, y2, score, idx: candidates.length });
   }

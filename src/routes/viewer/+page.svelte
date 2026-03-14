@@ -268,17 +268,21 @@
       if (doc?.manifestId) appState.scheduleAutoSave();
     };
 
-    // Route layout detection results
+    // Route layout detection results — create groups and auto-run line detection
     appState.htr.onLayoutDetected = (imageId, regions) => {
       const doc = appState.documents.find(d => d.id === imageId);
       if (!doc) return;
       for (const region of regions) {
         doc.groupCounter++;
+        const regionId = appState.htr.redetectRegion(
+          imageId, region.x, region.y, region.w, region.h,
+        );
         doc.groups = [...doc.groups, {
           id: `group-${doc.groupCounter}`,
           name: `${region.label} (${Math.round(region.confidence * 100)}%)`,
           lineIndices: [],
           collapsed: false,
+          regionId,
           rect: { x: region.x, y: region.y, w: region.w, h: region.h },
         }];
       }

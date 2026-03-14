@@ -38,6 +38,7 @@ self.onmessage = async (e: MessageEvent) => {
         const { imageId, imageData } = e.data.payload;
         const decoded = await decodeImage(imageData);
         imageStore.set(imageId, decoded);
+        self.postMessage({ type: 'image_ready', payload: { imageId } });
         break;
       }
 
@@ -49,20 +50,20 @@ self.onmessage = async (e: MessageEvent) => {
 
         const { width: origW, height: origH } = imgData;
 
-        // Preprocess: letterbox resize to 640x640 (gray padding, same as YOLO)
+        // Preprocess: resize keeping aspect ratio, pad bottom-right (MMDet convention)
         const canvas = new OffscreenCanvas(INPUT_SIZE, INPUT_SIZE);
         const ctx = canvas.getContext('2d')!;
         const scale = Math.min(INPUT_SIZE / origW, INPUT_SIZE / origH);
         const newW = Math.round(origW * scale);
         const newH = Math.round(origH * scale);
-        const padX = Math.round((INPUT_SIZE - newW) / 2);
-        const padY = Math.round((INPUT_SIZE - newH) / 2);
 
-        ctx.fillStyle = '#727272';
+        // Pad color 114/255 ≈ 0.447 (MMDet default)
+        ctx.fillStyle = 'rgb(114, 114, 114)';
         ctx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
         const srcCanvas = new OffscreenCanvas(origW, origH);
         srcCanvas.getContext('2d')!.putImageData(imgData, 0, 0);
-        ctx.drawImage(srcCanvas, padX, padY, newW, newH);
+        // Place image at top-left (0,0), pad is bottom-right
+        ctx.drawImage(srcCanvas, 0, 0, newW, newH);
 
         const resized = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
         const pixels = resized.data;
@@ -83,24 +84,15 @@ self.onmessage = async (e: MessageEvent) => {
         const numClasses = result['cls_scores'].dims[2];
         console.timeEnd(`[layout] inference`);
 
-        // Decode with letterbox compensation: pass padded size, then adjust
-        const rawRegions = parseRTMDetOutput(
+        // Decode: image at top-left, scale maps padded 640 coords back to original
+        const regions = parseRTMDetOutput(
           clsScores, bboxPreds,
           numAnchors, numClasses,
           INPUT_SIZE,
-          INPUT_SIZE, INPUT_SIZE, // decode in padded space first
+          scale,
           CONF_THRESHOLD, IOU_THRESHOLD,
           LABELS,
         );
-
-        // Map from padded 640x640 back to original image coords
-        const regions = rawRegions.map(r => ({
-          ...r,
-          x: Math.max(0, (r.x - padX) / scale),
-          y: Math.max(0, (r.y - padY) / scale),
-          w: r.w / scale,
-          h: r.h / scale,
-        }));
 
         console.log(`[layout] ${regions.length} regions detected, image ${origW}x${origH}`);
         for (const r of regions.slice(0, 5)) {
