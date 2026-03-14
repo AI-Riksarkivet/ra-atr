@@ -168,7 +168,7 @@
   });
 </script>
 
-<div class="flex flex-col h-full bg-card text-card-foreground" bind:this={panelEl}>
+<div class="flex flex-col flex-1 min-h-0 bg-card text-card-foreground" bind:this={panelEl}>
 
   {#if documents.length > 0}
     <!-- Sticky filter -->

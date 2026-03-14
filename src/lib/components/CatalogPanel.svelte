@@ -93,7 +93,7 @@
   });
 </script>
 
-<div class="flex flex-col h-full bg-card text-card-foreground font-sans text-xs">
+<div class="flex flex-col flex-1 min-h-0 bg-card text-card-foreground font-sans text-xs">
   <!-- Sticky header -->
   <div class="shrink-0 p-3 pb-2 border-b border-border">
     <div class="mb-2">

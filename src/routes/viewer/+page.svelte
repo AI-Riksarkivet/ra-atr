@@ -294,9 +294,21 @@
 
 <div class="flex flex-1 overflow-hidden">
   <!-- Left: Catalog browser -->
-  {#if !leftCollapsed}
-    <div class="overflow-hidden border-r border-border" style="width: {leftWidth}%">
+  {#if leftCollapsed}
+    <button
+      class="shrink-0 flex items-center justify-center px-1 border-r border-border text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
+      onclick={() => leftCollapsed = false}
+      title="Show catalog"
+    >
+      <span class="text-[0.55rem] [writing-mode:vertical-lr] tracking-widest uppercase select-none">catalog</span>
+    </button>
+  {:else}
+    <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
       <CatalogPanel onLoadVolume={handleCatalogLoad} />
+      <button
+        class="shrink-0 w-full py-0.5 text-center text-[0.55rem] text-muted-foreground hover:text-foreground hover:bg-muted/30 border-t border-border cursor-pointer transition-colors"
+        onclick={() => leftCollapsed = true}
+      >&laquo; hide</button>
     </div>
     <div
       class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
@@ -307,13 +319,6 @@
       role="separator"
     ></div>
   {/if}
-  <button
-    class="shrink-0 w-5 flex items-center justify-center border-r border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-    onclick={() => leftCollapsed = !leftCollapsed}
-    title={leftCollapsed ? 'Show catalog' : 'Hide catalog'}
-  >
-    <span class="text-[0.6rem]">{leftCollapsed ? '\u25B6' : '\u25C0'}</span>
-  </button>
 
   <!-- Center: Document viewer -->
   <div class="relative overflow-hidden flex-1">
@@ -349,14 +354,15 @@
   </div>
 
   <!-- Right: Transcription tree -->
-  <button
-    class="shrink-0 w-5 flex items-center justify-center border-l border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-    onclick={() => rightCollapsed = !rightCollapsed}
-    title={rightCollapsed ? 'Show transcriptions' : 'Hide transcriptions'}
-  >
-    <span class="text-[0.6rem]">{rightCollapsed ? '\u25C0' : '\u25B6'}</span>
-  </button>
-  {#if !rightCollapsed}
+  {#if rightCollapsed}
+    <button
+      class="shrink-0 flex items-center justify-center px-1 border-l border-border text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
+      onclick={() => rightCollapsed = false}
+      title="Show transcriptions"
+    >
+      <span class="text-[0.55rem] [writing-mode:vertical-lr] tracking-widest uppercase select-none">transcriptions</span>
+    </button>
+  {:else}
     <div
       class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
       class:bg-primary={draggingDivider === 'right'}
@@ -365,7 +371,7 @@
       onpointerup={onDividerPointerUp}
       role="separator"
     ></div>
-    <div class="overflow-hidden border-l border-border" style="width: {rightWidth}%">
+    <div class="overflow-hidden border-l border-border flex flex-col" style="width: {rightWidth}%">
       <TranscriptionPanel
         documents={appState.documents}
         activeDocumentId={appState.activeDocumentId}
@@ -393,6 +399,10 @@
         activeRegions={appState.htr.activeRegions}
         activeImageIds={appState.htr.activeImageIds}
       />
+      <button
+        class="shrink-0 w-full py-0.5 text-center text-[0.55rem] text-muted-foreground hover:text-foreground hover:bg-muted/30 border-t border-border cursor-pointer transition-colors"
+        onclick={() => rightCollapsed = true}
+      >hide &raquo;</button>
     </div>
   {/if}
 </div>
