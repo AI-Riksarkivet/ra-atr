@@ -23,11 +23,14 @@
   let gpuUrl = $state(gpuServerUrl.get());
   let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 
+  let gpuName = $state('');
+
   async function checkGpu() {
     const url = gpuUrl.trim();
     if (!url) {
       gpuServerUrl.set('');
       gpuStatus = 'idle';
+      gpuName = '';
       return;
     }
     gpuStatus = 'checking';
@@ -36,6 +39,8 @@
       if (res.ok) {
         gpuServerUrl.set(url);
         gpuStatus = 'ok';
+        const data = await res.json();
+        gpuName = data.gpu?.name ?? '';
       } else {
         gpuStatus = 'error';
       }
@@ -49,7 +54,7 @@
   <h1 class="text-lg font-semibold">Lejonet HTR</h1>
 
   {#if appState.htr.modelsReady && gpuServerUrl.get()}
-    <Badge variant="success">GPU</Badge>
+    <Badge variant="success" title={gpuName || 'GPU server'}>GPU</Badge>
   {:else if appState.htr.modelsReady}
     <Badge variant="success">WASM</Badge>
   {:else if appState.htr.stage === 'loading_models'}
@@ -120,7 +125,7 @@
             </button>
           </div>
           {#if gpuStatus === 'ok'}
-            <div class="text-[0.65rem] text-green-500 mt-1.5">Connected</div>
+            <div class="text-[0.65rem] text-green-500 mt-1.5">Connected{gpuName ? ` — ${gpuName}` : ''}</div>
           {:else if gpuStatus === 'error'}
             <div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
           {/if}

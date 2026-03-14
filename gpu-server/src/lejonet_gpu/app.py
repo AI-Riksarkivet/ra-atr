@@ -51,12 +51,61 @@ def _read_image(data: bytes) -> Image.Image:
     return Image.open(io.BytesIO(data)).convert("RGB")
 
 
+def _gpu_info() -> dict:
+    """Get GPU device info if available."""
+    import subprocess
+    # Try rocm-smi
+    for cmd in [
+        ["rocm-smi", "--showproductname", "--csv"],
+        ["rocm-smi", "--showallinfo", "--csv"],
+    ]:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = [l for l in result.stdout.strip().split("\n") if l and not l.startswith("device")]
+                if lines:
+                    return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
+        except Exception:
+            pass
+    # Try nvidia-smi
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return {"name": result.stdout.strip(), "runtime": "CUDA"}
+    except Exception:
+        pass
+    # Try reading from sysfs (works without tools)
+    try:
+        from pathlib import Path
+        for card in sorted(Path("/sys/class/drm").glob("card*/device")):
+            vendor = (card / "vendor").read_text().strip()
+            if vendor == "0x1002":  # AMD
+                name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "AMD GPU"
+                return {"name": name, "runtime": "ROCm"}
+            elif vendor == "0x10de":  # NVIDIA
+                name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "NVIDIA GPU"
+                return {"name": name, "runtime": "CUDA"}
+    except Exception:
+        pass
+    # Identify from providers
+    providers = store.providers()
+    if "ROCMExecutionProvider" in providers:
+        return {"name": "AMD GPU", "runtime": "ROCm"}
+    if "CUDAExecutionProvider" in providers:
+        return {"name": "NVIDIA GPU", "runtime": "CUDA"}
+    return {"name": "Unknown", "runtime": "Unknown"}
+
+
 @app.get("/health")
 def health():
     return {
         "status": "ok",
         "models": store.available_models(),
         "providers": store.providers(),
+        "gpu": _gpu_info(),
     }
 
 
