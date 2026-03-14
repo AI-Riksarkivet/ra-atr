@@ -1,0 +1,84 @@
+/**
+ * GPU inference server client.
+ * Stores the server URL in localStorage and provides inference functions.
+ */
+
+const STORAGE_KEY = 'lejonet-gpu-server-url';
+
+export const gpuServerUrl = {
+  get(): string {
+    if (typeof localStorage === 'undefined') return '';
+    return localStorage.getItem(STORAGE_KEY) || '';
+  },
+  set(url: string) {
+    if (typeof localStorage === 'undefined') return;
+    if (url) {
+      localStorage.setItem(STORAGE_KEY, url);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  },
+};
+
+export function isGpuServerEnabled(): boolean {
+  return !!gpuServerUrl.get();
+}
+
+function baseUrl(): string {
+  return gpuServerUrl.get().replace(/\/$/, '');
+}
+
+export async function gpuDetectLayout(imageData: ArrayBuffer): Promise<{
+  regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
+}> {
+  const form = new FormData();
+  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  const res = await fetch(`${baseUrl()}/detect-layout`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`GPU layout detection failed: ${res.status}`);
+  return res.json();
+}
+
+export async function gpuDetectLines(
+  imageData: ArrayBuffer,
+  region?: { x: number; y: number; w: number; h: number },
+): Promise<{ lines: { x: number; y: number; w: number; h: number; confidence: number }[] }> {
+  const form = new FormData();
+  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  if (region) {
+    form.append('x', String(region.x));
+    form.append('y', String(region.y));
+    form.append('w', String(region.w));
+    form.append('h', String(region.h));
+  }
+  const res = await fetch(`${baseUrl()}/detect-lines`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`GPU line detection failed: ${res.status}`);
+  return res.json();
+}
+
+export async function gpuTranscribe(
+  imageData: ArrayBuffer,
+  bbox: { x: number; y: number; w: number; h: number },
+): Promise<{ text: string; confidence: number }> {
+  const form = new FormData();
+  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  form.append('x', String(bbox.x));
+  form.append('y', String(bbox.y));
+  form.append('w', String(bbox.w));
+  form.append('h', String(bbox.h));
+  const res = await fetch(`${baseUrl()}/transcribe`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`GPU transcription failed: ${res.status}`);
+  return res.json();
+}
+
+export async function gpuProcessPage(imageData: ArrayBuffer): Promise<{
+  groups: {
+    region: { label: string; confidence: number; x: number; y: number; w: number; h: number };
+    lines: { bbox: { x: number; y: number; w: number; h: number }; text: string; confidence: number }[];
+  }[];
+}> {
+  const form = new FormData();
+  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  const res = await fetch(`${baseUrl()}/process-page`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`GPU processing failed: ${res.status}`);
+  return res.json();
+}
