@@ -2,9 +2,18 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { page } from '$app/state';
+
+  interface Props {
+    catalogOpen?: boolean;
+    transcriptionOpen?: boolean;
+    onToggleCatalog?: () => void;
+    onToggleTranscription?: () => void;
+  }
+
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
 </script>
@@ -18,17 +27,27 @@
     <Badge variant="outline" class="animate-pulse">Loading...</Badge>
   {/if}
 
-  <div class="ml-auto flex items-center gap-2">
+  <div class="ml-auto flex items-center gap-1">
     {#if isViewer}
+      <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
+        <Search class="size-4" />
+      </Button>
+      <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
+        <FileText class="size-4" />
+      </Button>
+
+      <div class="w-px h-5 bg-border mx-1"></div>
+
       <Button
-        variant={appState.selectMode ? 'default' : 'outline'}
-        size="sm"
+        variant={appState.selectMode ? 'default' : 'ghost'}
+        size="icon-sm"
         onclick={() => {
           appState.selectMode = !appState.selectMode;
           if (!appState.selectMode) appState.selectedLines = new Set();
         }}
+        title={appState.selectMode ? 'Switch to pan mode' : 'Switch to select mode'}
       >
-        {appState.selectMode ? 'Pan mode' : 'Select'}
+        <span class="text-xs">{appState.selectMode ? 'S' : 'P'}</span>
       </Button>
 
       <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">

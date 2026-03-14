@@ -293,16 +293,27 @@
   }
 </script>
 
-<AppHeader />
+<AppHeader
+  catalogOpen={!leftCollapsed}
+  transcriptionOpen={!rightCollapsed}
+  onToggleCatalog={() => leftCollapsed = !leftCollapsed}
+  onToggleTranscription={() => rightCollapsed = !rightCollapsed}
+/>
 
 {#if appState.htr.error}
-  <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
+  <div class="flex items-center gap-2 bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">
+    <span class="flex-1">{appState.htr.error}</span>
+    <button class="text-destructive/60 hover:text-destructive cursor-pointer text-lg leading-none" onclick={() => appState.htr.error = ''}>&times;</button>
+  </div>
 {/if}
 {#if catalogLoading}
   <div class="bg-muted px-4 py-1.5 text-xs text-muted-foreground animate-pulse shrink-0">{catalogLoading}</div>
 {/if}
 {#if catalogError}
-  <div class="bg-destructive/10 px-4 py-1.5 text-xs text-destructive shrink-0">{catalogError}</div>
+  <div class="flex items-center gap-2 bg-destructive/10 px-4 py-1.5 text-xs text-destructive shrink-0">
+    <span class="flex-1">{catalogError}</span>
+    <button class="text-destructive/60 hover:text-destructive cursor-pointer text-sm leading-none" onclick={() => catalogError = ''}>&times;</button>
+  </div>
 {/if}
 
 
@@ -317,16 +328,8 @@
 
 <div class="flex flex-1 overflow-hidden">
   <!-- Left: Catalog browser -->
-  {#if leftCollapsed}
-    <button
-      class="shrink-0 flex items-center justify-center px-0.5 border-r border-border text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
-      onclick={() => leftCollapsed = false}
-      title="Show catalog"
-    >
-      <span class="text-[0.5rem]">&#x25B6;</span>
-    </button>
-  {:else}
-    <div class="overflow-hidden border-r border-border" style="width: {leftWidth}%">
+  {#if !leftCollapsed}
+    <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
       <CatalogPanel bind:this={catalogPanel} onLoadVolume={handleCatalogLoad} />
     </div>
     <div
@@ -455,15 +458,7 @@
   </div>
 
   <!-- Right: Transcription tree -->
-  {#if rightCollapsed}
-    <button
-      class="shrink-0 flex items-center justify-center px-0.5 border-l border-border text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
-      onclick={() => rightCollapsed = false}
-      title="Show transcriptions"
-    >
-      <span class="text-[0.5rem]">&#x25C0;</span>
-    </button>
-  {:else}
+  {#if !rightCollapsed}
     <div
       class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
       class:bg-primary={draggingDivider === 'right'}
@@ -474,7 +469,7 @@
       role="separator"
       title="Drag to resize, double-click to collapse"
     ></div>
-    <div class="overflow-hidden border-l border-border" style="width: {rightWidth}%">
+    <div class="overflow-hidden border-l border-border flex flex-col" style="width: {rightWidth}%">
       <TranscriptionPanel
         documents={appState.documents}
         activeDocumentId={appState.activeDocumentId}
