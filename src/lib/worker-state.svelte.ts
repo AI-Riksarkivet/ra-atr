@@ -1,5 +1,6 @@
 import type { WorkerOutMessage, PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
+import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe } from './gpu-client';
 
 const MODEL_URLS = [
   '/models/yolo-lines.onnx',
@@ -254,6 +255,12 @@ export class HTRWorkerState {
   redetectRegion(imageId: string, x: number, y: number, w: number, h: number): string {
     this.regionCounter++;
     const regionId = `region-${this.regionCounter}`;
+
+    if (isGpuServerEnabled()) {
+      this._gpuDetectAndTranscribe(imageId, regionId, x, y, w, h);
+      return regionId;
+    }
+
     this.detectWorker.postMessage({
       type: 'redetect_region',
       payload: { imageId, regionId, x, y, w, h },
@@ -261,18 +268,103 @@ export class HTRWorkerState {
     return regionId;
   }
 
+  private async _gpuDetectAndTranscribe(
+    imageId: string, regionId: string,
+    x: number, y: number, w: number, h: number,
+  ) {
+    const imageData = this.storedImages.get(imageId);
+    if (!imageData) return;
+
+    try {
+      this.activeRegions = new Set([...this.activeRegions, regionId]);
+      this.activeImageIds = new Set([...this.activeImageIds, imageId]);
+      if (this.stage === 'done' || this.stage === 'idle') {
+        this.stage = 'transcribing';
+      }
+
+      // Detect lines via GPU
+      const { lines } = await gpuDetectLines(imageData, { x, y, w, h });
+      const startIndex = this._getNextLineIndex(imageId, lines.length);
+      const bboxes: BBox[] = lines.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h, confidence: l.confidence }));
+      this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
+
+      // Transcribe each line via GPU
+      this.activeTranscriptions += lines.length;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        try {
+          const { text, confidence } = await gpuTranscribe(imageData, {
+            x: line.x, y: line.y, w: line.w, h: line.h,
+          });
+          this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
+          this.onLineDone?.(imageId, startIndex + i, text, confidence);
+        } catch (err) {
+          this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
+          this.onLineDone?.(imageId, startIndex + i, `[error]`, 0);
+        }
+      }
+
+      // Region done
+      const nextRegions = new Set(this.activeRegions);
+      nextRegions.delete(regionId);
+      this.activeRegions = nextRegions;
+      const imageStillActive = [...this.activeRegions].some(r => {
+        // simplified: if no regions left, image is done
+        return false;
+      });
+      if (!imageStillActive) {
+        const nextImages = new Set(this.activeImageIds);
+        nextImages.delete(imageId);
+        this.activeImageIds = nextImages;
+      }
+      this.onRegionDone?.(imageId, regionId);
+
+      if (this.activeTranscriptions === 0) {
+        this.stage = 'done';
+      }
+    } catch (err: any) {
+      this.error = err.message ?? String(err);
+      this.layoutRunning = false;
+      const nextRegions = new Set(this.activeRegions);
+      nextRegions.delete(regionId);
+      this.activeRegions = nextRegions;
+    }
+  }
+
+  private _gpuLineCounters = new Map<string, number>();
+  private _getNextLineIndex(imageId: string, count: number): number {
+    const prev = this._gpuLineCounters.get(imageId) ?? 0;
+    this._gpuLineCounters.set(imageId, prev + count);
+    return prev;
+  }
+
   /** Run layout detection on an image */
   async detectLayout(imageId: string) {
-    if (this.layoutRunning || !this.layoutWorker || !this.layoutReady) return;
+    if (this.layoutRunning) return;
     this.layoutRunning = true;
 
-    // Send image and wait for it to be decoded before detecting
+    if (isGpuServerEnabled()) {
+      try {
+        const imageData = this.storedImages.get(imageId);
+        if (!imageData) { this.layoutRunning = false; return; }
+        const { regions } = await gpuDetectLayout(imageData);
+        this.layoutRunning = false;
+        this.onLayoutDetected?.(imageId, regions);
+      } catch (err: any) {
+        this.layoutRunning = false;
+        this.error = err.message ?? String(err);
+      }
+      return;
+    }
+
+    // WASM path
+    if (!this.layoutWorker || !this.layoutReady) { this.layoutRunning = false; return; }
+
     const imageData = this.storedImages.get(imageId);
     if (imageData) {
       this.layoutWorker.postMessage(
         { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
       );
-      // Wait for image_ready
       await new Promise<void>((resolve) => {
         const origHandler = this.layoutWorker!.onmessage;
         this.layoutWorker!.onmessage = (e: MessageEvent) => {
