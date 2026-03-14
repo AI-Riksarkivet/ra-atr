@@ -268,6 +268,24 @@
       if (doc?.manifestId) appState.scheduleAutoSave();
     };
 
+    // Route layout detection results
+    appState.htr.onLayoutDetected = (imageId, regions) => {
+      const doc = appState.documents.find(d => d.id === imageId);
+      if (!doc) return;
+      for (const region of regions) {
+        doc.groupCounter++;
+        doc.groups = [...doc.groups, {
+          id: `group-${doc.groupCounter}`,
+          name: `${region.label} (${Math.round(region.confidence * 100)}%)`,
+          lineIndices: [],
+          collapsed: false,
+          rect: { x: region.x, y: region.y, w: region.w, h: region.h },
+        }];
+      }
+      appState.documents = [...appState.documents];
+      rightCollapsed = false;
+    };
+
     window.addEventListener('keydown', onKeyDown);
     return () => { window.removeEventListener('keydown', onKeyDown); };
   });
@@ -298,6 +316,8 @@
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
   onToggleTranscription={() => rightCollapsed = !rightCollapsed}
+  onDetectLayout={() => { if (activeDoc) appState.htr.detectLayout(activeDoc.id); }}
+  layoutRunning={appState.htr.layoutRunning}
 />
 
 {#if appState.htr.error}

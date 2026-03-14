@@ -25,18 +25,22 @@ export class HTRWorkerState {
   activeTranscriptions = $state(0);
 
   private detectWorker!: Worker;
+  private layoutWorker: Worker | null = null;
   private transcribeWorkers: Worker[] = [];
   private nextWorker = 0;
   private regionCounter = 0;
 
   private detectReady = false;
   private transcribeReadyCount = 0;
+  layoutReady = $state(false);
+  layoutRunning = $state(false);
 
   // Callbacks for multi-image routing
   onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => void) | null = null;
   onRegionDone: ((imageId: string, regionId: string) => void) | null = null;
   onLineDone: ((imageId: string, lineIndex: number, text: string, confidence: number) => void) | null = null;
   onToken: ((imageId: string, lineIndex: number, token: string) => void) | null = null;
+  onLayoutDetected: ((imageId: string, regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[]) => void) | null = null;
 
   private regionPending = new Map<string, { imageId: string; total: number; done: number }>();
   /** Stored image buffers for re-sending to new workers */
@@ -246,6 +250,67 @@ export class HTRWorkerState {
     return regionId;
   }
 
+  /** Load and run layout detection on an image */
+  async detectLayout(imageId: string) {
+    if (this.layoutRunning) return;
+    this.layoutRunning = true;
+
+    // Create layout worker on first use (lazy)
+    if (!this.layoutWorker) {
+      this.layoutWorker = new Worker(
+        new URL('../worker-layout.ts', import.meta.url),
+        { type: 'module' },
+      );
+      this.layoutWorker.onmessage = (e: MessageEvent) => this.handleLayoutMessage(e.data);
+    }
+
+    // Load model if not ready
+    if (!this.layoutReady) {
+      this.layoutWorker.postMessage({ type: 'load_model' });
+      // Wait for ready
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (this.layoutReady) { resolve(); return; }
+          setTimeout(check, 100);
+        };
+        check();
+      });
+    }
+
+    // Send image if not already sent
+    const imageData = this.storedImages.get(imageId);
+    if (imageData) {
+      this.layoutWorker.postMessage(
+        { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
+      );
+    }
+
+    this.layoutWorker.postMessage({ type: 'detect_layout', payload: { imageId } });
+  }
+
+  private handleLayoutMessage(msg: any) {
+    switch (msg.type) {
+      case 'ready':
+        this.layoutReady = true;
+        break;
+      case 'model_status':
+        if (msg.payload.progress !== undefined) {
+          this.modelProgress['layout'] = msg.payload.progress;
+        }
+        break;
+      case 'layout_result': {
+        const { imageId, regions } = msg.payload;
+        this.layoutRunning = false;
+        this.onLayoutDetected?.(imageId, regions);
+        break;
+      }
+      case 'error':
+        this.layoutRunning = false;
+        this.error = msg.payload.message;
+        break;
+    }
+  }
+
   cancelRegion(regionId: string) {
     this.detectWorker.postMessage({ type: 'cancel_region', payload: { regionId } });
     for (const w of this.transcribeWorkers) {
@@ -266,6 +331,7 @@ export class HTRWorkerState {
 
   destroy() {
     this.detectWorker.terminate();
+    this.layoutWorker?.terminate();
     for (const w of this.transcribeWorkers) w.terminate();
   }
 }

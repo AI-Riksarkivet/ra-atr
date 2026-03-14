@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, LayoutGrid } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { page } from '$app/state';
 
@@ -11,9 +11,11 @@
     transcriptionOpen?: boolean;
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
+    onDetectLayout?: () => void;
+    layoutRunning?: boolean;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onDetectLayout, layoutRunning }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
 </script>
@@ -37,6 +39,14 @@
       </Button>
 
       <div class="w-px h-5 bg-border mx-1"></div>
+
+      <Button variant="ghost" size="icon-sm" onclick={onDetectLayout} title="Detect layout" disabled={layoutRunning}>
+        {#if layoutRunning}
+          <LayoutGrid class="size-4 animate-spin" />
+        {:else}
+          <LayoutGrid class="size-4" />
+        {/if}
+      </Button>
 
       <Button
         variant={appState.selectMode ? 'default' : 'ghost'}
