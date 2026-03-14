@@ -257,6 +257,113 @@ def health():
     return {"status": "ok"}
 
 
+# --- Debug: LanceDB viewer ---
+
+
+@app.get("/debug/tables")
+def debug_tables():
+    """List all LanceDB tables with row counts and schemas."""
+    if db is None:
+        return {"tables": []}
+    tables = []
+    for name in db.table_names():
+        t = db.open_table(name)
+        schema = t.to_arrow().schema
+        tables.append({
+            "name": name,
+            "rows": t.count_rows(),
+            "columns": [{"name": f.name, "type": str(f.type)} for f in schema],
+        })
+    return {"tables": tables}
+
+
+@app.get("/debug/tables/{table_name}")
+def debug_browse(
+    table_name: str,
+    limit: int = 50,
+    offset: int = 0,
+    q: str | None = None,
+    where: str | None = None,
+    columns: str | None = None,
+):
+    """Browse a LanceDB table with optional FTS query, SQL where filter, and column selection."""
+    if db is None:
+        raise HTTPException(503, "Database not initialized")
+    try:
+        t = db.open_table(table_name)
+    except Exception:
+        raise HTTPException(404, f"Table '{table_name}' not found")
+
+    # Select columns
+    col_list = [c.strip() for c in columns.split(",")] if columns else None
+
+    if q:
+        # FTS search
+        try:
+            result = t.search(q, query_type="fts").limit(limit + offset).to_arrow()
+        except Exception as e:
+            raise HTTPException(400, f"FTS error: {e}")
+    elif where:
+        # SQL where filter
+        try:
+            result = t.search().where(where).limit(limit + offset).to_arrow()
+        except Exception as e:
+            raise HTTPException(400, f"Where error: {e}")
+    else:
+        result = t.to_arrow().slice(offset, limit)
+        # For browse without query, just return the slice
+        if col_list:
+            available = [c for c in col_list if c in result.column_names]
+            result = result.select(available) if available else result
+        rows = []
+        for i in range(len(result)):
+            row = {}
+            for col in result.column_names:
+                val = result.column(col)[i].as_py()
+                # Skip large fields
+                if isinstance(val, (list, bytes)) and len(str(val)) > 200:
+                    row[col] = f"[{type(val).__name__}, len={len(val)}]"
+                else:
+                    row[col] = val
+            rows.append(row)
+        return {
+            "table": table_name,
+            "total": t.count_rows(),
+            "offset": offset,
+            "limit": limit,
+            "rows": rows,
+        }
+
+    # For query/where results, apply offset + limit
+    total = len(result)
+    result = result.slice(offset, limit)
+    if col_list:
+        available = [c for c in col_list if c in result.column_names]
+        result = result.select(available) if available else result
+
+    # Strip internal columns like _score, _rowid, _distance, vector
+    skip = {"vector", "_score", "_rowid", "_distance"}
+    rows = []
+    for i in range(len(result)):
+        row = {}
+        for col in result.column_names:
+            if col in skip:
+                continue
+            val = result.column(col)[i].as_py()
+            if isinstance(val, (list, bytes)) and len(str(val)) > 200:
+                row[col] = f"[{type(val).__name__}, len={len(val)}]"
+            else:
+                row[col] = val
+        rows.append(row)
+    return {
+        "table": table_name,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "rows": rows,
+    }
+
+
 @app.get("/transcriptions")
 def list_transcriptions(request: Request, q: str | None = None):
     """List all manifests for the current user, optionally filtered by search query."""

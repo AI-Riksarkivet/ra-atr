@@ -23,6 +23,7 @@ export default defineConfig({
       '/catalog': 'http://localhost:8000',
       '/transcriptions': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/debug': 'http://localhost:8000',
     },
     watch: {
       ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**'],
