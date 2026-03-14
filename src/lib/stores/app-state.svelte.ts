@@ -3,6 +3,7 @@ import type { ImageDocument, Line, LineGroup } from '$lib/types';
 import type { TranscriptionGroup } from '$lib/api';
 
 const AUTOSAVE_DELAY = 2000;
+const MAX_CACHED_IMAGES = 10;
 
 class AppState {
   htr = $state(new HTRWorkerState());
@@ -17,6 +18,7 @@ class AppState {
   private docCounter = 0;
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSaveHash = '';
+  private imageLoadOrder: string[] = []; // LRU tracking for loaded images
 
   get activeDocument(): ImageDocument | undefined {
     return this.documents.find(d => d.id === this.activeDocumentId);
@@ -61,7 +63,13 @@ class AppState {
 
   async loadDocumentImage(docId: string) {
     const doc = this.documents.find(d => d.id === docId);
-    if (!doc || !doc.placeholder || !doc.manifestId || !doc.pageNumber) return;
+    if (!doc || !doc.manifestId || !doc.pageNumber) return;
+
+    // Already loaded — just move to front of LRU
+    if (!doc.placeholder) {
+      this.imageLoadOrder = [docId, ...this.imageLoadOrder.filter(id => id !== docId)];
+      return;
+    }
 
     const { fetchPageImage } = await import('$lib/riksarkivet');
     const result = await fetchPageImage(doc.manifestId, doc.pageNumber);
@@ -69,8 +77,32 @@ class AppState {
       doc.imageUrl = result.previewUrl;
       doc.imageData = result.imageData;
       doc.placeholder = false;
+
+      // Track in LRU and evict oldest if over limit
+      this.imageLoadOrder = [docId, ...this.imageLoadOrder.filter(id => id !== docId)];
+      this.evictOldImages();
+
       this.documents = [...this.documents];
       this.htr.addImage(doc.id, result.imageData.slice(0));
+    }
+  }
+
+  private evictOldImages() {
+    while (this.imageLoadOrder.length > MAX_CACHED_IMAGES) {
+      const evictId = this.imageLoadOrder.pop()!;
+      // Don't evict the active document
+      if (evictId === this.activeDocumentId) {
+        this.imageLoadOrder.push(evictId);
+        break;
+      }
+      const doc = this.documents.find(d => d.id === evictId);
+      if (doc && !doc.placeholder && doc.manifestId) {
+        // Revoke blob URL to free memory
+        if (doc.imageUrl) URL.revokeObjectURL(doc.imageUrl);
+        doc.imageUrl = '';
+        doc.imageData = new ArrayBuffer(0);
+        doc.placeholder = true;
+      }
     }
   }
 
