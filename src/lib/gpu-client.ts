@@ -24,6 +24,39 @@ export function isGpuServerEnabled(): boolean {
   return !!gpuServerUrl.get();
 }
 
+/**
+ * Try to connect to a GPU server at the given URL.
+ * Returns true if the server is healthy.
+ */
+export async function probeGpuServer(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/health`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auto-detect GPU server on common local addresses.
+ * Tries localhost:8080 first (Docker default).
+ * Returns the URL if found, empty string if not.
+ */
+export async function autoDetectGpuServer(): Promise<string> {
+  const candidates = [
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+  ];
+  for (const url of candidates) {
+    if (await probeGpuServer(url)) {
+      return url;
+    }
+  }
+  return '';
+}
+
 function baseUrl(): string {
   return gpuServerUrl.get().replace(/\/$/, '');
 }

@@ -1,6 +1,6 @@
 import type { WorkerOutMessage, PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
-import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe } from './gpu-client';
+import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe, autoDetectGpuServer, gpuServerUrl } from './gpu-client';
 
 const MODEL_URLS = [
   '/models/yolo-lines.onnx',
@@ -51,12 +51,37 @@ export class HTRWorkerState {
   constructor() {
     this.createDetectWorker();
 
-    areAllModelsCached(MODEL_URLS).then((cached) => {
-      this.cacheChecked = true;
-      if (cached) {
-        this.loadModels();
+    // Try GPU server first, fall back to WASM
+    this._init();
+  }
+
+  private async _init() {
+    // Auto-detect GPU server if not already configured
+    if (!isGpuServerEnabled()) {
+      const url = await autoDetectGpuServer();
+      if (url) {
+        gpuServerUrl.set(url);
+        console.log(`[htr] Auto-detected GPU server at ${url}`);
       }
-    });
+    }
+
+    if (isGpuServerEnabled()) {
+      // GPU server available — skip WASM model loading
+      console.log(`[htr] Using GPU server: ${gpuServerUrl.get()}`);
+      this.cacheChecked = true;
+      this.modelsReady = true;
+      this.layoutReady = true;
+      this.stage = 'idle';
+      return;
+    }
+
+    // Fall back to WASM
+    console.log('[htr] No GPU server found, using WASM');
+    const cached = await areAllModelsCached(MODEL_URLS);
+    this.cacheChecked = true;
+    if (cached) {
+      this.loadModels();
+    }
   }
 
   private createDetectWorker() {
@@ -308,10 +333,7 @@ export class HTRWorkerState {
       const nextRegions = new Set(this.activeRegions);
       nextRegions.delete(regionId);
       this.activeRegions = nextRegions;
-      const imageStillActive = [...this.activeRegions].some(r => {
-        // simplified: if no regions left, image is done
-        return false;
-      });
+      const imageStillActive = this.activeRegions.size > 0;
       if (!imageStillActive) {
         const nextImages = new Set(this.activeImageIds);
         nextImages.delete(imageId);

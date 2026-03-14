@@ -48,8 +48,10 @@
 <header class="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
   <h1 class="text-lg font-semibold">Lejonet HTR</h1>
 
-  {#if appState.htr.modelsReady}
-    <Badge variant="success">Ready</Badge>
+  {#if appState.htr.modelsReady && gpuServerUrl.get()}
+    <Badge variant="success">GPU</Badge>
+  {:else if appState.htr.modelsReady}
+    <Badge variant="success">WASM</Badge>
   {:else if appState.htr.stage === 'loading_models'}
     <Badge variant="outline" class="animate-pulse">Loading...</Badge>
   {/if}
