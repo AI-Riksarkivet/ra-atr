@@ -11,7 +11,7 @@
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
   let img: HTMLImageElement | null = $state(null);
-  let collapsed = $state(false);
+  let collapsed = $state(true);
   let height = $state(80);
   let isDragging = $state(false);
 
