@@ -16,13 +16,15 @@ TOKENIZER_FILE = "tokenizer.json"
 
 
 def _providers() -> list[str]:
-    """Get available execution providers, preferring GPU."""
+    """Get available GPU execution providers. Fails if no GPU found."""
     available = ort.get_available_providers()
-    if "CUDAExecutionProvider" in available:
-        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    if "ROCMExecutionProvider" in available:
-        return ["ROCMExecutionProvider", "CPUExecutionProvider"]
-    return ["CPUExecutionProvider"]
+    for gpu in ["CUDAExecutionProvider", "ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
+        if gpu in available:
+            return [gpu]
+    raise RuntimeError(
+        f"No GPU execution provider found. Available: {available}. "
+        "Install onnxruntime-gpu (NVIDIA) or onnxruntime-rocm (AMD)."
+    )
 
 
 def _create_session(model_path: Path) -> ort.InferenceSession:

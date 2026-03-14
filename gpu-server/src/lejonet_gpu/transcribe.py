@@ -67,13 +67,16 @@ def transcribe_line(
     total_logprob = 0.0
 
     for _ in range(max_length):
-        attention_mask = np.ones_like(input_ids, dtype=np.int64)
-
-        decoder_out = decoder_session.run(None, {
+        decoder_inputs = {
             "input_ids": input_ids,
-            "attention_mask": attention_mask,
             "encoder_hidden_states": hidden_states,
-        })
+        }
+        # Add attention_mask only if the model expects it
+        input_names = {i.name for i in decoder_session.get_inputs()}
+        if "attention_mask" in input_names:
+            decoder_inputs["attention_mask"] = np.ones_like(input_ids, dtype=np.int64)
+
+        decoder_out = decoder_session.run(None, decoder_inputs)
 
         logits = decoder_out[0]  # [1, seq_len, vocab_size]
         next_logits = logits[0, -1]
