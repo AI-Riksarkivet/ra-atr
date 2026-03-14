@@ -7,14 +7,17 @@
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
+  import CatalogPanel from '$lib/components/CatalogPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import LinePreview from '$lib/components/LinePreview.svelte';
   import { Button } from '$lib/components/ui/button';
   import type { LineGroup, Line, BBox } from '$lib/types';
 
-  let dividerX = $state(30);
-  let panelCollapsed = $state(false);
-  let isDraggingDivider = $state(false);
+  let leftWidth = $state(20);
+  let rightWidth = $state(25);
+  let leftCollapsed = $state(false);
+  let rightCollapsed = $state(false);
+  let draggingDivider = $state<'left' | 'right' | null>(null);
   let docViewer: DocumentViewer;
 
   // Redirect to home if models not loaded (wait for cache check first)
@@ -241,18 +244,23 @@
     return () => { window.removeEventListener('keydown', onKeyDown); };
   });
 
-  function onDividerPointerDown(e: PointerEvent) {
-    isDraggingDivider = true;
+  function onDividerPointerDown(side: 'left' | 'right', e: PointerEvent) {
+    draggingDivider = side;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onDividerPointerMove(e: PointerEvent) {
-    if (!isDraggingDivider) return;
+    if (!draggingDivider) return;
     const container = (e.target as HTMLElement).parentElement!;
     const rect = container.getBoundingClientRect();
-    dividerX = Math.min(85, Math.max(25, ((e.clientX - rect.left) / rect.width) * 100));
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    if (draggingDivider === 'left') {
+      leftWidth = Math.min(40, Math.max(12, pct));
+    } else {
+      rightWidth = Math.min(40, Math.max(12, 100 - pct));
+    }
   }
   function onDividerPointerUp(e: PointerEvent) {
-    isDraggingDivider = false;
+    draggingDivider = null;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }
 </script>
@@ -267,6 +275,12 @@
 {#if appState.htr.error}
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
 {/if}
+{#if catalogLoading}
+  <div class="bg-muted px-4 py-1.5 text-xs text-muted-foreground animate-pulse shrink-0">Loading volume...</div>
+{/if}
+{#if catalogError}
+  <div class="bg-destructive/10 px-4 py-1.5 text-xs text-destructive shrink-0">{catalogError}</div>
+{/if}
 
 
 {#if appState.selectedLines.size > 0}
@@ -279,41 +293,15 @@
 {/if}
 
 <div class="flex flex-1 overflow-hidden">
-  {#if !panelCollapsed}
-    <div class="overflow-hidden border-r border-border" style="width: {dividerX}%">
-      <TranscriptionPanel
-        documents={appState.documents}
-        activeDocumentId={appState.activeDocumentId}
-        onSwitchDocument={(id) => appState.switchDocument(id)}
-        hoveredLine={appState.hoveredLine}
-        onHoverLine={(i) => appState.hoveredLine = i}
-        selectedLines={appState.selectedLines}
-        onSelectLine={handleSelectLine}
-        onToggleGroup={toggleGroup}
-        onRenameGroup={renameGroup}
-        onDeleteGroup={deleteGroup}
-        onFocusGroup={(indices, rect) => {
-          if (indices.length > 0) docViewer?.focusLines(indices);
-          else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
-        }}
-        onFocusLine={(i) => docViewer?.focusLines([i])}
-        onEditLine={(i, text) => {
-          if (activeDoc?.lines[i]) {
-            activeDoc.lines[i].text = text;
-            appState.documents = [...appState.documents];
-            if (activeDoc.manifestId) appState.scheduleAutoSave();
-          }
-        }}
-        onLoadVolume={handleCatalogLoad}
-        selectMode={appState.selectMode}
-        activeRegions={appState.htr.activeRegions}
-        activeImageIds={appState.htr.activeImageIds}
-      />
+  <!-- Left: Catalog browser -->
+  {#if !leftCollapsed}
+    <div class="overflow-hidden border-r border-border" style="width: {leftWidth}%">
+      <CatalogPanel onLoadVolume={handleCatalogLoad} />
     </div>
     <div
       class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
-      class:bg-primary={isDraggingDivider}
-      onpointerdown={onDividerPointerDown}
+      class:bg-primary={draggingDivider === 'left'}
+      onpointerdown={(e) => onDividerPointerDown('left', e)}
       onpointermove={onDividerPointerMove}
       onpointerup={onDividerPointerUp}
       role="separator"
@@ -321,11 +309,13 @@
   {/if}
   <button
     class="shrink-0 w-5 flex items-center justify-center border-r border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-    onclick={() => panelCollapsed = !panelCollapsed}
-    title={panelCollapsed ? 'Show panel' : 'Hide panel'}
+    onclick={() => leftCollapsed = !leftCollapsed}
+    title={leftCollapsed ? 'Show catalog' : 'Hide catalog'}
   >
-    <span class="text-[0.6rem]">{panelCollapsed ? '\u25B6' : '\u25C0'}</span>
+    <span class="text-[0.6rem]">{leftCollapsed ? '\u25B6' : '\u25C0'}</span>
   </button>
+
+  <!-- Center: Document viewer -->
   <div class="relative overflow-hidden flex-1">
     <DocumentViewer
       bind:this={docViewer}
@@ -357,6 +347,54 @@
       selectMode={appState.selectMode}
     />
   </div>
+
+  <!-- Right: Transcription tree -->
+  <button
+    class="shrink-0 w-5 flex items-center justify-center border-l border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+    onclick={() => rightCollapsed = !rightCollapsed}
+    title={rightCollapsed ? 'Show transcriptions' : 'Hide transcriptions'}
+  >
+    <span class="text-[0.6rem]">{rightCollapsed ? '\u25C0' : '\u25B6'}</span>
+  </button>
+  {#if !rightCollapsed}
+    <div
+      class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
+      class:bg-primary={draggingDivider === 'right'}
+      onpointerdown={(e) => onDividerPointerDown('right', e)}
+      onpointermove={onDividerPointerMove}
+      onpointerup={onDividerPointerUp}
+      role="separator"
+    ></div>
+    <div class="overflow-hidden border-l border-border" style="width: {rightWidth}%">
+      <TranscriptionPanel
+        documents={appState.documents}
+        activeDocumentId={appState.activeDocumentId}
+        onSwitchDocument={(id) => appState.switchDocument(id)}
+        hoveredLine={appState.hoveredLine}
+        onHoverLine={(i) => appState.hoveredLine = i}
+        selectedLines={appState.selectedLines}
+        onSelectLine={handleSelectLine}
+        onToggleGroup={toggleGroup}
+        onRenameGroup={renameGroup}
+        onDeleteGroup={deleteGroup}
+        onFocusGroup={(indices, rect) => {
+          if (indices.length > 0) docViewer?.focusLines(indices);
+          else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
+        }}
+        onFocusLine={(i) => docViewer?.focusLines([i])}
+        onEditLine={(i, text) => {
+          if (activeDoc?.lines[i]) {
+            activeDoc.lines[i].text = text;
+            appState.documents = [...appState.documents];
+            if (activeDoc.manifestId) appState.scheduleAutoSave();
+          }
+        }}
+        selectMode={appState.selectMode}
+        activeRegions={appState.htr.activeRegions}
+        activeImageIds={appState.htr.activeImageIds}
+      />
+    </div>
+  {/if}
 </div>
 
 <LinePreview
