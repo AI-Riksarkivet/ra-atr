@@ -1,12 +1,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { appState } from '$lib/stores/app-state.svelte';
-  import { resolveVolume } from '$lib/riksarkivet';
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import ModelManager from '$lib/components/ModelManager.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
-  import RiksarkivetImport from '$lib/components/RiksarkivetImport.svelte';
-  import CatalogSearch from '$lib/components/CatalogSearch.svelte';
 
   let videoEl = $state<HTMLVideoElement>();
   let videoStarted = false;
@@ -29,56 +26,7 @@
     goto('/viewer');
   }
 
-  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
-    // Skip pages that are already loaded (user navigated back to add more)
-    const existingPages = new Set(
-      appState.documents.filter(d => d.manifestId === manifestId).map(d => d.pageNumber)
-    );
-    const newPages = pages.filter(p => !existingPages.has(p));
-
-    for (const page of newPages) {
-      const padded = String(page).padStart(5, '0');
-      const docId = appState.addPlaceholderDocument(
-        `${manifestId}_${padded}.jpg`, manifestId, page
-      );
-      if (!appState.activeDocumentId) {
-        appState.activeDocumentId = docId;
-        appState.loadDocumentImage(docId);
-      }
-    }
-
-    appState.selectMode = true;
-    goto('/viewer');
-
-    // Pre-populate existing transcriptions from backend (non-blocking)
-    // Only fetch if we added new pages (avoid re-populating existing ones)
-    if (newPages.length > 0) {
-      import('$lib/api').then(({ fetchTranscriptions }) =>
-        fetchTranscriptions(manifestId).then(groups => {
-          if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
-        }).catch(() => {})
-      );
-    }
-  }
-
-  let catalogLoading = $state(false);
-  let catalogError = $state('');
-
-  async function handleCatalogLoad(referenceCode: string) {
-    if (catalogLoading) return;
-    catalogLoading = true;
-    catalogError = '';
-    try {
-      const { manifestId, pages } = await resolveVolume(referenceCode, () => {});
-      handleRiksarkivetResolved(manifestId, pages);
-    } catch (e) {
-      catalogError = e instanceof Error ? e.message : 'Failed to load volume';
-    } finally {
-      catalogLoading = false;
-    }
-  }
-
-  function continueWorkspace() {
+  function enterWorkspace() {
     goto('/viewer');
   }
 </script>
@@ -99,18 +47,18 @@
       />
     {/if}
 
-    <div class="text-center text-xs text-muted-foreground uppercase tracking-wide">Riksarkivet</div>
-    <CatalogSearch onLoad={handleCatalogLoad} />
-    {#if catalogLoading}
-      <p class="text-xs text-muted-foreground animate-pulse text-center">Loading volume...</p>
+    {#if appState.htr.modelsReady}
+      <button
+        class="w-full rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        onclick={enterWorkspace}
+      >
+        {#if appState.documents.length > 0}
+          Continue workspace ({appState.documents.length} image{appState.documents.length !== 1 ? 's' : ''})
+        {:else}
+          Explore collection
+        {/if}
+      </button>
     {/if}
-    {#if catalogError}
-      <p class="text-xs text-destructive text-center">{catalogError}</p>
-    {/if}
-    <RiksarkivetImport
-      onResolved={handleRiksarkivetResolved}
-      disabled={false}
-    />
 
     <div class="flex items-center gap-3 text-xs text-muted-foreground">
       <div class="flex-1 border-t border-border"></div>
@@ -125,15 +73,5 @@
       onPoolSizeChange={(n) => appState.htr.setPoolSize(n)}
       poolLocked={appState.documents.length > 0}
     />
-
-    {#if appState.documents.length > 0}
-      <button
-        class="w-full rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-        onclick={continueWorkspace}
-      >
-        Continue workspace ({appState.documents.length} image{appState.documents.length !== 1 ? 's' : ''})
-      </button>
-    {/if}
-
   </div>
 </div>

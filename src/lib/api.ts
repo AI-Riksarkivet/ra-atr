@@ -23,7 +23,6 @@ export interface TranscriptionGroup {
 }
 
 export async function fetchTranscriptions(manifestId: string, query?: string): Promise<TranscriptionGroup[]> {
-  if (!API_BASE) return [];
   const params = query ? `?q=${encodeURIComponent(query)}` : '';
   const res = await fetch(`${API_BASE}/transcriptions/${manifestId}${params}`, {
     headers: authHeaders(),
@@ -38,7 +37,6 @@ export async function saveTranscriptions(
   referenceCode: string,
   groups: TranscriptionGroup[],
 ): Promise<{ lines_added: number; contributor: string }> {
-  if (!API_BASE) throw new Error('API not configured');
   const res = await fetch(`${API_BASE}/transcriptions/${manifestId}`, {
     method: 'POST',
     headers: {
@@ -61,7 +59,6 @@ export interface SavedManifest {
 }
 
 export async function listTranscriptions(query?: string): Promise<SavedManifest[]> {
-  if (!API_BASE) return [];
   const params = query ? `?q=${encodeURIComponent(query)}` : '';
   const res = await fetch(`${API_BASE}/transcriptions${params}`, {
     headers: authHeaders(),
@@ -72,7 +69,6 @@ export async function listTranscriptions(query?: string): Promise<SavedManifest[
 }
 
 export async function deleteTranscriptions(manifestId: string): Promise<void> {
-  if (!API_BASE) return;
   const res = await fetch(`${API_BASE}/transcriptions/${manifestId}`, {
     method: 'DELETE',
     headers: authHeaders(),
@@ -82,7 +78,10 @@ export async function deleteTranscriptions(manifestId: string): Promise<void> {
 
 export interface CatalogResult {
   reference_code: string;
+  archive_code: string;
   fonds_title: string;
+  fonds_description: string;
+  creator: string;
   series_title: string;
   volume_id: string;
   date_text: string;
@@ -91,7 +90,7 @@ export interface CatalogResult {
 }
 
 export async function searchCatalog(params: {
-  q: string;
+  q?: string;
   digitized?: boolean;
   date_start?: number;
   date_end?: number;
@@ -100,9 +99,8 @@ export async function searchCatalog(params: {
   limit?: number;
   offset?: number;
 }): Promise<{ results: CatalogResult[]; total: number }> {
-  if (!API_BASE) return { results: [], total: 0 };
   const searchParams = new URLSearchParams();
-  searchParams.set('q', params.q);
+  if (params.q) searchParams.set('q', params.q);
   if (params.digitized !== undefined) searchParams.set('digitized', String(params.digitized));
   if (params.date_start !== undefined) searchParams.set('date_start', String(params.date_start));
   if (params.date_end !== undefined) searchParams.set('date_end', String(params.date_end));

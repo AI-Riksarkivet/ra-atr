@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { appState } from '$lib/stores/app-state.svelte';
+  import { resolveVolume } from '$lib/riksarkivet';
+  import { fetchTranscriptions } from '$lib/api';
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
@@ -11,12 +13,13 @@
   import type { LineGroup, Line, BBox } from '$lib/types';
 
   let dividerX = $state(30);
+  let panelCollapsed = $state(false);
   let isDraggingDivider = $state(false);
   let docViewer: DocumentViewer;
 
-  // Redirect to home if no documents loaded
+  // Redirect to home if models not loaded (wait for cache check first)
   $effect(() => {
-    if (appState.documents.length === 0 && appState.htr.modelsReady) goto('/');
+    if (appState.htr.cacheChecked && !appState.htr.modelsReady && appState.htr.stage === 'idle') goto('/');
   });
 
   // Active document derived state
@@ -134,6 +137,49 @@
     if (e.key === 'ArrowDown') { e.preventDefault(); appState.navigateLine(1); }
   }
 
+  let catalogLoading = $state(false);
+  let catalogError = $state('');
+
+  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
+    const existingPages = new Set(
+      appState.documents.filter(d => d.manifestId === manifestId).map(d => d.pageNumber)
+    );
+    const newPages = pages.filter(p => !existingPages.has(p));
+
+    for (const page of newPages) {
+      const padded = String(page).padStart(5, '0');
+      const docId = appState.addPlaceholderDocument(
+        `${manifestId}_${padded}.jpg`, manifestId, page
+      );
+      if (!appState.activeDocumentId) {
+        appState.activeDocumentId = docId;
+        appState.loadDocumentImage(docId);
+      }
+    }
+
+    appState.selectMode = true;
+
+    if (newPages.length > 0) {
+      fetchTranscriptions(manifestId).then(groups => {
+        if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
+      }).catch(() => {});
+    }
+  }
+
+  async function handleCatalogLoad(referenceCode: string) {
+    if (catalogLoading) return;
+    catalogLoading = true;
+    catalogError = '';
+    try {
+      const { manifestId, pages } = await resolveVolume(referenceCode, () => {});
+      handleRiksarkivetResolved(manifestId, pages);
+    } catch (e) {
+      catalogError = e instanceof Error ? e.message : 'Failed to load volume';
+    } finally {
+      catalogLoading = false;
+    }
+  }
+
   function handleAddImages() {
     goto('/');
   }
@@ -233,44 +279,54 @@
 {/if}
 
 <div class="flex flex-1 overflow-hidden">
-  <div class="overflow-hidden border-r border-border" style="width: {dividerX}%">
-    <TranscriptionPanel
-      documents={appState.documents}
-      activeDocumentId={appState.activeDocumentId}
-      onSwitchDocument={(id) => appState.switchDocument(id)}
-      hoveredLine={appState.hoveredLine}
-      onHoverLine={(i) => appState.hoveredLine = i}
-      selectedLines={appState.selectedLines}
-      onSelectLine={handleSelectLine}
-      onToggleGroup={toggleGroup}
-      onRenameGroup={renameGroup}
-      onDeleteGroup={deleteGroup}
-      onFocusGroup={(indices, rect) => {
-        if (indices.length > 0) docViewer?.focusLines(indices);
-        else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
-      }}
-      onFocusLine={(i) => docViewer?.focusLines([i])}
-      onEditLine={(i, text) => {
-        if (activeDoc?.lines[i]) {
-          activeDoc.lines[i].text = text;
-          appState.documents = [...appState.documents];
-          if (activeDoc.manifestId) appState.scheduleAutoSave();
-        }
-      }}
-      selectMode={appState.selectMode}
-      activeRegions={appState.htr.activeRegions}
-      activeImageIds={appState.htr.activeImageIds}
-    />
-  </div>
-  <div
-    class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
-    class:bg-primary={isDraggingDivider}
-    onpointerdown={onDividerPointerDown}
-    onpointermove={onDividerPointerMove}
-    onpointerup={onDividerPointerUp}
-    role="separator"
-  ></div>
-  <div class="relative overflow-hidden" style="width: {100 - dividerX}%">
+  {#if !panelCollapsed}
+    <div class="overflow-hidden border-r border-border" style="width: {dividerX}%">
+      <TranscriptionPanel
+        documents={appState.documents}
+        activeDocumentId={appState.activeDocumentId}
+        onSwitchDocument={(id) => appState.switchDocument(id)}
+        hoveredLine={appState.hoveredLine}
+        onHoverLine={(i) => appState.hoveredLine = i}
+        selectedLines={appState.selectedLines}
+        onSelectLine={handleSelectLine}
+        onToggleGroup={toggleGroup}
+        onRenameGroup={renameGroup}
+        onDeleteGroup={deleteGroup}
+        onFocusGroup={(indices, rect) => {
+          if (indices.length > 0) docViewer?.focusLines(indices);
+          else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
+        }}
+        onFocusLine={(i) => docViewer?.focusLines([i])}
+        onEditLine={(i, text) => {
+          if (activeDoc?.lines[i]) {
+            activeDoc.lines[i].text = text;
+            appState.documents = [...appState.documents];
+            if (activeDoc.manifestId) appState.scheduleAutoSave();
+          }
+        }}
+        onLoadVolume={handleCatalogLoad}
+        selectMode={appState.selectMode}
+        activeRegions={appState.htr.activeRegions}
+        activeImageIds={appState.htr.activeImageIds}
+      />
+    </div>
+    <div
+      class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
+      class:bg-primary={isDraggingDivider}
+      onpointerdown={onDividerPointerDown}
+      onpointermove={onDividerPointerMove}
+      onpointerup={onDividerPointerUp}
+      role="separator"
+    ></div>
+  {/if}
+  <button
+    class="shrink-0 w-5 flex items-center justify-center border-r border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+    onclick={() => panelCollapsed = !panelCollapsed}
+    title={panelCollapsed ? 'Show panel' : 'Hide panel'}
+  >
+    <span class="text-[0.6rem]">{panelCollapsed ? '\u25B6' : '\u25C0'}</span>
+  </button>
+  <div class="relative overflow-hidden flex-1">
     <DocumentViewer
       bind:this={docViewer}
       imageUrl={activeDoc?.imageUrl ?? null}

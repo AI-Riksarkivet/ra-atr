@@ -19,6 +19,11 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
+    proxy: {
+      '/catalog': 'http://localhost:8000',
+      '/transcriptions': 'http://localhost:8000',
+      '/health': 'http://localhost:8000',
+    },
     watch: {
       ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**'],
     },

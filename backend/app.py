@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 DATASET_REPO = os.environ.get("DATASET_REPO", "lejonet/transcriptions")
 TABLE_NAME = "transcriptions"
-DB_PATH = os.environ.get("LANCEDB_PATH", "/tmp/lancedb")
+DB_PATH = os.environ.get("LANCEDB_PATH", str(Path(__file__).parent / "data" / "lancedb"))
 PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "/tmp/parquet_export"))
 
 SCHEMA = pa.schema([
@@ -464,19 +464,49 @@ def catalog_search(
     limit: int = 50,
     offset: int = 0,
 ):
-    if not q:
-        raise HTTPException(400, "Query required")
-
     if catalog_table is None:
-        # No catalog loaded — return empty results (not an error)
         return {"results": [], "total": 0}
 
-    if mode == "vector":
-        results = _catalog_vector_search(q, limit + offset)
-    elif mode == "hybrid":
-        results = _catalog_hybrid_search(q, limit + offset)
+    browse_total = None
+
+    # Build pre-filter for search queries
+    where_parts = []
+    if digitized is not None:
+        where_parts.append(f"digitized = {'true' if digitized else 'false'}")
+        digitized = None  # skip re-applying below
+    if archive:
+        where_parts.append(f"archive_code = '{archive}'")
+        archive = None
+    if date_start is not None:
+        where_parts.append(f"date_end >= {date_start}")
+        date_start = None
+    if date_end is not None:
+        where_parts.append(f"date_start <= {date_end}")
+        date_end = None
+    pre_filter = " AND ".join(where_parts) if where_parts else None
+
+    if q:
+        # Reference code lookup: contains "/" → use exact prefix match
+        if "/" in q:
+            ref_where = f"reference_code LIKE '{q}%'"
+            if pre_filter:
+                ref_where = f"{ref_where} AND {pre_filter}"
+            try:
+                results = catalog_table.search().where(ref_where).limit(limit + offset).to_arrow()
+            except Exception:
+                results = catalog_table.to_arrow().slice(0, 0)
+        elif mode == "vector":
+            results = _catalog_vector_search(q, limit + offset, pre_filter)
+        elif mode == "hybrid":
+            results = _catalog_hybrid_search(q, limit + offset, pre_filter)
+        else:
+            results = _catalog_fts_search(q, limit + offset, pre_filter)
     else:
-        results = _catalog_fts_search(q, limit + offset)
+        # No query — browse mode, need at least one filter
+        if not pre_filter:
+            raise HTTPException(400, "Query or filter required")
+        browse_total = catalog_table.count_rows(pre_filter)
+        results = catalog_table.search().where(pre_filter).limit(limit + offset).to_arrow()
 
     # Apply filters with pyarrow
     if len(results) > 0 and digitized is not None:
@@ -494,14 +524,17 @@ def catalog_search(
         mask = pc.equal(results.column("archive_code"), archive)
         results = results.filter(mask)
 
-    total = len(results)
+    total = browse_total if browse_total is not None else len(results)
     results = results.slice(offset, limit)
 
     return {
         "results": [
             {
                 "reference_code": results.column("reference_code")[i].as_py(),
+                "archive_code": results.column("archive_code")[i].as_py(),
                 "fonds_title": results.column("fonds_title")[i].as_py(),
+                "fonds_description": results.column("fonds_description")[i].as_py(),
+                "creator": results.column("creator")[i].as_py(),
                 "series_title": results.column("series_title")[i].as_py(),
                 "volume_id": results.column("volume_id")[i].as_py(),
                 "date_text": results.column("date_text")[i].as_py(),
@@ -514,37 +547,50 @@ def catalog_search(
     }
 
 
-def _catalog_fts_search(q: str, limit: int) -> pa.Table:
+def _catalog_fts_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
-        return catalog_table.search(q, query_type="fts").limit(limit).to_arrow()
-    except Exception:
+        s = catalog_table.search(q, query_type="fts")
+        if where:
+            s = s.where(where)
+        return s.limit(limit).to_arrow()
+    except Exception as e:
+        print(f"FTS search failed for '{q}': {e}")
         return catalog_table.to_arrow().slice(0, 0)  # empty with correct schema
 
 
-def _catalog_vector_search(q: str, limit: int) -> pa.Table:
+def _catalog_vector_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
         from ingest_catalog import create_embedder, embed_batch
-        # Lazy-load embedder
         if not hasattr(_catalog_vector_search, "_embedder"):
             _catalog_vector_search._embedder = create_embedder()
         vec = embed_batch(_catalog_vector_search._embedder, [q])[0]
-        return catalog_table.search(vec).limit(limit).to_arrow()
+        s = catalog_table.search(vec)
+        if where:
+            s = s.where(where)
+        return s.limit(limit).to_arrow()
     except Exception:
         return catalog_table.to_arrow().slice(0, 0)
 
 
-def _catalog_hybrid_search(q: str, limit: int) -> pa.Table:
-    fts = _catalog_fts_search(q, limit)
-    vec = _catalog_vector_search(q, limit)
+def _catalog_hybrid_search(q: str, limit: int, where: str | None = None) -> pa.Table:
+    fts = _catalog_fts_search(q, limit, where)
+    try:
+        vec = _catalog_vector_search(q, limit, where)
+    except Exception:
+        return fts
     if len(fts) == 0:
         return vec
     if len(vec) == 0:
         return fts
+    # Merge: vector results first, deduplicate
     vec_ids = set(vec.column("id").to_pylist())
-    fts_only_mask = pc.invert(pc.is_in(fts.column("id"), pa.array(list(vec_ids))))
-    fts_only = fts.filter(fts_only_mask)
-    if len(fts_only) > 0:
-        return pa.concat_tables([vec, fts_only])
+    fts_only_indices = [i for i in range(len(fts)) if fts.column("id")[i].as_py() not in vec_ids]
+    if fts_only_indices:
+        # Select only shared columns to avoid schema mismatch
+        shared = [c for c in vec.column_names if c in fts.column_names and not c.startswith("_")]
+        vec_clean = vec.select(shared)
+        fts_extra = fts.select(shared).take(fts_only_indices)
+        return pa.concat_tables([vec_clean, fts_extra])
     return vec
 
 

@@ -136,7 +136,10 @@ def parse_ead_file(path: str) -> list[dict]:
             row_id = f"{eadid}/{series_id}/{vol_id}"
 
             search_text = " ".join(
-                part for part in [fonds_title, series_title, description, creator] if part
+                part for part in [
+                    fonds_title, fonds_description, series_title,
+                    description, creator, ref_code, vol_id, date_text,
+                ] if part
             )
 
             rows.append({
@@ -227,17 +230,66 @@ def ingest_rows(
 
 
 def build_fts_index(db_path: str):
-    """Build FTS ngram index on search_text column."""
+    """Build FTS word-level index on search_text column."""
     db = lancedb.connect(db_path)
     table = db.open_table(CATALOG_TABLE)
     try:
         table.create_fts_index(
             "search_text", replace=True,
-            base_tokenizer="ngram", ngram_min_length=2, prefix_only=True,
         )
         print(f"FTS index built on {table.count_rows()} rows")
     except Exception as e:
         print(f"FTS index failed: {e}")
+
+
+def _stream_all_dirs(data_dir: str, sample: int | None = None):
+    """Yield volume dicts from all archive subdirectories, streaming."""
+    for archive_dir in sorted(os.listdir(data_dir)):
+        full_path = os.path.join(data_dir, archive_dir)
+        if not os.path.isdir(full_path):
+            continue
+        yield from walk_archive_dir(full_path, limit=sample)
+
+
+def ingest_streaming(
+    rows_iter,
+    db_path: str,
+    batch_size: int = 10_000,
+    embed: bool = True,
+) -> int:
+    """Stream rows into LanceDB in fixed-size batches. Memory-efficient."""
+    db = lancedb.connect(db_path)
+    embedder = create_embedder() if embed else None
+    written = 0
+    batch: list[dict] = []
+
+    def flush(batch: list[dict], first: bool) -> None:
+        nonlocal written
+        if embedder:
+            vectors = embed_batch(embedder, [r["search_text"] for r in batch])
+            for row, vec in zip(batch, vectors):
+                row["vector"] = vec
+        else:
+            for row in batch:
+                row["vector"] = [0.0] * EMBED_DIM
+        arrow_batch = pa.Table.from_pylist(batch, schema=CATALOG_SCHEMA)
+        if first:
+            db.create_table(CATALOG_TABLE, arrow_batch, mode="overwrite")
+        else:
+            db.open_table(CATALOG_TABLE).add(arrow_batch)
+        written += len(batch)
+        print(f"  Written {written} rows...")
+
+    for row in rows_iter:
+        batch.append(row)
+        if len(batch) >= batch_size:
+            flush(batch, first=(written == 0))
+            batch = []
+
+    if batch:
+        flush(batch, first=(written == 0))
+
+    return written
 
 
 def main():
@@ -246,39 +298,28 @@ def main():
 
     parser = argparse.ArgumentParser(description="Ingest Riksarkivet EAD metadata into LanceDB")
     parser.add_argument("data_dir", help="Path to Riksarkivet-2022-12-16 directory")
-    parser.add_argument("--db-path", default="/tmp/lancedb", help="LanceDB directory")
+    default_db = os.path.join(os.path.dirname(__file__), "data", "lancedb")
+    parser.add_argument("--db-path", default=default_db, help="LanceDB directory")
     parser.add_argument("--sample", type=int, default=0, help="Only process N files per archive (0=all)")
     parser.add_argument("--batch-size", type=int, default=10_000)
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding (for testing)")
     args = parser.parse_args()
 
     t0 = time.time()
-    all_rows = []
+    sample = args.sample or None
 
-    for archive_dir in sorted(os.listdir(args.data_dir)):
-        full_path = os.path.join(args.data_dir, archive_dir)
-        if not os.path.isdir(full_path):
-            continue
-        print(f"Parsing {archive_dir}...")
-        count = 0
-        for row in walk_archive_dir(full_path, limit=args.sample or None):
-            all_rows.append(row)
-            count += 1
-        print(f"  {count} volumes from {archive_dir}")
-
-    print(f"Total: {len(all_rows)} volumes parsed in {time.time() - t0:.1f}s")
-
-    if not all_rows:
-        print("No volumes found, exiting.")
-        return
-
-    print("Ingesting into LanceDB...")
-    stats = ingest_rows(
-        all_rows, args.db_path,
+    print("Streaming parse + ingest...")
+    rows_iter = _stream_all_dirs(args.data_dir, sample=sample)
+    written = ingest_streaming(
+        rows_iter, args.db_path,
         batch_size=args.batch_size,
         embed=not args.no_embed,
     )
-    print(f"Wrote {stats['rows_written']} rows to {args.db_path}")
+    print(f"Wrote {written} rows to {args.db_path} in {time.time() - t0:.1f}s")
+
+    if written == 0:
+        print("No volumes found, exiting.")
+        return
 
     print("Building FTS index...")
     build_fts_index(args.db_path)

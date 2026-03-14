@@ -31,7 +31,7 @@
       const data = await searchCatalog({
         q: query.trim(),
         digitized: digitizedOnly ? true : undefined,
-        mode: 'hybrid',
+        mode: 'fts',
         limit: 50,
       });
       results = data.results;
@@ -61,7 +61,7 @@
       bind:value={query}
       oninput={triggerSearch}
       placeholder="Search archive catalog..."
-      class="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+      class="flex-1 rounded border border-border bg-background px-2 py-1.5 text-xs font-sans text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
     />
   </div>
 
@@ -76,7 +76,7 @@
 
   {#if results.length > 0}
     <div class="text-[0.65rem] text-muted-foreground">{total} result{total !== 1 ? 's' : ''}</div>
-    <div class="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto">
+    <div class="flex flex-col gap-1.5 max-h-[40vh] overflow-y-auto">
       {#each results as r}
         <div class="rounded border border-border px-3 py-2 text-xs {r.digitized ? '' : 'opacity-50'}">
           <div class="flex items-start gap-2">
