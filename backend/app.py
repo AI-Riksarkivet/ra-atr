@@ -486,21 +486,23 @@ def catalog_search(
     pre_filter = " AND ".join(where_parts) if where_parts else None
 
     if q:
+        # Fetch one extra to detect if there are more results
+        fetch_limit = limit + offset + 1
         # Reference code lookup: contains "/" → use exact prefix match
         if "/" in q:
             ref_where = f"reference_code LIKE '{q}%'"
             if pre_filter:
                 ref_where = f"{ref_where} AND {pre_filter}"
             try:
-                results = catalog_table.search().where(ref_where).limit(limit + offset).to_arrow()
+                results = catalog_table.search().where(ref_where).limit(fetch_limit).to_arrow()
             except Exception:
                 results = catalog_table.to_arrow().slice(0, 0)
         elif mode == "vector":
-            results = _catalog_vector_search(q, limit + offset, pre_filter)
+            results = _catalog_vector_search(q, fetch_limit, pre_filter)
         elif mode == "hybrid":
-            results = _catalog_hybrid_search(q, limit + offset, pre_filter)
+            results = _catalog_hybrid_search(q, fetch_limit, pre_filter)
         else:
-            results = _catalog_fts_search(q, limit + offset, pre_filter)
+            results = _catalog_fts_search(q, fetch_limit, pre_filter)
     else:
         # No query — browse mode, need at least one filter
         if not pre_filter:
@@ -524,7 +526,12 @@ def catalog_search(
         mask = pc.equal(results.column("archive_code"), archive)
         results = results.filter(mask)
 
-    total = browse_total if browse_total is not None else len(results)
+    if browse_total is not None:
+        total = browse_total
+    else:
+        # For search queries: if we got more than limit+offset, signal "more available"
+        has_more = len(results) > limit + offset
+        total = offset + limit + (1 if has_more else 0)
     results = results.slice(offset, limit)
 
     return {

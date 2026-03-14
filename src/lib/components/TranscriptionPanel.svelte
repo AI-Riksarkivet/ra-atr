@@ -144,6 +144,24 @@
   let collapsedVolumes = $state(new Set<string>());
   let collapsedDocs = $state(new Set<string>());
 
+  // Auto-collapse other volumes when switching to a different one
+  let lastActiveManifest = $state('');
+  $effect(() => {
+    const activeDoc = documents.find(d => d.id === activeDocumentId);
+    const manifest = activeDoc?.manifestId ?? '';
+    if (manifest && manifest !== lastActiveManifest) {
+      // Collapse all volumes except the active one
+      const next = new Set<string>();
+      for (const doc of documents) {
+        if (doc.manifestId && doc.manifestId !== manifest) {
+          next.add(doc.manifestId);
+        }
+      }
+      collapsedVolumes = next;
+      lastActiveManifest = manifest;
+    }
+  });
+
   function toggleVolume(id: string) {
     const next = new Set(collapsedVolumes);
     if (next.has(id)) next.delete(id); else next.add(id);

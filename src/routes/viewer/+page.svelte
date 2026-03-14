@@ -149,15 +149,18 @@
     );
     const newPages = pages.filter(p => !existingPages.has(p));
 
+    let firstDocId = '';
     for (const page of newPages) {
       const padded = String(page).padStart(5, '0');
       const docId = appState.addPlaceholderDocument(
         `${manifestId}_${padded}.jpg`, manifestId, page
       );
-      if (!appState.activeDocumentId) {
-        appState.activeDocumentId = docId;
-        appState.loadDocumentImage(docId);
-      }
+      if (!firstDocId) firstDocId = docId;
+    }
+
+    // Switch to first page of new volume
+    if (firstDocId) {
+      appState.switchDocument(firstDocId);
     }
 
     appState.selectMode = true;
