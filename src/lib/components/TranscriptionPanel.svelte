@@ -110,6 +110,72 @@
 
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
+  let copiedLineIdx = $state<number>(-1);
+
+  async function copyLinePrompt(doc: ImageDocument, lineIdx: number) {
+    // Find which group this line belongs to
+    const group = doc.groups.find(g => g.lineIndices.includes(lineIdx));
+    const groupLines = group ? group.lineIndices : [lineIdx];
+
+    // Build context: all lines in the group, with [THIS LINE] marker
+    const contextLines: string[] = [];
+    for (const idx of groupLines) {
+      const text = doc.lines[idx]?.text ?? '';
+      if (idx === lineIdx) {
+        contextLines.push('[THIS LINE]');
+      } else if (text.trim()) {
+        contextLines.push(text);
+      }
+    }
+
+    const prompt = `This is a handwritten line from a 17th-19th century Swedish document.
+
+Surrounding text from the same region:
+${contextLines.map(l => `> ${l}`).join('\n')}
+
+[IMAGE: see attached line cutout]
+
+Read the handwritten text in the image. Use the surrounding text for context.
+Provide only the transcription, nothing else.`;
+
+    // Build clipboard items: text prompt + image cutout
+    const items: Record<string, Blob> = {
+      'text/plain': new Blob([prompt], { type: 'text/plain' }),
+    };
+
+    // Include image cutout
+    const line = doc.lines[lineIdx];
+    if (doc.imageUrl && line?.bbox) {
+      try {
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = doc.imageUrl!;
+        });
+        const b = line.bbox;
+        const pad = 8;
+        const sx = Math.max(0, b.x - pad);
+        const sy = Math.max(0, b.y - pad);
+        const sw = Math.min(img.width - sx, b.w + pad * 2);
+        const sh = Math.min(img.height - sy, b.h + pad * 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        const blob = await new Promise<Blob>((resolve) =>
+          canvas.toBlob(b => resolve(b!), 'image/png')
+        );
+        items['image/png'] = blob;
+      } catch { /* text-only fallback */ }
+    }
+
+    await navigator.clipboard.write([new ClipboardItem(items)]);
+    copiedLineIdx = lineIdx;
+    setTimeout(() => { if (copiedLineIdx === lineIdx) copiedLineIdx = -1; }, 1500);
+  }
+
   // Filter for transcriptions
   let searchQuery = $state('');
   let filter = $derived(searchQuery.trim().toLowerCase());
@@ -429,7 +495,7 @@
 {#snippet lineRow(doc: ImageDocument, lineIdx: number)}
   {#if doc.lines[lineIdx] && lineMatches(doc, lineIdx)}
     <div
-      class="flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
+      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
       data-line={lineIdx}
       onmouseenter={() => onHoverLine(lineIdx)}
       onmouseleave={() => onHoverLine(-1)}
@@ -452,6 +518,11 @@
         </span>
         {#if doc.lines[lineIdx].complete}
           <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+          <button
+            class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
+            onclick={(e) => { e.stopPropagation(); copyLinePrompt(doc, lineIdx); }}
+            title="Copy prompt with image"
+          >{copiedLineIdx === lineIdx ? '\u2713' : '\u2398'}</button>
         {/if}
       {/if}
     </div>
