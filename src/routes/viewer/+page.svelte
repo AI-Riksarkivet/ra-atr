@@ -8,6 +8,7 @@
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
   import CatalogPanel from '$lib/components/CatalogPanel.svelte';
+  import UploadPanel from '$lib/components/UploadPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import LinePreview from '$lib/components/LinePreview.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -24,6 +25,16 @@
   $effect(() => {
     if (appState.htr.cacheChecked && !appState.htr.modelsReady && appState.htr.stage === 'idle') goto('/');
   });
+
+  function handleUpload(files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) {
+    for (const file of files) {
+      const docId = appState.addDocument(file.name, file.previewUrl, file.imageData);
+      if (!appState.activeDocumentId) {
+        appState.activeDocumentId = docId;
+      }
+    }
+    appState.selectMode = true;
+  }
 
   // Active document derived state
   let activeDoc = $derived(appState.activeDocument);
@@ -190,9 +201,6 @@
     }
   }
 
-  function handleAddImages() {
-    goto('/');
-  }
 
   onMount(() => {
     // Route region detections to the right document
@@ -276,7 +284,6 @@
   onZoomIn={() => docViewer?.zoomIn()}
   onZoomOut={() => docViewer?.zoomOut()}
   onResetView={() => docViewer?.resetView()}
-  onNewImage={handleAddImages}
 />
 
 {#if appState.htr.error}
@@ -329,35 +336,56 @@
 
   <!-- Center: Document viewer -->
   <div class="relative overflow-hidden flex-1">
-    <DocumentViewer
-      bind:this={docViewer}
-      imageUrl={activeDoc?.imageUrl ?? null}
-      lines={lines}
-      currentLine={-1}
-      hoveredLine={appState.hoveredLine}
-      onHoverLine={(i) => appState.hoveredLine = i}
-      stage={appState.htr.stage}
-      selectedLines={appState.selectedLines}
-      onSelectLine={handleSelectLine}
-      onMarqueeSelect={handleMarqueeSelect}
-      onRedetectRegion={(x, y, w, h) => {
-        if (!activeDoc) return '';
-        const regionId = appState.htr.redetectRegion(activeDoc.id, x, y, w, h);
-        activeDoc.groupCounter++;
-        activeDoc.groups = [...activeDoc.groups, {
-          id: `group-${activeDoc.groupCounter}`,
-          name: `Group ${activeDoc.groupCounter}`,
-          lineIndices: [],
-          collapsed: false,
-          regionId,
-          rect: { x, y, w, h },
-        }];
-        appState.documents = [...appState.documents];
-        return regionId;
-      }}
-      groups={groups}
-      selectMode={appState.selectMode}
-    />
+    {#if activeDoc}
+      <DocumentViewer
+        bind:this={docViewer}
+        imageUrl={activeDoc?.imageUrl ?? null}
+        lines={lines}
+        currentLine={-1}
+        hoveredLine={appState.hoveredLine}
+        onHoverLine={(i) => appState.hoveredLine = i}
+        stage={appState.htr.stage}
+        selectedLines={appState.selectedLines}
+        onSelectLine={handleSelectLine}
+        onMarqueeSelect={handleMarqueeSelect}
+        onRedetectRegion={(x, y, w, h) => {
+          if (!activeDoc) return '';
+          const regionId = appState.htr.redetectRegion(activeDoc.id, x, y, w, h);
+          activeDoc.groupCounter++;
+          activeDoc.groups = [...activeDoc.groups, {
+            id: `group-${activeDoc.groupCounter}`,
+            name: `Group ${activeDoc.groupCounter}`,
+            lineIndices: [],
+            collapsed: false,
+            regionId,
+            rect: { x, y, w, h },
+          }];
+          appState.documents = [...appState.documents];
+          return regionId;
+        }}
+        groups={groups}
+        selectMode={appState.selectMode}
+      />
+    {:else}
+      <div class="absolute inset-0 flex items-center justify-center">
+        <video class="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none" src="/flying-papers.mp4" loop muted autoplay playsinline></video>
+        <div class="relative w-full max-w-sm space-y-4 p-8">
+          <p class="text-sm text-muted-foreground text-center">Search the catalog to load a volume</p>
+          <div class="flex items-center gap-3 text-xs text-muted-foreground">
+            <div class="flex-1 border-t border-border"></div>
+            <span>or upload from disk</span>
+            <div class="flex-1 border-t border-border"></div>
+          </div>
+          <UploadPanel
+            onUpload={handleUpload}
+            disabled={!appState.htr.modelsReady}
+            poolSize={appState.htr.poolSize}
+            onPoolSizeChange={(n) => appState.htr.setPoolSize(n)}
+            poolLocked={appState.documents.length > 0}
+          />
+        </div>
+      </div>
+    {/if}
   </div>
 
   <!-- Right: Transcription tree -->
