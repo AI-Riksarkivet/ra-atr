@@ -413,4 +413,10 @@
       <p class="text-sm text-white">Detecting text lines...</p>
     </div>
   {/if}
+  {#if !imageUrl}
+    <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+      <div class="size-6 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground"></div>
+      <p class="text-xs text-muted-foreground">Loading page...</p>
+    </div>
+  {/if}
 </div>

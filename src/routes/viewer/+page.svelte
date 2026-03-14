@@ -140,7 +140,7 @@
     if (e.key === 'ArrowDown') { e.preventDefault(); appState.navigateLine(1); }
   }
 
-  let catalogLoading = $state(false);
+  let catalogLoading = $state('');
   let catalogError = $state('');
 
   function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
@@ -171,15 +171,19 @@
 
   async function handleCatalogLoad(referenceCode: string) {
     if (catalogLoading) return;
-    catalogLoading = true;
+    catalogLoading = 'Resolving...';
     catalogError = '';
     try {
-      const { manifestId, pages } = await resolveVolume(referenceCode, () => {});
+      const { manifestId, pages } = await resolveVolume(referenceCode, (p) => {
+        if (p.stage === 'resolving') catalogLoading = 'Resolving reference code...';
+        else if (p.stage === 'manifest') catalogLoading = `Found ${p.manifestId}, loading manifest...`;
+        else if (p.stage === 'done') catalogLoading = `Loading ${p.totalPages} pages...`;
+      });
       handleRiksarkivetResolved(manifestId, pages);
     } catch (e) {
       catalogError = e instanceof Error ? e.message : 'Failed to load volume';
     } finally {
-      catalogLoading = false;
+      catalogLoading = '';
     }
   }
 
@@ -276,7 +280,7 @@
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
 {/if}
 {#if catalogLoading}
-  <div class="bg-muted px-4 py-1.5 text-xs text-muted-foreground animate-pulse shrink-0">Loading volume...</div>
+  <div class="bg-muted px-4 py-1.5 text-xs text-muted-foreground animate-pulse shrink-0">{catalogLoading}</div>
 {/if}
 {#if catalogError}
   <div class="bg-destructive/10 px-4 py-1.5 text-xs text-destructive shrink-0">{catalogError}</div>

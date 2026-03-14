@@ -114,6 +114,17 @@
   let searchQuery = $state('');
   let filter = $derived(searchQuery.trim().toLowerCase());
 
+  function highlightText(text: string): { before: string; match: string; after: string }[] {
+    if (!filter || !text) return [{ before: text, match: '', after: '' }];
+    const idx = text.toLowerCase().indexOf(filter);
+    if (idx === -1) return [{ before: text, match: '', after: '' }];
+    return [{
+      before: text.slice(0, idx),
+      match: text.slice(idx, idx + filter.length),
+      after: text.slice(idx + filter.length),
+    }];
+  }
+
   function lineMatches(doc: ImageDocument, lineIdx: number): boolean {
     if (!filter) return true;
     return doc.lines[lineIdx]?.text?.toLowerCase().includes(filter) ?? false;
@@ -233,6 +244,8 @@
             </button>
             {#if isWorking}
               <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+            {:else if doc.placeholder}
+              <span class="inline-block size-2 rounded-full border border-muted-foreground/40 border-t-muted-foreground animate-spin"></span>
             {/if}
             <span class="truncate flex-1">p. {doc.pageNumber ?? '?'}</span>
             {#if totalLines > 0}
@@ -417,7 +430,7 @@
         />
       {:else}
         <span class="flex-1">
-          {doc.lines[lineIdx].text}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
+          {#each highlightText(doc.lines[lineIdx].text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
         </span>
         {#if doc.lines[lineIdx].complete}
           <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>

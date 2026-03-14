@@ -66,6 +66,18 @@
     series: { title: string; volumes: CatalogResult[] }[];
   }
   let collapsedFonds = $state(new Set<string>());
+  let query = $derived(searchQuery.trim());
+
+  function highlight(text: string): { before: string; match: string; after: string }[] {
+    if (!query || !text) return [{ before: text, match: '', after: '' }];
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return [{ before: text, match: '', after: '' }];
+    return [{
+      before: text.slice(0, idx),
+      match: text.slice(idx, idx + query.length),
+      after: text.slice(idx + query.length),
+    }];
+  }
 
   let catalogTree = $derived.by(() => {
     const fondsMap = new Map<string, Map<string, CatalogResult[]>>();
@@ -121,6 +133,10 @@
 
   <!-- Scrollable results -->
   <div class="flex-1 overflow-y-auto p-3 pt-2">
+
+{#snippet hl(text: string)}
+  {#each highlight(text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}
+{/snippet}
   {#each catalogTree as fonds}
     {@const fCollapsed = collapsedFonds.has(fonds.title)}
     <div
@@ -132,17 +148,17 @@
       }}
     >
       <span class="text-[0.65rem] w-4">{fCollapsed ? '\u25B6' : '\u25BC'}</span>
-      <span class="font-semibold truncate flex-1">{fonds.title}</span>
+      <span class="font-semibold truncate flex-1">{@render hl(fonds.title)}</span>
       <span class="text-[0.65rem] text-muted-foreground font-mono">{fonds.series.reduce((n, s) => n + s.volumes.length, 0)}</span>
     </div>
 
     {#if !fCollapsed}
       <div class="pl-4 pr-2 pb-1">
         {#if fonds.creator}
-          <div class="text-[0.6rem] text-muted-foreground">{fonds.creator}</div>
+          <div class="text-[0.6rem] text-muted-foreground">{@render hl(fonds.creator)}</div>
         {/if}
         {#if fonds.description}
-          <div class="text-[0.6rem] text-muted-foreground/70 mt-0.5 line-clamp-3">{fonds.description}</div>
+          <div class="text-[0.6rem] text-muted-foreground/70 mt-0.5 line-clamp-3">{@render hl(fonds.description)}</div>
         {/if}
         <div class="text-[0.55rem] text-muted-foreground/40 font-mono mt-0.5">{fonds.archiveCode}</div>
       </div>
@@ -150,7 +166,7 @@
       <div class="pl-2">
         {#each fonds.series as series}
           {#if series.title}
-            <div class="text-[0.65rem] text-muted-foreground font-medium px-2 py-0.5 mt-1">{series.title}</div>
+            <div class="text-[0.65rem] text-muted-foreground font-medium px-2 py-0.5 mt-1">{@render hl(series.title)}</div>
           {/if}
           <div class="pl-2">
             {#each series.volumes as vol}
@@ -169,7 +185,7 @@
                 {/if}
               </div>
               {#if vol.description}
-                <div class="text-[0.6rem] text-muted-foreground/60 px-4 pb-0.5">{vol.description}</div>
+                <div class="text-[0.6rem] text-muted-foreground/60 px-4 pb-0.5">{@render hl(vol.description)}</div>
               {/if}
               <div class="text-[0.5rem] text-muted-foreground/30 px-4 pb-1 font-mono">{vol.reference_code}</div>
             {/each}
