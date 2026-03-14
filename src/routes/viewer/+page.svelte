@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { resolveVolume } from '$lib/riksarkivet';
   import { fetchTranscriptions } from '$lib/api';
@@ -16,8 +16,8 @@
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
-  let leftCollapsed = $state(false);
-  let rightCollapsed = $state(false);
+  let leftCollapsed = $state(true);
+  let rightCollapsed = $state(true);
   let draggingDivider = $state<'left' | 'right' | null>(null);
   let docViewer: DocumentViewer;
 
@@ -40,6 +40,16 @@
   let activeDoc = $derived(appState.activeDocument);
   let lines = $derived(activeDoc?.lines ?? []);
   let groups = $derived(activeDoc?.groups ?? []);
+
+  // Page navigation info
+  let pageNav = $derived.by(() => {
+    if (!activeDoc?.manifestId) return null;
+    const siblings = appState.documents
+      .filter(d => d.manifestId === activeDoc.manifestId)
+      .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
+    const idx = siblings.findIndex(d => d.id === activeDoc.id);
+    return { current: idx + 1, total: siblings.length, hasPrev: idx > 0, hasNext: idx < siblings.length - 1 };
+  });
 
   function handleSelectLine(index: number, additive: boolean) {
     if (index < 0) { appState.selectedLines = new Set(); return; }
@@ -153,6 +163,8 @@
 
   let catalogLoading = $state('');
   let catalogError = $state('');
+  let homeSearch = $state('');
+  let catalogPanel: CatalogPanel;
 
   function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
     const existingPages = new Set(
@@ -169,9 +181,10 @@
       if (!firstDocId) firstDocId = docId;
     }
 
-    // Switch to first page of new volume
+    // Switch to first page of new volume and show transcription panel
     if (firstDocId) {
       appState.switchDocument(firstDocId);
+      rightCollapsed = false;
     }
 
     appState.selectMode = true;
@@ -280,11 +293,7 @@
   }
 </script>
 
-<AppHeader
-  onZoomIn={() => docViewer?.zoomIn()}
-  onZoomOut={() => docViewer?.zoomOut()}
-  onResetView={() => docViewer?.resetView()}
-/>
+<AppHeader />
 
 {#if appState.htr.error}
   <div class="bg-destructive/10 px-4 py-2 text-sm text-destructive shrink-0">{appState.htr.error}</div>
@@ -310,27 +319,25 @@
   <!-- Left: Catalog browser -->
   {#if leftCollapsed}
     <button
-      class="shrink-0 flex items-center justify-center px-1 border-r border-border text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
+      class="shrink-0 flex items-center justify-center px-0.5 border-r border-border text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       onclick={() => leftCollapsed = false}
       title="Show catalog"
     >
-      <span class="text-[0.55rem] [writing-mode:vertical-lr] tracking-widest uppercase select-none">catalog</span>
+      <span class="text-[0.5rem]">&#x25B6;</span>
     </button>
   {:else}
-    <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
-      <CatalogPanel onLoadVolume={handleCatalogLoad} />
-      <button
-        class="shrink-0 w-full py-0.5 text-center text-[0.55rem] text-muted-foreground hover:text-foreground hover:bg-muted/30 border-t border-border cursor-pointer transition-colors"
-        onclick={() => leftCollapsed = true}
-      >&laquo; hide</button>
+    <div class="overflow-hidden border-r border-border" style="width: {leftWidth}%">
+      <CatalogPanel bind:this={catalogPanel} onLoadVolume={handleCatalogLoad} />
     </div>
     <div
-      class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary"
+      class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary group relative"
       class:bg-primary={draggingDivider === 'left'}
       onpointerdown={(e) => onDividerPointerDown('left', e)}
       onpointermove={onDividerPointerMove}
       onpointerup={onDividerPointerUp}
+      ondblclick={() => leftCollapsed = true}
       role="separator"
+      title="Drag to resize, double-click to collapse"
     ></div>
   {/if}
 
@@ -366,11 +373,70 @@
         groups={groups}
         selectMode={appState.selectMode}
       />
+
+      <!-- Page navigation arrows -->
+      {#if pageNav}
+        {#if pageNav.hasPrev}
+          <button
+            class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border size-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm"
+            onclick={() => appState.navigatePage(-1)}
+            title="Previous page"
+          >
+            <span class="text-sm">&#x25C0;</span>
+          </button>
+        {/if}
+        {#if pageNav.hasNext}
+          <button
+            class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border size-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm"
+            onclick={() => appState.navigatePage(1)}
+            title="Next page"
+          >
+            <span class="text-sm">&#x25B6;</span>
+          </button>
+        {/if}
+        <div class="absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border px-3 py-1 text-[0.6rem] text-muted-foreground font-mono shadow-sm">
+          {pageNav.current} / {pageNav.total}
+        </div>
+      {/if}
+
+      <!-- Zoom controls -->
+      <div class="absolute bottom-3 right-3 flex gap-1">
+        <button
+          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm"
+          onclick={() => docViewer?.zoomIn()}
+          title="Zoom in"
+        >+</button>
+        <button
+          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm"
+          onclick={() => docViewer?.zoomOut()}
+          title="Zoom out"
+        >&minus;</button>
+        <button
+          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-xs"
+          onclick={() => docViewer?.resetView()}
+          title="Reset view"
+        >&#x21BA;</button>
+      </div>
     {:else}
       <div class="absolute inset-0 flex items-center justify-center">
         <video class="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none" src="/flying-papers.mp4" loop muted autoplay playsinline></video>
-        <div class="relative w-full max-w-sm space-y-4 p-8">
-          <p class="text-sm text-muted-foreground text-center">Search the catalog to load a volume</p>
+        <div class="relative w-full max-w-md space-y-5 p-8">
+          <h2 class="text-xl font-semibold text-center text-foreground/80">Lejonet HTR</h2>
+          <input
+            type="text"
+            bind:value={homeSearch}
+            placeholder="Search the archive catalog..."
+            class="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+            onkeydown={async (e) => {
+              if (e.key === 'Enter' && homeSearch.trim()) {
+                const q = homeSearch.trim();
+                homeSearch = '';
+                leftCollapsed = false;
+                await tick();
+                catalogPanel?.setSearch(q);
+              }
+            }}
+          />
           <div class="flex items-center gap-3 text-xs text-muted-foreground">
             <div class="flex-1 border-t border-border"></div>
             <span>or upload from disk</span>
@@ -391,11 +457,11 @@
   <!-- Right: Transcription tree -->
   {#if rightCollapsed}
     <button
-      class="shrink-0 flex items-center justify-center px-1 border-l border-border text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
+      class="shrink-0 flex items-center justify-center px-0.5 border-l border-border text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       onclick={() => rightCollapsed = false}
       title="Show transcriptions"
     >
-      <span class="text-[0.55rem] [writing-mode:vertical-lr] tracking-widest uppercase select-none">transcriptions</span>
+      <span class="text-[0.5rem]">&#x25C0;</span>
     </button>
   {:else}
     <div
@@ -404,9 +470,11 @@
       onpointerdown={(e) => onDividerPointerDown('right', e)}
       onpointermove={onDividerPointerMove}
       onpointerup={onDividerPointerUp}
+      ondblclick={() => rightCollapsed = true}
       role="separator"
+      title="Drag to resize, double-click to collapse"
     ></div>
-    <div class="overflow-hidden border-l border-border flex flex-col" style="width: {rightWidth}%">
+    <div class="overflow-hidden border-l border-border" style="width: {rightWidth}%">
       <TranscriptionPanel
         documents={appState.documents}
         activeDocumentId={appState.activeDocumentId}
@@ -434,10 +502,6 @@
         activeRegions={appState.htr.activeRegions}
         activeImageIds={appState.htr.activeImageIds}
       />
-      <button
-        class="shrink-0 w-full py-0.5 text-center text-[0.55rem] text-muted-foreground hover:text-foreground hover:bg-muted/30 border-t border-border cursor-pointer transition-colors"
-        onclick={() => rightCollapsed = true}
-      >hide &raquo;</button>
     </div>
   {/if}
 </div>

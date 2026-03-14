@@ -8,6 +8,11 @@
   let { onLoadVolume }: Props = $props();
 
   let searchQuery = $state('');
+
+  export function setSearch(q: string) {
+    searchQuery = q;
+    queryCatalog();
+  }
   let catalogResults = $state<CatalogResult[]>([]);
   let catalogTotal = $state(0);
   let catalogLoading = $state(false);

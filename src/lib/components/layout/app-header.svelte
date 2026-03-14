@@ -2,17 +2,9 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Plus, Minus, RotateCcw, Home } from 'lucide-svelte';
+  import { Sun, Moon, Home } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { page } from '$app/state';
-
-  interface Props {
-    onZoomIn?: () => void;
-    onZoomOut?: () => void;
-    onResetView?: () => void;
-  }
-
-  let { onZoomIn, onZoomOut, onResetView }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
 </script>
@@ -39,15 +31,6 @@
         {appState.selectMode ? 'Pan mode' : 'Select'}
       </Button>
 
-      <div class="flex">
-        <Button variant="outline" size="icon-sm" onclick={onZoomIn}><Plus class="size-4" /></Button>
-        <Button variant="outline" size="icon-sm" onclick={onZoomOut}><Minus class="size-4" /></Button>
-        <Button variant="outline" size="icon-sm" onclick={onResetView}><RotateCcw class="size-4" /></Button>
-      </div>
-
-    {/if}
-
-    {#if isViewer}
       <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
         <Home class="size-4" />
       </Button>
