@@ -27,13 +27,16 @@
   });
 
   function handleUpload(files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) {
-    for (const file of files) {
-      const docId = appState.addDocument(file.name, file.previewUrl, file.imageData);
+    const volumeId = appState.createUploadVolumeId();
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const docId = appState.addDocument(file.name, file.previewUrl, file.imageData, volumeId, i + 1);
       if (!appState.activeDocumentId) {
         appState.activeDocumentId = docId;
       }
     }
     appState.selectMode = true;
+    rightCollapsed = false;
   }
 
   // Active document derived state

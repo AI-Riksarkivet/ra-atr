@@ -16,6 +16,7 @@ class AppState {
   saveError = $state<string | null>(null);
   lastSaved = $state<string | null>(null);
   private docCounter = 0;
+  private uploadCounter = 0;
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSaveHash = '';
   private imageLoadOrder: string[] = []; // LRU tracking for loaded images
@@ -24,7 +25,13 @@ class AppState {
     return this.documents.find(d => d.id === this.activeDocumentId);
   }
 
-  addDocument(name: string, imageUrl: string, imageData: ArrayBuffer): string {
+  /** Create a new upload volume ID for grouping uploaded images together. */
+  createUploadVolumeId(): string {
+    this.uploadCounter++;
+    return `upload-${this.uploadCounter}`;
+  }
+
+  addDocument(name: string, imageUrl: string, imageData: ArrayBuffer, manifestId?: string, pageNumber?: number): string {
     this.docCounter++;
     const id = `doc-${this.docCounter}`;
     const doc: ImageDocument = {
@@ -35,6 +42,8 @@ class AppState {
       lines: [],
       groups: [],
       groupCounter: 0,
+      manifestId,
+      pageNumber,
     };
     this.documents = [...this.documents, doc];
     // Send image to worker (clone buffer since addImage transfers it)

@@ -243,19 +243,12 @@ Provide only the transcription, nothing else.`;
 
   let volumes = $derived.by(() => {
     const vols = new Map<string, ImageDocument[]>();
-    const standalone: ImageDocument[] = [];
     for (const doc of documents) {
-      if (doc.manifestId) {
-        const list = vols.get(doc.manifestId);
-        if (list) list.push(doc); else vols.set(doc.manifestId, [doc]);
-      } else {
-        standalone.push(doc);
-      }
+      const key = doc.manifestId || 'unnamed';
+      const list = vols.get(key);
+      if (list) list.push(doc); else vols.set(key, [doc]);
     }
-    return {
-      volumes: [...vols.entries()].map(([manifestId, docs]) => ({ manifestId, docs })) as Volume[],
-      standalone,
-    };
+    return [...vols.entries()].map(([manifestId, docs]) => ({ manifestId, docs })) as Volume[];
   });
 </script>
 
@@ -280,7 +273,7 @@ Provide only the transcription, nothing else.`;
   <div class="flex-1 overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed">
 
   <!-- Volumes (Riksarkivet) -->
-  {#each volumes.volumes as vol}
+  {#each volumes as vol}
     {@const volHasMatches = !filter || vol.docs.some(d => docHasMatches(d))}
     {#if volHasMatches}
     {@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
@@ -298,7 +291,7 @@ Provide only the transcription, nothing else.`;
       {#if volWorking}
         <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
       {/if}
-      <span class="font-semibold truncate flex-1">{vol.manifestId}</span>
+      <span class="font-semibold truncate flex-1">{vol.manifestId.startsWith('upload-') ? `Upload ${vol.manifestId.slice(7)}` : vol.manifestId}</span>
       <span class="text-[0.65rem] text-muted-foreground font-mono">{vol.docs.length} pg</span>
       {#if volLines > 0}
         <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
@@ -357,56 +350,6 @@ Provide only the transcription, nothing else.`;
           {/if}
           {/if}
         {/each}
-      </div>
-    {/if}
-    {/if}
-  {/each}
-
-  <!-- Standalone uploads -->
-  {#each volumes.standalone as doc}
-    {#if !filter || docHasMatches(doc)}
-    {@const isActive = doc.id === activeDocumentId}
-    {@const isCollapsed = collapsedDocs.has(doc.id)}
-    {@const isWorking = activeImageIds.has(doc.id)}
-    {@const totalLines = doc.lines.length}
-    {@const completedLines = doc.lines.filter(l => l.complete).length}
-
-    <div
-      class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none font-sans text-xs mb-1 {isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'}"
-      onclick={() => { onSwitchDocument(doc.id); if (isCollapsed) toggleDoc(doc.id); }}
-    >
-      <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); toggleDoc(doc.id); }}>
-        {isCollapsed ? '\u25B6' : '\u25BC'}
-      </button>
-      {#if isWorking}
-        <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
-      {/if}
-      <span class="font-semibold truncate flex-1">{doc.name}</span>
-      {#if totalLines > 0}
-        <span class="text-[0.7rem] font-mono">{completedLines}/{totalLines}</span>
-      {/if}
-    </div>
-
-    {#if !isCollapsed && isActive}
-      <div class="pl-2">
-        {#each doc.groups as group, gi}
-          {#if !filter || groupHasMatches(doc, group.lineIndices)}
-            {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
-            {@render groupBlock(doc, group, gi, groupWorking)}
-          {/if}
-        {/each}
-
-        {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
-          <p class="text-muted-foreground italic text-center text-sm mt-4">Draw regions to detect text lines</p>
-        {/if}
-      </div>
-    {:else if !isCollapsed}
-      <div class="pl-6 pb-2">
-        {#if doc.lines.length === 0 && doc.groups.length === 0}
-          <p class="text-muted-foreground italic text-xs">No regions detected</p>
-        {:else}
-          <p class="text-muted-foreground text-xs">{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}</p>
-        {/if}
       </div>
     {/if}
     {/if}
