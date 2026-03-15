@@ -5,7 +5,7 @@ from ray import serve
 
 from .detect import decode_yolo
 from .layout import decode_rtmdet
-from .models import TOKENIZER_FILE, ModelStore
+from .models import TOKENIZER_FILE, ModelStore, _resolve_model
 from .preprocessing import (
     crop_region,
     preprocess_rtmdet,
@@ -59,7 +59,7 @@ class Transcriber:
         self.store = ModelStore()
         self.encoder = self.store.encoder
         self.decoder = self.store.decoder
-        tok_path = self.store.models_dir / TOKENIZER_FILE
+        tok_path = _resolve_model(TOKENIZER_FILE, self.store.models_dir)
         self.tokenizer = Tokenizer(tok_path)
         print(f"[Transcriber] Loaded with providers: {self.store.providers()}")
 

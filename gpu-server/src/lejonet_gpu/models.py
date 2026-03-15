@@ -92,7 +92,20 @@ class ModelStore:
         return self.get(DECODER_MODEL)
 
     def available_models(self) -> list[str]:
-        return [name for name in [LAYOUT_MODEL, YOLO_MODEL, ENCODER_MODEL, DECODER_MODEL, TOKENIZER_FILE] if (self.models_dir / name).exists()]
+        result = []
+        for name in ALL_MODELS:
+            if (self.models_dir / name).exists():
+                result.append(name)
+            else:
+                # Check HF cache
+                try:
+                    from huggingface_hub import try_to_load_from_cache
+                    cached = try_to_load_from_cache(HF_REPO, name)
+                    if cached and isinstance(cached, str):
+                        result.append(name)
+                except Exception:
+                    pass
+        return result
 
     def providers(self) -> list[str]:
         return _providers()

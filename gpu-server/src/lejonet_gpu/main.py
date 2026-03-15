@@ -12,7 +12,7 @@ from ray import serve
 
 from .detect import decode_yolo
 from .layout import decode_rtmdet
-from .models import TOKENIZER_FILE, ModelStore
+from .models import TOKENIZER_FILE, ModelStore, _resolve_model
 from .preprocessing import crop_region, preprocess_rtmdet, preprocess_trocr, preprocess_yolo
 from .transcribe import Tokenizer, transcribe_line
 
@@ -61,7 +61,7 @@ class TranscriberDeployment:
         self.store = ModelStore()
         self.encoder = self.store.encoder
         self.decoder = self.store.decoder
-        tok_path = self.store.models_dir / TOKENIZER_FILE
+        tok_path = _resolve_model(TOKENIZER_FILE, self.store.models_dir)
         self.tokenizer = Tokenizer(tok_path)
         print(f"[Transcriber] Loaded with {self.store.providers()}")
 
@@ -228,11 +228,14 @@ def start():
     os.environ.setdefault("RAY_GRAFANA_IFRAME_HOST", "http://localhost:3000")
 
     os.environ.setdefault("RAY_METRICS_EXPORT_PORT", "9100")
+    os.environ.setdefault("RAY_OBJECT_STORE_ALLOW_SLOW_STORAGE", "1")
 
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
         dashboard_host="0.0.0.0",
+        _plasma_directory="/tmp",
+        object_store_memory=2_000_000_000,
     )
 
     serve.start(http_options={"host": "0.0.0.0", "port": 8080})

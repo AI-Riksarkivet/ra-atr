@@ -25,16 +25,15 @@ tokenizer: Tokenizer | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global tokenizer
-    from .models import download_models
+    from .models import download_models, _resolve_model
 
     # Download models if missing
     download_models(store.models_dir)
 
     # Pre-load tokenizer
-    tok_path = store.models_dir / TOKENIZER_FILE
-    if tok_path.exists():
-        tokenizer = Tokenizer(tok_path)
-        print(f"Tokenizer loaded from {tok_path}")
+    tok_path = _resolve_model(TOKENIZER_FILE, store.models_dir)
+    tokenizer = Tokenizer(tok_path)
+    print(f"Tokenizer loaded from {tok_path}")
     print(f"Models dir: {store.models_dir}")
     print(f"Available: {store.available_models()}")
     print(f"Providers: {store.providers()}")
