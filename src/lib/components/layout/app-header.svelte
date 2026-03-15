@@ -12,7 +12,7 @@
     transcriptionOpen?: boolean;
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
-    onDetectLayout?: () => void;
+    onDetectLayout?: (allPages: boolean) => void;
     layoutRunning?: boolean;
   }
 
@@ -72,7 +72,7 @@
 
       <div class="w-px h-5 bg-border mx-1"></div>
 
-      <Button variant="ghost" size="icon-sm" onclick={onDetectLayout} title="Detect layout" disabled={layoutRunning}>
+      <Button variant="ghost" size="icon-sm" onclick={(e: MouseEvent) => onDetectLayout?.(e.shiftKey)} title="Detect layout (Shift+click = all pages)" disabled={layoutRunning}>
         {#if layoutRunning}
           <LayoutGrid class="size-4 animate-spin" />
         {:else}

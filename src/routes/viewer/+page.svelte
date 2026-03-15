@@ -325,7 +325,23 @@
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
   onToggleTranscription={() => rightCollapsed = !rightCollapsed}
-  onDetectLayout={() => { if (activeDoc) appState.htr.detectLayout(activeDoc.id); }}
+  onDetectLayout={(all) => {
+    if (!activeDoc) return;
+    if (all && activeDoc.manifestId) {
+      // All pages in this volume
+      const volumePages = appState.documents.filter(d => d.manifestId === activeDoc.manifestId);
+      const run = async () => {
+        for (const doc of volumePages) {
+          if (doc.placeholder) await appState.loadDocumentImage(doc.id);
+        }
+        appState.htr.detectLayoutMultiple(volumePages.map(d => d.id));
+      };
+      run();
+    } else {
+      // Current page only
+      appState.htr.detectLayout(activeDoc.id);
+    }
+  }}
   layoutRunning={appState.htr.layoutRunning}
 />
 

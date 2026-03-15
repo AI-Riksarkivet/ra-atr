@@ -360,6 +360,13 @@ export class HTRWorkerState {
     return prev;
   }
 
+  /** Run layout detection on multiple images sequentially */
+  async detectLayoutMultiple(imageIds: string[]) {
+    for (const id of imageIds) {
+      await this.detectLayout(id);
+    }
+  }
+
   /** Run layout detection on an image */
   async detectLayout(imageId: string) {
     if (this.layoutRunning) return;
