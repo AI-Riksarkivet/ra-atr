@@ -369,7 +369,7 @@
           return regionId;
         }}
         groups={groups}
-        selectMode={false}
+        selectMode={appState.selectMode}
       />
 
       <!-- Page navigation arrows -->
@@ -490,7 +490,7 @@
             if (activeDoc.manifestId) appState.scheduleAutoSave();
           }
         }}
-        selectMode={false}
+        selectMode={appState.selectMode}
         activeRegions={appState.htr.activeRegions}
         activeImageIds={appState.htr.activeImageIds}
       />

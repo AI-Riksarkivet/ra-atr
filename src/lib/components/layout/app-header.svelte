@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Play, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Play, PenTool, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -78,6 +78,15 @@
         {:else}
           <Play class="size-4" />
         {/if}
+      </Button>
+
+      <Button
+        variant={appState.selectMode ? 'secondary' : 'ghost'}
+        size="icon-sm"
+        onclick={() => { appState.selectMode = !appState.selectMode; }}
+        title={appState.selectMode ? 'Switch to pan mode' : 'Draw region to transcribe'}
+      >
+        <PenTool class="size-4" />
       </Button>
 
       <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
