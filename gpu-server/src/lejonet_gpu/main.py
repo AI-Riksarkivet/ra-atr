@@ -125,6 +125,24 @@ class APIIngress:
         self.layout = layout
         self.line_det = line_det
         self.transcriber = transcriber
+        self._images: dict[str, Image.Image] = {}
+        self._image_counter = 0
+
+    def _store_image(self, img: Image.Image) -> str:
+        self._image_counter += 1
+        image_id = f"img-{self._image_counter}"
+        self._images[image_id] = img
+        # Evict old images (keep max 20)
+        if len(self._images) > 20:
+            oldest = list(self._images.keys())[0]
+            del self._images[oldest]
+        return image_id
+
+    def _get_image(self, image_id: str) -> Image.Image:
+        img = self._images.get(image_id)
+        if not img:
+            raise ValueError(f"Image {image_id} not found. Upload first via /upload-image")
+        return img
 
     @app.get("/health")
     def health(self):
@@ -166,22 +184,29 @@ class APIIngress:
             },
         }
 
-    @app.post("/detect-layout")
-    async def detect_layout(self, image: UploadFile = File(...)):
+    @app.post("/upload-image")
+    async def upload_image(self, image: UploadFile = File(...)):
+        """Upload image once, get an ID to use in subsequent calls."""
         img = _read_image(await image.read())
+        image_id = self._store_image(img)
+        return {"image_id": image_id, "width": img.width, "height": img.height}
+
+    @app.post("/detect-layout")
+    async def detect_layout(self, image: UploadFile = File(None), image_id: str = Form(None)):
+        img = self._get_image(image_id) if image_id else _read_image(await image.read())
         regions = await self.layout.detect.remote(img)
         return {"regions": regions, "image_size": [img.width, img.height]}
 
     @app.post("/detect-lines")
-    async def detect_lines(self, image: UploadFile = File(...), x: float = Form(0), y: float = Form(0), w: float = Form(0), h: float = Form(0)):
-        img = _read_image(await image.read())
+    async def detect_lines(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(0), y: float = Form(0), w: float = Form(0), h: float = Form(0)):
+        img = self._get_image(image_id) if image_id else _read_image(await image.read())
         region = {"x": x, "y": y, "w": w, "h": h} if w > 0 and h > 0 else None
         lines = await self.line_det.detect.remote(img, region)
         return {"lines": lines}
 
     @app.post("/transcribe")
-    async def transcribe(self, image: UploadFile = File(...), x: float = Form(...), y: float = Form(...), w: float = Form(...), h: float = Form(...)):
-        img = _read_image(await image.read())
+    async def transcribe(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(...), y: float = Form(...), w: float = Form(...), h: float = Form(...)):
+        img = self._get_image(image_id) if image_id else _read_image(await image.read())
         result = await self.transcriber.transcribe_one.remote(img, {"x": x, "y": y, "w": w, "h": h})
         return result
 

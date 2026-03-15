@@ -105,11 +105,29 @@ export async function fetchGpuStatus(): Promise<GpuStatus | null> {
   }
 }
 
-export async function gpuDetectLayout(imageData: ArrayBuffer): Promise<{
-  regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
-}> {
+// Server-side image cache — upload once, reference by ID
+const _imageIdCache = new Map<string, string>(); // localImageId → serverImageId
+
+async function _ensureUploaded(imageData: ArrayBuffer, localId?: string): Promise<string> {
+  const cacheKey = localId || `buf-${imageData.byteLength}`;
+  const cached = _imageIdCache.get(cacheKey);
+  if (cached) return cached;
+
   const form = new FormData();
   form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  const res = await fetch(`${baseUrl()}/upload-image`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`Image upload failed: ${res.status}`);
+  const { image_id } = await res.json();
+  _imageIdCache.set(cacheKey, image_id);
+  return image_id;
+}
+
+export async function gpuDetectLayout(imageData: ArrayBuffer, localId?: string): Promise<{
+  regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
+}> {
+  const imageId = await _ensureUploaded(imageData, localId);
+  const form = new FormData();
+  form.append('image_id', imageId);
   const res = await fetch(`${baseUrl()}/detect-layout`, { method: 'POST', body: form });
   if (!res.ok) throw new Error(`GPU layout detection failed: ${res.status}`);
   return res.json();
@@ -118,9 +136,11 @@ export async function gpuDetectLayout(imageData: ArrayBuffer): Promise<{
 export async function gpuDetectLines(
   imageData: ArrayBuffer,
   region?: { x: number; y: number; w: number; h: number },
+  localId?: string,
 ): Promise<{ lines: { x: number; y: number; w: number; h: number; confidence: number }[] }> {
+  const imageId = await _ensureUploaded(imageData, localId);
   const form = new FormData();
-  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  form.append('image_id', imageId);
   if (region) {
     form.append('x', String(region.x));
     form.append('y', String(region.y));
@@ -135,9 +155,11 @@ export async function gpuDetectLines(
 export async function gpuTranscribe(
   imageData: ArrayBuffer,
   bbox: { x: number; y: number; w: number; h: number },
+  localId?: string,
 ): Promise<{ text: string; confidence: number }> {
+  const imageId = await _ensureUploaded(imageData, localId);
   const form = new FormData();
-  form.append('image', new Blob([imageData], { type: 'image/jpeg' }), 'page.jpg');
+  form.append('image_id', imageId);
   form.append('x', String(bbox.x));
   form.append('y', String(bbox.y));
   form.append('w', String(bbox.w));

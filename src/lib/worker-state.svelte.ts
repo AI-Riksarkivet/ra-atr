@@ -319,20 +319,20 @@ export class HTRWorkerState {
         this.stage = 'transcribing';
       }
 
-      // Detect lines via GPU
-      const { lines } = await gpuDetectLines(imageData, { x, y, w, h });
+      // Detect lines via GPU (image already uploaded, uses cached ID)
+      const { lines } = await gpuDetectLines(imageData, { x, y, w, h }, imageId);
       const startIndex = this._getNextLineIndex(imageId, lines.length);
       const bboxes: BBox[] = lines.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h, confidence: l.confidence }));
       this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
 
-      // Transcribe each line via GPU
+      // Transcribe each line via GPU (no re-upload, uses cached image ID)
       this.activeTranscriptions += lines.length;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         try {
           const { text, confidence } = await gpuTranscribe(imageData, {
             x: line.x, y: line.y, w: line.w, h: line.h,
-          });
+          }, imageId);
           this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
           this.onLineDone?.(imageId, startIndex + i, text, confidence);
         } catch (err) {
@@ -399,7 +399,7 @@ export class HTRWorkerState {
         if (!imageData) { this.layoutRunning = false; return; }
 
         // Step 1: Layout detection (one upload)
-        const { regions } = await gpuDetectLayout(imageData);
+        const { regions } = await gpuDetectLayout(imageData, imageId);
         this.layoutRunning = false;
         this.onLayoutDetected?.(imageId, regions);
 
