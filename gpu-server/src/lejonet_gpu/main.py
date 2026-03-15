@@ -192,11 +192,16 @@ class APIIngress:
 
 
 def start():
-    # Skip runtime env packaging — all deps already installed in container
+    import os
+    os.environ.setdefault("RAY_GRAFANA_HOST", "http://grafana:3000")
+    os.environ.setdefault("RAY_PROMETHEUS_HOST", "http://prometheus:9090")
+    os.environ.setdefault("RAY_GRAFANA_IFRAME_HOST", "http://localhost:3000")
+
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
         dashboard_host="0.0.0.0",
+        metrics_export_port=9100,
     )
 
     serve.start(http_options={"host": "0.0.0.0", "port": 8080})

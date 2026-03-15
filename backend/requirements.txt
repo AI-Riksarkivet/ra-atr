@@ -5,3 +5,4 @@ pyarrow>=18,<19
 huggingface_hub>=0.27,<1
 tantivy>=0.22
 sentence-transformers>=3,<4
+starlette-exporter>=0.21

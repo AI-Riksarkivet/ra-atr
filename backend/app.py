@@ -248,6 +248,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Prometheus metrics
+try:
+    from starlette_exporter import PrometheusMiddleware, handle_metrics
+    app.add_middleware(PrometheusMiddleware, app_name="lejonet_backend", prefix="lejonet")
+    app.add_route("/metrics", handle_metrics)
+except ImportError:
+    pass  # starlette_exporter not installed, skip metrics
+
 
 # --- Endpoints ---
 
