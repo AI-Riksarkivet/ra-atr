@@ -195,11 +195,11 @@ class APIIngress:
         for region in regions:
             lines = await self.line_det.detect.remote(img, region)
 
-            # Send all lines for transcription — Ray batching kicks in
+            # Send all lines for transcription in parallel
             futures = []
             for line in lines:
                 bbox = {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]}
-                futures.append((line, self.transcriber.transcribe_batch.remote(img, bbox)))
+                futures.append((line, self.transcriber.transcribe_one.remote(img, bbox)))
 
             transcribed = []
             for line, fut in futures:

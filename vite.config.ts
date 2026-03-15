@@ -25,7 +25,8 @@ export default defineConfig({
       '/health': 'http://localhost:8000',
       '/debug': 'http://localhost:8000',
       '/gpu': {
-        target: 'http://localhost:8080',
+        target: process.env.GPU_SERVER_URL || 'http://localhost:8080',
+        changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/gpu/, ''),
       },
     },

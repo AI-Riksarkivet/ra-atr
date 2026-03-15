@@ -1,6 +1,6 @@
 import type { WorkerOutMessage, PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
-import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe, autoDetectGpuServer, gpuServerUrl } from './gpu-client';
+import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe, gpuProcessPage, autoDetectGpuServer, gpuServerUrl } from './gpu-client';
 
 const MODEL_URLS = [
   '/models/yolo-lines.onnx',
@@ -388,7 +388,7 @@ export class HTRWorkerState {
     }
   }
 
-  /** Run layout detection on an image */
+  /** Run full pipeline on an image (layout → lines → transcription) */
   async detectLayout(imageId: string) {
     if (this.layoutRunning) return;
     this.layoutRunning = true;
@@ -397,11 +397,50 @@ export class HTRWorkerState {
       try {
         const imageData = this.storedImages.get(imageId);
         if (!imageData) { this.layoutRunning = false; return; }
-        const { regions } = await gpuDetectLayout(imageData);
+
+        // Single upload — full pipeline on GPU server
+        this.stage = 'transcribing';
+        this.activeImageIds = new Set([...this.activeImageIds, imageId]);
+
+        const result = await gpuProcessPage(imageData);
+
+        // Process all groups and lines from the result
+        for (const group of result.groups) {
+          const region = group.region;
+          const startIndex = this._getNextLineIndex(imageId, group.lines.length);
+
+          // Create region with lines
+          const bboxes: BBox[] = group.lines.map(l => ({
+            x: l.bbox.x, y: l.bbox.y, w: l.bbox.w, h: l.bbox.h,
+            confidence: l.confidence,
+          }));
+
+          this.regionCounter++;
+          const regionId = `region-${this.regionCounter}`;
+
+          // Emit layout region (creates the group in UI)
+          this.onLayoutDetected?.(imageId, [region]);
+
+          // Emit lines detected
+          this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
+
+          // Emit each line's transcription
+          for (let i = 0; i < group.lines.length; i++) {
+            const line = group.lines[i];
+            this.onLineDone?.(imageId, startIndex + i, line.text, line.confidence);
+          }
+
+          this.onRegionDone?.(imageId, regionId);
+        }
+
         this.layoutRunning = false;
-        this.onLayoutDetected?.(imageId, regions);
+        this.stage = 'done';
+        const nextImages = new Set(this.activeImageIds);
+        nextImages.delete(imageId);
+        this.activeImageIds = nextImages;
       } catch (err: any) {
         this.layoutRunning = false;
+        this.stage = 'done';
         this.error = err.message ?? String(err);
       }
       return;
