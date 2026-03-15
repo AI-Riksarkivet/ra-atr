@@ -249,6 +249,53 @@ def start():
     print("  Dashboard: http://localhost:8265")
     print("  Deployments: LayoutDetector(0.25GPU), LineDetector(0.25GPU), Transcriber(0.5GPU, batch=8)")
 
+    # Warm up models by sending a dummy request (triggers GPU kernel compilation)
+    import threading
+    import time as _time
+
+    def _warmup():
+        _time.sleep(8)  # Wait for Ray Serve to fully start
+        try:
+            import requests as _req
+        except ImportError:
+            import urllib.request
+
+            print("Warming up models...")
+            # Create a tiny dummy JPEG
+            dummy = Image.new("RGB", (100, 100), (200, 200, 200))
+            buf = io.BytesIO()
+            dummy.save(buf, format="JPEG")
+            img_bytes = buf.getvalue()
+
+            # Send to detect-layout to trigger model load
+            import http.client
+            import mimetypes
+
+            boundary = "warmup_boundary"
+            body = (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="image"; filename="warmup.jpg"\r\n'
+                f"Content-Type: image/jpeg\r\n\r\n"
+            ).encode() + img_bytes + f"\r\n--{boundary}--\r\n".encode()
+
+            conn = http.client.HTTPConnection("localhost", 8080)
+            conn.request("POST", "/detect-layout", body=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+            resp = conn.getresponse()
+            print(f"  Warmup layout: {resp.status}")
+            conn.close()
+
+            conn = http.client.HTTPConnection("localhost", 8080)
+            conn.request("POST", "/detect-lines", body=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+            resp = conn.getresponse()
+            print(f"  Warmup lines: {resp.status}")
+            conn.close()
+
+            print("  Warmup complete — models ready.")
+        except Exception as e:
+            print(f"  Warmup error (non-fatal): {e}")
+
+    threading.Thread(target=_warmup, daemon=True).start()
+
 
 if __name__ == "__main__":
     start()

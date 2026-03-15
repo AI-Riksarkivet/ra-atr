@@ -35,16 +35,27 @@ export function getGpuName(): string {
 }
 
 export async function probeGpuServer(url: string): Promise<boolean> {
+  const base = url.replace(/\/$/, '');
   try {
-    const res = await fetch(`${url.replace(/\/$/, '')}/health`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      _gpuName = data.gpu?.name ?? '';
-      return true;
+    const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) return false;
+    const data = await res.json();
+    _gpuName = data.gpu?.name ?? '';
+
+    // Check if all deployments are healthy via /status
+    try {
+      const statusRes = await fetch(`${base}/status`, { signal: AbortSignal.timeout(3000) });
+      if (statusRes.ok) {
+        const status = await statusRes.json();
+        const allHealthy = Object.values(status.deployments as Record<string, { status: string }>)
+          .every(d => d.status === 'HEALTHY');
+        if (!allHealthy) return false;
+      }
+    } catch {
+      // /status not available (simple mode) — that's fine
     }
-    return false;
+
+    return true;
   } catch {
     return false;
   }

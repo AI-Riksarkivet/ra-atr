@@ -58,10 +58,18 @@ export class HTRWorkerState {
   private async _init() {
     // Auto-detect GPU server if not already configured
     if (!isGpuServerEnabled()) {
-      const url = await autoDetectGpuServer();
-      if (url) {
-        gpuServerUrl.set(url);
-        console.log(`[htr] Auto-detected GPU server at ${url}`);
+      // Retry a few times — GPU server may still be booting
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const url = await autoDetectGpuServer();
+        if (url) {
+          gpuServerUrl.set(url);
+          console.log(`[htr] Auto-detected GPU server at ${url}`);
+          break;
+        }
+        if (attempt < 4) {
+          console.log(`[htr] GPU server not ready, retrying in 3s... (${attempt + 1}/5)`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
       }
     }
 
