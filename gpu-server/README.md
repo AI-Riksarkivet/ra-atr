@@ -38,9 +38,21 @@ Place ONNX model files in the models directory:
 - `POST /transcribe` — image + line bbox → text
 - `POST /process-page` — full pipeline (layout → lines → transcription)
 
+## Architecture
+
+Uses Ray Serve with three GPU deployments:
+- **LayoutDetector** (0.25 GPU) — RTMDet region detection
+- **LineDetector** (0.25 GPU) — YOLO line detection
+- **Transcriber** (0.5 GPU) — TrOCR with dynamic batching (up to 8 lines)
+
+Requests to `/process-page` run the full pipeline with parallel transcription
+across lines. Ray Serve handles batching, queuing, and fault tolerance.
+
+Ray Dashboard available at port 8265.
+
 ## Development
 
 ```bash
 uv sync
-uv run uvicorn lejonet_gpu.app:app --reload --port 8080
+uv run python -m lejonet_gpu.main
 ```

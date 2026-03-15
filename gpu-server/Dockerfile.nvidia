@@ -19,5 +19,5 @@ RUN uv venv && uv pip install -e ".[dev]" \
 RUN mkdir -p /models
 ENV MODELS_DIR=/models
 
-EXPOSE 8080
-CMD ["uv", "run", "uvicorn", "lejonet_gpu.app:app", "--host", "0.0.0.0", "--port", "8080"]
+EXPOSE 8080 8265
+CMD ["uv", "run", "python", "-m", "lejonet_gpu.main"]

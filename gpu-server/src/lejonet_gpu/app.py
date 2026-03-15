@@ -1,44 +1,19 @@
-"""GPU inference server for Lejonet HTR."""
+"""GPU inference server for Lejonet HTR — Ray Serve + FastAPI."""
 
 import io
-from contextlib import asynccontextmanager
+import subprocess
+from pathlib import Path
 
-import numpy as np
+import ray
+from ray import serve
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
 from .models import ModelStore, TOKENIZER_FILE
-from .preprocessing import (
-    preprocess_rtmdet,
-    preprocess_yolo,
-    preprocess_trocr,
-    crop_region,
-)
-from .layout import decode_rtmdet
-from .detect import decode_yolo
-from .transcribe import Tokenizer, transcribe_line
+from .serve import LayoutDetector, LineDetector, Transcriber
 
-store = ModelStore()
-tokenizer: Tokenizer | None = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global tokenizer
-    # Pre-load tokenizer
-    tok_path = store.models_dir / TOKENIZER_FILE
-    if tok_path.exists():
-        tokenizer = Tokenizer(tok_path)
-        print(f"Tokenizer loaded from {tok_path}")
-    # Models load lazily on first request
-    print(f"Models dir: {store.models_dir}")
-    print(f"Available: {store.available_models()}")
-    print(f"Providers: {store.providers()}")
-    yield
-
-
-app = FastAPI(title="Lejonet GPU Inference", lifespan=lifespan)
+app = FastAPI(title="Lejonet GPU Inference")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,9 +27,7 @@ def _read_image(data: bytes) -> Image.Image:
 
 
 def _gpu_info() -> dict:
-    """Get GPU device info if available."""
-    import subprocess
-    # Try rocm-smi
+    """Get GPU device info."""
     for cmd in [
         ["rocm-smi", "--showproductname", "--csv"],
         ["rocm-smi", "--showallinfo", "--csv"],
@@ -67,7 +40,6 @@ def _gpu_info() -> dict:
                     return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
         except Exception:
             pass
-    # Try nvidia-smi
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -77,20 +49,18 @@ def _gpu_info() -> dict:
             return {"name": result.stdout.strip(), "runtime": "CUDA"}
     except Exception:
         pass
-    # Try reading from sysfs (works without tools)
     try:
-        from pathlib import Path
         for card in sorted(Path("/sys/class/drm").glob("card*/device")):
             vendor = (card / "vendor").read_text().strip()
-            if vendor == "0x1002":  # AMD
+            if vendor == "0x1002":
                 name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "AMD GPU"
                 return {"name": name, "runtime": "ROCm"}
-            elif vendor == "0x10de":  # NVIDIA
+            elif vendor == "0x10de":
                 name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "NVIDIA GPU"
                 return {"name": name, "runtime": "CUDA"}
     except Exception:
         pass
-    # Identify from providers
+    store = ModelStore()
     providers = store.providers()
     if "ROCMExecutionProvider" in providers:
         return {"name": "AMD GPU", "runtime": "ROCm"}
@@ -101,26 +71,21 @@ def _gpu_info() -> dict:
 
 @app.get("/health")
 def health():
+    store = ModelStore()
     return {
         "status": "ok",
         "models": store.available_models(),
         "providers": store.providers(),
         "gpu": _gpu_info(),
+        "ray": {"running": ray.is_initialized()},
     }
 
 
 @app.post("/detect-layout")
 async def detect_layout(image: UploadFile = File(...)):
-    """Detect layout regions in an image using RTMDet."""
     img = _read_image(await image.read())
-    tensor, scale = preprocess_rtmdet(img)
-
-    session = store.layout
-    result = session.run(None, {"image": tensor})
-    cls_scores = result[0][0]  # [8400, num_classes]
-    bbox_preds = result[1][0]  # [8400, 4]
-
-    regions = decode_rtmdet(cls_scores, bbox_preds, 640, scale)
+    detector = serve.get_deployment_handle("LayoutDetector")
+    regions = await detector.detect.remote(img)
     return {"regions": regions, "image_size": [img.width, img.height]}
 
 
@@ -132,29 +97,10 @@ async def detect_lines(
     w: float = Form(0),
     h: float = Form(0),
 ):
-    """Detect text lines in a region using YOLO."""
     img = _read_image(await image.read())
-
-    # Crop to region if specified
-    if w > 0 and h > 0:
-        img = crop_region(img, x, y, w, h)
-        offset_x, offset_y = x, y
-    else:
-        offset_x, offset_y = 0, 0
-
-    tensor, scale, pad_x, pad_y = preprocess_yolo(img)
-
-    session = store.yolo
-    result = session.run(None, {session.get_inputs()[0].name: tensor})
-    output = result[0]
-
-    lines = decode_yolo(output, img.width, img.height, scale, pad_x, pad_y)
-
-    # Offset back to full image coordinates
-    for line in lines:
-        line["x"] += offset_x
-        line["y"] += offset_y
-
+    region = {"x": x, "y": y, "w": w, "h": h} if w > 0 and h > 0 else None
+    detector = serve.get_deployment_handle("LineDetector")
+    lines = await detector.detect.remote(img, region)
     return {"lines": lines}
 
 
@@ -166,59 +112,47 @@ async def transcribe(
     w: float = Form(...),
     h: float = Form(...),
 ):
-    """Transcribe a single text line using TrOCR."""
-    if tokenizer is None:
-        raise HTTPException(503, "Tokenizer not loaded")
-
     img = _read_image(await image.read())
-    line_img = crop_region(img, x, y, w, h)
-    tensor = preprocess_trocr(line_img)
-
-    text, confidence = transcribe_line(
-        store.encoder, store.decoder, tokenizer, tensor,
-    )
-    return {"text": text, "confidence": confidence}
+    transcriber = serve.get_deployment_handle("Transcriber")
+    result = await transcriber.transcribe.remote(img, {"x": x, "y": y, "w": w, "h": h})
+    return result
 
 
 @app.post("/process-page")
 async def process_page(image: UploadFile = File(...)):
-    """Full pipeline: layout → lines → transcription for a page image."""
-    if tokenizer is None:
-        raise HTTPException(503, "Tokenizer not loaded")
-
+    """Full pipeline: layout → lines → transcription."""
     img = _read_image(await image.read())
 
+    layout = serve.get_deployment_handle("LayoutDetector")
+    line_det = serve.get_deployment_handle("LineDetector")
+    transcriber = serve.get_deployment_handle("Transcriber")
+
     # 1. Layout detection
-    layout_tensor, layout_scale = preprocess_rtmdet(img)
-    layout_result = store.layout.run(None, {"image": layout_tensor})
-    regions = decode_rtmdet(
-        layout_result[0][0], layout_result[1][0], 640, layout_scale,
-    )
+    regions = await layout.detect.remote(img)
 
-    # 2. Line detection per region
-    all_groups = []
+    # 2. Line detection per region (parallel)
+    line_futures = []
     for region in regions:
-        region_img = crop_region(img, region["x"], region["y"], region["w"], region["h"])
-        yolo_tensor, scale, pad_x, pad_y = preprocess_yolo(region_img)
-        yolo_result = store.yolo.run(
-            None, {store.yolo.get_inputs()[0].name: yolo_tensor},
-        )
-        lines = decode_yolo(yolo_result[0], region_img.width, region_img.height, scale, pad_x, pad_y)
+        line_futures.append((region, line_det.detect.remote(img, region)))
 
-        # 3. Transcribe each line
-        transcribed_lines = []
+    # 3. Transcribe lines (parallel within each region)
+    all_groups = []
+    for region, lines_future in line_futures:
+        lines = await lines_future
+
+        # Send all lines for transcription in parallel (batching kicks in)
+        transcribe_futures = []
         for line in lines:
-            abs_x = region["x"] + line["x"]
-            abs_y = region["y"] + line["y"]
-            line_img = crop_region(img, abs_x, abs_y, line["w"], line["h"])
-            trocr_tensor = preprocess_trocr(line_img)
-            text, confidence = transcribe_line(
-                store.encoder, store.decoder, tokenizer, trocr_tensor,
-            )
+            bbox = {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]}
+            transcribe_futures.append((line, transcriber.transcribe.remote(img, bbox)))
+
+        transcribed_lines = []
+        for line, fut in transcribe_futures:
+            result = await fut
             transcribed_lines.append({
-                "bbox": {"x": abs_x, "y": abs_y, "w": line["w"], "h": line["h"]},
-                "text": text,
-                "confidence": confidence,
+                "bbox": {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]},
+                "text": result["text"],
+                "confidence": result["confidence"],
             })
 
         all_groups.append({
