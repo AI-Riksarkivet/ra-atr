@@ -15,6 +15,7 @@
     onFocusGroup: (lineIndices: number[], rect?: { x: number; y: number; w: number; h: number }) => void;
     onFocusLine: (index: number) => void;
     onEditLine: (index: number, text: string) => void;
+    onRemoveVolume: (manifestId: string) => void;
     selectMode: boolean;
     activeRegions: Set<string>;
     activeImageIds: Set<string>;
@@ -25,6 +26,7 @@
     hoveredLine, onHoverLine,
     selectedLines, onSelectLine,
     onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine,
+    onRemoveVolume,
     selectMode, activeRegions, activeImageIds,
   }: Props = $props();
 
@@ -111,6 +113,7 @@
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
   let copiedLineIdx = $state<number>(-1);
+  let confirmRemoveVolume = $state<string | null>(null);
 
   async function copyLinePrompt(doc: ImageDocument, lineIdx: number) {
     const group = doc.groups.find(g => g.lineIndices.includes(lineIdx));
@@ -282,7 +285,7 @@ Provide only the transcription, nothing else.`;
     {@const volWorking = vol.docs.some(d => activeImageIds.has(d.id))}
 
     <div
-      class="flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
+      class="group/vol flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
       onclick={() => toggleVolume(vol.manifestId)}
     >
       <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4">
@@ -295,6 +298,24 @@ Provide only the transcription, nothing else.`;
       <span class="text-[0.65rem] text-muted-foreground font-mono">{vol.docs.length} pg</span>
       {#if volLines > 0}
         <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
+      {/if}
+      {#if !volWorking}
+        {#if confirmRemoveVolume === vol.manifestId}
+          <button
+            class="bg-destructive text-destructive-foreground rounded px-1.5 py-0.5 text-[0.6rem] font-medium cursor-pointer hover:bg-destructive/90"
+            onclick={(e) => { e.stopPropagation(); onRemoveVolume(vol.manifestId); confirmRemoveVolume = null; }}
+          >Remove</button>
+          <button
+            class="bg-transparent border-none text-muted-foreground cursor-pointer text-[0.6rem] hover:text-foreground"
+            onclick={(e) => { e.stopPropagation(); confirmRemoveVolume = null; }}
+          >Cancel</button>
+        {:else}
+          <button
+            class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/vol:opacity-30 hover:!opacity-100 hover:text-destructive transition-opacity"
+            onclick={(e) => { e.stopPropagation(); confirmRemoveVolume = vol.manifestId; }}
+            title="Remove volume"
+          >x</button>
+        {/if}
       {/if}
     </div>
 

@@ -510,6 +510,7 @@
         onToggleGroup={toggleGroup}
         onRenameGroup={renameGroup}
         onDeleteGroup={deleteGroup}
+        onRemoveVolume={(manifestId) => appState.removeVolume(manifestId)}
         onFocusGroup={(indices, rect) => {
           if (indices.length > 0) docViewer?.focusLines(indices);
           else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);

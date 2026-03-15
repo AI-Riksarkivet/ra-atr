@@ -123,6 +123,26 @@ class AppState {
     this.loadDocumentImage(docId);
   }
 
+  /** Remove all documents belonging to a volume */
+  removeVolume(manifestId: string) {
+    const toRemove = new Set(this.documents.filter(d => d.manifestId === manifestId).map(d => d.id));
+    // Revoke blob URLs
+    for (const doc of this.documents) {
+      if (toRemove.has(doc.id) && doc.imageUrl) {
+        try { URL.revokeObjectURL(doc.imageUrl); } catch {}
+      }
+    }
+    this.documents = this.documents.filter(d => !toRemove.has(d.id));
+    // Clear active if it was in this volume
+    if (this.activeDocumentId && toRemove.has(this.activeDocumentId)) {
+      this.activeDocumentId = null;
+      this.hoveredLine = -1;
+      this.selectedLines = new Set();
+    }
+    // Clean up LRU cache
+    this.imageLoadOrder = this.imageLoadOrder.filter(id => !toRemove.has(id));
+  }
+
   /** Navigate to adjacent page within the same volume */
   navigatePage(delta: -1 | 1) {
     const doc = this.activeDocument;
