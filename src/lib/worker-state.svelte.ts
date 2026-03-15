@@ -325,21 +325,20 @@ export class HTRWorkerState {
       const bboxes: BBox[] = lines.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h, confidence: l.confidence }));
       this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
 
-      // Transcribe each line via GPU (no re-upload, uses cached image ID)
+      // Transcribe all lines in parallel — keeps GPU saturated via Ray batching
       this.activeTranscriptions += lines.length;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        try {
-          const { text, confidence } = await gpuTranscribe(imageData, {
-            x: line.x, y: line.y, w: line.w, h: line.h,
-          }, imageId);
-          this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
-          this.onLineDone?.(imageId, startIndex + i, text, confidence);
-        } catch (err) {
-          this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
-          this.onLineDone?.(imageId, startIndex + i, `[error]`, 0);
-        }
-      }
+      const transcribePromises = lines.map((line, i) =>
+        gpuTranscribe(imageData, { x: line.x, y: line.y, w: line.w, h: line.h }, imageId)
+          .then(({ text, confidence }) => {
+            this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
+            this.onLineDone?.(imageId, startIndex + i, text, confidence);
+          })
+          .catch(() => {
+            this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
+            this.onLineDone?.(imageId, startIndex + i, '[error]', 0);
+          })
+      );
+      await Promise.all(transcribePromises);
 
       // Region done
       const nextRegions = new Set(this.activeRegions);
