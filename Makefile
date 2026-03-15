@@ -34,8 +34,8 @@ serve: serve-backend serve-frontend ## Start backend + frontend
 serve-backend: ## Start backend on port 8000
 	cd backend && uv run uvicorn lejonet_backend.app:app --reload --port 8000 --host 0.0.0.0 &
 
-serve-frontend: ## Start frontend dev server
-	npx vite dev --port 5173 &
+serve-frontend: ## Start frontend dev server (set GPU_SERVER_URL for remote GPU)
+	GPU_SERVER_URL=$(GPU_SERVER_URL) npx vite dev --port 5173 &
 
 serve-gpu: ## Start GPU server (Docker, ROCm)
 	docker run --rm -d \

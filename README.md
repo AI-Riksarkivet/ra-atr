@@ -39,23 +39,106 @@ Frontend (Svelte 5)  ←→  Backend (FastAPI + LanceDB)
 | Prometheus | 9090 | Metrics collection |
 | Grafana | 3000 | Dashboards |
 
-## GPU Server (Optional)
+## GPU Server
+
+The GPU server runs the HTR pipeline on a dedicated GPU — significantly faster than in-browser WASM. Models are auto-downloaded from HuggingFace on first startup.
+
+### Local GPU (AMD ROCm)
 
 ```bash
-# AMD ROCm
-make build-gpu && make serve-gpu
-
-# NVIDIA
-make build-gpu-nvidia
-docker run --gpus all -v ./public/models:/models -p 8080:8080 lejonet-gpu:nvidia
+make build-gpu
+make serve-gpu
 ```
 
-The frontend auto-detects the GPU server at `localhost:8080`.
+### Local GPU (NVIDIA)
+
+```bash
+make build-gpu-nvidia
+docker run --gpus all --shm-size=4g \
+  -p 8080:8080 -p 8265:8265 \
+  carpelan/lejonet-gpu:nvidia
+```
+
+### Cloud GPU (RunPod)
+
+For cloud GPU acceleration without a local GPU:
+
+**1. Install CLI and authenticate:**
+```bash
+brew install runpod/runpodctl/runpodctl
+runpodctl config --apiKey YOUR_RUNPOD_API_KEY
+```
+
+**2. Create a GPU pod:**
+```bash
+runpodctl pod create \
+  --name "htr-gpu" \
+  --gpu-id "NVIDIA RTX A4000" \
+  --image "carpelan/lejonet-gpu:nvidia" \
+  --container-disk-in-gb 20 \
+  --ports "8080/http" \
+  --cloud-type "COMMUNITY" \
+  --env '{"HF_TOKEN":"your_hf_token_here"}'
+```
+
+Models download automatically from HuggingFace on first boot (~60s).
+
+**3. Connect the frontend:**
+```bash
+GPU_SERVER_URL=https://<POD_ID>-8080.proxy.runpod.net make serve-frontend
+```
+
+Or start the full stack:
+```bash
+GPU_SERVER_URL=https://<POD_ID>-8080.proxy.runpod.net make serve
+```
+
+The header badge will show "GPU (NVIDIA RTX A4000)".
+
+**4. Manage the pod:**
+```bash
+runpodctl pod list              # List pods
+runpodctl pod stop <POD_ID>     # Pause (stop billing)
+runpodctl pod start <POD_ID>    # Resume
+runpodctl pod delete <POD_ID>   # Destroy
+```
+
+**Available GPUs:**
+
+| GPU | VRAM | Price/hr | Speed (warm) |
+|-----|------|----------|-------------|
+| RTX A4000 | 16 GB | $0.17 | ~0.7s/line |
+| RTX 4090 | 24 GB | $0.39 | ~0.3s/line |
+| A100 | 80 GB | $1.29 | ~0.1s/line |
+
+### Pre-built Docker Images
+
+```bash
+docker pull carpelan/lejonet-gpu:nvidia   # NVIDIA (CUDA + cuDNN)
+docker pull carpelan/lejonet-gpu:rocm     # AMD (ROCm)
+```
+
+### Frontend Auto-Detection
+
+The frontend automatically detects a GPU server at `localhost:8080` (local) or via the `/gpu` proxy (remote). You can also manually enter a URL in the Server settings (click the Server icon in the header).
 
 ## Monitoring
 
 ```bash
 make compose-up   # Start Prometheus + Grafana
+```
+
+- **Prometheus**: http://localhost:9090 — scrapes Ray Serve + backend metrics
+- **Grafana**: http://localhost:3000 — pre-loaded Ray dashboards
+- **Ray Dashboard**: http://localhost:8265 — deployment status, logs
+
+## Catalog Ingestion
+
+To index the Riksarkivet metadata (3.7M volumes):
+
+```bash
+cd backend
+uv run python -m lejonet_backend.ingest_catalog /path/to/Riksarkivet-2022-12-16 --no-embed
 ```
 
 ## Development
@@ -77,6 +160,8 @@ See [CLAUDE.md](CLAUDE.md) for the full development guide.
 | `encoder.onnx` | 329 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
 | `decoder.onnx` | 1.2 GB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
 | `tokenizer.json` | 2 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
+
+Models are stored on [HuggingFace](https://huggingface.co/carpelan/htr-onnx-models) and auto-downloaded by the GPU server on first startup.
 
 ## License
 
