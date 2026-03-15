@@ -18,24 +18,23 @@ TOKENIZER_FILE = "tokenizer.json"
 ALL_MODELS = [LAYOUT_MODEL, YOLO_MODEL, ENCODER_MODEL, DECODER_MODEL, TOKENIZER_FILE]
 
 
-def download_models(models_dir: Path = MODELS_DIR, repo: str = HF_REPO) -> None:
-    """Download missing models from HuggingFace."""
-    missing = [m for m in ALL_MODELS if not (models_dir / m).exists()]
-    if not missing:
-        return
+def _resolve_model(name: str, models_dir: Path = MODELS_DIR, repo: str = HF_REPO) -> Path:
+    """Find a model file — local first, then download from HuggingFace."""
+    local = models_dir / name
+    if local.exists():
+        return local
 
-    print(f"Downloading {len(missing)} model(s) from {repo}...")
+    # Download from HF (uses HF cache, no extra disk copy)
+    print(f"  Downloading {name} from {repo}...")
     from huggingface_hub import hf_hub_download
 
-    models_dir.mkdir(parents=True, exist_ok=True)
-    for name in missing:
-        print(f"  Downloading {name}...")
-        hf_hub_download(
-            repo_id=repo,
-            filename=name,
-            local_dir=str(models_dir),
-        )
-    print("All models downloaded.")
+    return Path(hf_hub_download(repo_id=repo, filename=name))
+
+
+def download_models(models_dir: Path = MODELS_DIR, repo: str = HF_REPO) -> None:
+    """Ensure all models are available (local or HF cache)."""
+    for name in ALL_MODELS:
+        _resolve_model(name, models_dir, repo)
 
 
 def _providers() -> list[str]:
@@ -72,11 +71,7 @@ class ModelStore:
 
     def get(self, name: str) -> ort.InferenceSession:
         if name not in self._sessions:
-            path = self.models_dir / name
-            if not path.exists():
-                download_models(self.models_dir)
-            if not path.exists():
-                raise FileNotFoundError(f"Model not found: {path}")
+            path = _resolve_model(name, self.models_dir)
             self._sessions[name] = _create_session(path)
         return self._sessions[name]
 
