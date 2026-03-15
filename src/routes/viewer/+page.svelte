@@ -355,24 +355,15 @@
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
   onToggleTranscription={() => rightCollapsed = !rightCollapsed}
-  onDetectLayout={(all) => {
+  onTranscribe={(all) => {
     if (!activeDoc) return;
     if (all && activeDoc.manifestId) {
-      // All pages in this volume
-      const volumePages = appState.documents.filter(d => d.manifestId === activeDoc.manifestId);
-      const run = async () => {
-        for (const doc of volumePages) {
-          if (doc.placeholder) await appState.loadDocumentImage(doc.id);
-        }
-        appState.htr.detectLayoutMultiple(volumePages.map(d => d.id));
-      };
-      run();
+      transcribeVolume(activeDoc.manifestId);
     } else {
-      // Current page only
       appState.htr.detectLayout(activeDoc.id);
     }
   }}
-  layoutRunning={appState.htr.layoutRunning}
+  transcribing={appState.htr.layoutRunning || appState.htr.activeRegions.size > 0}
 />
 
 {#if appState.htr.error}
