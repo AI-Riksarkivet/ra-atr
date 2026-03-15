@@ -4,7 +4,7 @@
   import { toggleMode } from 'mode-watcher';
   import { Sun, Moon, Home, Search, FileText, LayoutGrid, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
-  import { gpuServerUrl } from '$lib/gpu-client';
+  import { gpuServerUrl, getGpuName } from '$lib/gpu-client';
   import { page } from '$app/state';
 
   interface Props {
@@ -54,7 +54,7 @@
   <h1 class="text-lg font-semibold">Lejonet HTR</h1>
 
   {#if appState.htr.modelsReady && gpuServerUrl.get()}
-    <Badge variant="success" title={gpuName || 'GPU server'}>GPU</Badge>
+    <Badge variant="success" title={gpuName || getGpuName() || 'GPU server'}>GPU {gpuName || getGpuName() ? `(${gpuName || getGpuName()})` : ''}</Badge>
   {:else if appState.htr.modelsReady}
     <Badge variant="success">WASM</Badge>
   {:else if appState.htr.stage === 'loading_models'}

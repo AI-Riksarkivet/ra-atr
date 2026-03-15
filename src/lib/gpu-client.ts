@@ -28,12 +28,23 @@ export function isGpuServerEnabled(): boolean {
  * Try to connect to a GPU server at the given URL.
  * Returns true if the server is healthy.
  */
+let _gpuName = '';
+
+export function getGpuName(): string {
+  return _gpuName;
+}
+
 export async function probeGpuServer(url: string): Promise<boolean> {
   try {
     const res = await fetch(`${url.replace(/\/$/, '')}/health`, {
       signal: AbortSignal.timeout(2000),
     });
-    return res.ok;
+    if (res.ok) {
+      const data = await res.json();
+      _gpuName = data.gpu?.name ?? '';
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
