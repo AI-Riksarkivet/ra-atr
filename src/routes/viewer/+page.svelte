@@ -261,13 +261,6 @@
 
     // Route region completion
     appState.htr.onRegionDone = (imageId, regionId) => {
-      // Check if all lines across all documents are complete
-      const anyIncomplete = appState.documents.some(d =>
-        d.lines.some(l => !l.complete && l.text === '')
-      );
-      if (!anyIncomplete && appState.htr.stage === 'transcribing') {
-        appState.htr.stage = 'done';
-      }
       // Auto-save when a region finishes transcribing
       const doc = appState.documents.find(d => d.id === imageId);
       if (doc?.manifestId) appState.scheduleAutoSave();

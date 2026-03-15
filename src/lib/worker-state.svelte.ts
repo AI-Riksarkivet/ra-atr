@@ -333,7 +333,12 @@ export class HTRWorkerState {
       const nextRegions = new Set(this.activeRegions);
       nextRegions.delete(regionId);
       this.activeRegions = nextRegions;
-      const imageStillActive = this.activeRegions.size > 0;
+      // Check if image still has active regions
+      const imageStillActive = [...this.activeRegions].some(rid => {
+        // Check regionPending for WASM regions
+        const pending = this.regionPending.get(rid);
+        return pending?.imageId === imageId;
+      });
       if (!imageStillActive) {
         const nextImages = new Set(this.activeImageIds);
         nextImages.delete(imageId);
@@ -341,15 +346,19 @@ export class HTRWorkerState {
       }
       this.onRegionDone?.(imageId, regionId);
 
-      if (this.activeTranscriptions === 0) {
+      if (this.activeTranscriptions === 0 && this.activeRegions.size === 0) {
         this.stage = 'done';
+        this.activeImageIds = new Set();
       }
     } catch (err: any) {
       this.error = err.message ?? String(err);
-      this.layoutRunning = false;
       const nextRegions = new Set(this.activeRegions);
       nextRegions.delete(regionId);
       this.activeRegions = nextRegions;
+      if (this.activeRegions.size === 0) {
+        this.stage = 'done';
+        this.activeImageIds = new Set();
+      }
     }
   }
 
