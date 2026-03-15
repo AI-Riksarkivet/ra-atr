@@ -38,4 +38,18 @@ static/ort-*.mjs
 
 # Worktrees
 .worktrees
+
+# Data
 backend/data/
+
+# Documentation build
+site/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Docker
+.export-venv/

@@ -68,6 +68,14 @@ compose-down: ## Stop all Docker Compose services
 ingest-catalog: ## Ingest Riksarkivet metadata into LanceDB
 	cd backend && .venv/bin/python ingest_catalog.py $(DATA_DIR) --no-embed
 
+# --- Documentation ---
+
+docs-serve: ## Serve documentation locally
+	uvx zensical serve
+
+docs-build: ## Build documentation site
+	uvx zensical build
+
 # --- Cleanup ---
 
 clean: ## Remove caches and builds
