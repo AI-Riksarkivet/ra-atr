@@ -122,14 +122,41 @@ async function _ensureUploaded(imageData: ArrayBuffer, localId?: string): Promis
   return image_id;
 }
 
-export async function gpuDetectLayout(imageData: ArrayBuffer, localId?: string): Promise<{
-  regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
-}> {
+async function _gpuCall(
+  endpoint: string,
+  imageData: ArrayBuffer,
+  localId: string | undefined,
+  extraFields?: Record<string, string>,
+): Promise<Response> {
   const imageId = await _ensureUploaded(imageData, localId);
   const form = new FormData();
   form.append('image_id', imageId);
-  const res = await fetch(`${baseUrl()}/detect-layout`, { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`GPU layout detection failed: ${res.status}`);
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) form.append(k, v);
+  }
+  let res = await fetch(`${baseUrl()}${endpoint}`, { method: 'POST', body: form });
+
+  // If 500, image_id might be stale — re-upload and retry once
+  if (res.status === 500) {
+    const cacheKey = localId || `buf-${imageData.byteLength}`;
+    _imageIdCache.delete(cacheKey);
+    const newId = await _ensureUploaded(imageData, localId);
+    const retryForm = new FormData();
+    retryForm.append('image_id', newId);
+    if (extraFields) {
+      for (const [k, v] of Object.entries(extraFields)) retryForm.append(k, v);
+    }
+    res = await fetch(`${baseUrl()}${endpoint}`, { method: 'POST', body: retryForm });
+  }
+
+  if (!res.ok) throw new Error(`GPU ${endpoint} failed: ${res.status}`);
+  return res;
+}
+
+export async function gpuDetectLayout(imageData: ArrayBuffer, localId?: string): Promise<{
+  regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
+}> {
+  const res = await _gpuCall('/detect-layout', imageData, localId);
   return res.json();
 }
 
@@ -138,17 +165,14 @@ export async function gpuDetectLines(
   region?: { x: number; y: number; w: number; h: number },
   localId?: string,
 ): Promise<{ lines: { x: number; y: number; w: number; h: number; confidence: number }[] }> {
-  const imageId = await _ensureUploaded(imageData, localId);
-  const form = new FormData();
-  form.append('image_id', imageId);
+  const extra: Record<string, string> = {};
   if (region) {
-    form.append('x', String(region.x));
-    form.append('y', String(region.y));
-    form.append('w', String(region.w));
-    form.append('h', String(region.h));
+    extra.x = String(region.x);
+    extra.y = String(region.y);
+    extra.w = String(region.w);
+    extra.h = String(region.h);
   }
-  const res = await fetch(`${baseUrl()}/detect-lines`, { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`GPU line detection failed: ${res.status}`);
+  const res = await _gpuCall('/detect-lines', imageData, localId, extra);
   return res.json();
 }
 
@@ -157,13 +181,12 @@ export async function gpuTranscribe(
   bbox: { x: number; y: number; w: number; h: number },
   localId?: string,
 ): Promise<{ text: string; confidence: number }> {
-  const imageId = await _ensureUploaded(imageData, localId);
-  const form = new FormData();
-  form.append('image_id', imageId);
-  form.append('x', String(bbox.x));
-  form.append('y', String(bbox.y));
-  form.append('w', String(bbox.w));
-  form.append('h', String(bbox.h));
+  const res = await _gpuCall('/transcribe', imageData, localId, {
+    x: String(bbox.x),
+    y: String(bbox.y),
+    w: String(bbox.w),
+    h: String(bbox.h),
+  });
   const res = await fetch(`${baseUrl()}/transcribe`, { method: 'POST', body: form });
   if (!res.ok) throw new Error(`GPU transcription failed: ${res.status}`);
   return res.json();
