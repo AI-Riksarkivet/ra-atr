@@ -1,31 +1,27 @@
 [project]
-name = "lejonet-gpu"
+name = "lejonet-backend"
 version = "0.1.0"
-description = "GPU inference server for Lejonet HTR"
+description = "Lejonet HTR backend — catalog search and transcription storage"
 requires-python = ">=3.11"
+license = "Apache-2.0"
 dependencies = [
     "fastapi[standard]>=0.115,<1",
     "uvicorn[standard]>=0.30,<1",
-    "numpy>=1.26",
-    "pillow>=10",
-    "huggingface-hub>=0.27",
-    "ray[serve]>=2.40",
+    "lancedb>=0.20,<1",
+    "pyarrow>=18,<19",
+    "huggingface-hub>=0.27,<1",
+    "tantivy>=0.22",
+    "starlette-exporter>=0.21",
 ]
 
 [project.optional-dependencies]
-nvidia = ["onnxruntime-gpu>=1.19"]
-rocm = ["onnxruntime-rocm>=1.19"]
 dev = [
     "pytest>=8",
-    "httpx>=0.27",
+    "ruff>=0.14",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/lejonet_gpu"]
+embeddings = [
+    "sentence-transformers>=3,<4",
+]
 
 [tool.ruff]
 line-length = 160

@@ -1,0 +1,83 @@
+.PHONY: install format lint typecheck check test ci serve serve-backend serve-gpu clean
+
+# --- Setup ---
+
+install: ## Install all dependencies
+	cd backend && uv sync
+	cd gpu-server && uv sync
+	npm install
+
+# --- Code Quality ---
+
+format: ## Auto-format code
+	cd backend && uvx ruff format .
+	cd gpu-server && uvx ruff format .
+	npx prettier --write "src/**/*.{svelte,ts,js,css}"
+
+lint: ## Lint code with auto-fix
+	cd backend && uvx ruff check --fix .
+	cd gpu-server && uvx ruff check --fix .
+
+typecheck: ## Type check
+	npx svelte-check --threshold error
+
+check: format lint typecheck ## Run all quality checks
+
+test: ## Run tests
+	cd backend && .venv/bin/python -m pytest -v
+	cd gpu-server && uv run pytest -v
+
+# --- Development ---
+
+serve: serve-backend serve-frontend ## Start backend + frontend
+
+serve-backend: ## Start backend on port 8000
+	cd backend && .venv/bin/uvicorn app:app --reload --port 8000 --host 0.0.0.0 &
+
+serve-frontend: ## Start frontend dev server
+	npx vite dev --port 5173 &
+
+serve-gpu: ## Start GPU server (Docker, ROCm)
+	docker run --rm -d \
+		--device /dev/kfd --device /dev/dri --group-add video \
+		--shm-size=4g \
+		-v $(PWD)/public/models:/models \
+		-p 8080:8080 -p 8265:8265 \
+		--network lejonet_lejonet \
+		--name lejonet-gpu \
+		lejonet-gpu:rocm
+
+serve-all: serve serve-gpu ## Start all services
+
+# --- Docker ---
+
+build-gpu: ## Build GPU server Docker image (ROCm)
+	cd gpu-server && docker build -f Dockerfile.rocm -t lejonet-gpu:rocm .
+
+build-gpu-nvidia: ## Build GPU server Docker image (NVIDIA)
+	cd gpu-server && docker build -f Dockerfile.nvidia -t lejonet-gpu:nvidia .
+
+compose-up: ## Start Prometheus + Grafana
+	docker compose up -d prometheus grafana
+
+compose-down: ## Stop all Docker Compose services
+	docker compose down
+
+# --- Data ---
+
+ingest-catalog: ## Ingest Riksarkivet metadata into LanceDB
+	cd backend && .venv/bin/python ingest_catalog.py $(DATA_DIR) --no-embed
+
+# --- Cleanup ---
+
+clean: ## Remove caches and builds
+	rm -rf .svelte-kit node_modules/.vite
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+
+# --- Help ---
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+.DEFAULT_GOAL := help
