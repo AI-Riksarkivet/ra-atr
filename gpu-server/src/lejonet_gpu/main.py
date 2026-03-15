@@ -137,6 +137,35 @@ class APIIngress:
             "ray": True,
         }
 
+    @app.get("/status")
+    def status(self):
+        """Rich status with Ray Serve deployment metrics."""
+        from ray.serve import status as serve_status
+
+        info = serve_status()
+        deployments = {}
+        for app_status in info.applications.values():
+            for name, dep in app_status.deployments.items():
+                deployments[name] = {
+                    "status": dep.status,
+                    "message": dep.message or None,
+                    "replicas": len(dep.replica_states) if hasattr(dep, "replica_states") else None,
+                }
+
+        # Get cluster resources
+        import ray
+        resources = ray.available_resources()
+
+        return {
+            "deployments": deployments,
+            "gpu": _gpu_info(),
+            "cluster": {
+                "cpu_available": resources.get("CPU", 0),
+                "gpu_available": resources.get("GPU", 0),
+                "memory_gb": round(resources.get("memory", 0) / 1e9, 1),
+            },
+        }
+
     @app.post("/detect-layout")
     async def detect_layout(self, image: UploadFile = File(...)):
         img = _read_image(await image.read())
@@ -198,11 +227,12 @@ def start():
     os.environ.setdefault("RAY_PROMETHEUS_HOST", "http://prometheus:9090")
     os.environ.setdefault("RAY_GRAFANA_IFRAME_HOST", "http://localhost:3000")
 
+    os.environ.setdefault("RAY_METRICS_EXPORT_PORT", "9100")
+
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
         dashboard_host="0.0.0.0",
-        metrics_export_port=9100,
     )
 
     serve.start(http_options={"host": "0.0.0.0", "port": 8080})

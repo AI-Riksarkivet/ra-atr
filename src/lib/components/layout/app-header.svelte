@@ -4,7 +4,7 @@
   import { toggleMode } from 'mode-watcher';
   import { Sun, Moon, Home, Search, FileText, Play, PenTool, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
-  import { gpuServerUrl, getGpuName } from '$lib/gpu-client';
+  import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
 
   interface Props {
@@ -24,6 +24,20 @@
   let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 
   let gpuName = $state('');
+  let gpuDetails = $state<GpuStatus | null>(null);
+  let statusInterval: ReturnType<typeof setInterval>;
+
+  // Poll GPU status when settings panel is open
+  $effect(() => {
+    if (showGpuSettings && gpuServerUrl.get()) {
+      fetchGpuStatus().then(s => { gpuDetails = s; });
+      statusInterval = setInterval(async () => {
+        gpuDetails = await fetchGpuStatus();
+      }, 5000);
+      return () => clearInterval(statusInterval);
+    }
+    return () => {};
+  });
 
   async function checkGpu() {
     const url = gpuUrl.trim();
@@ -127,9 +141,26 @@
             <div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
           {/if}
           {#if gpuServerUrl.get()}
+            <!-- Deployment status -->
+            {#if gpuDetails}
+              <div class="mt-2 pt-2 border-t border-border space-y-1">
+                {#each Object.entries(gpuDetails.deployments) as [name, dep]}
+                  <div class="flex items-center gap-2 text-[0.6rem]">
+                    <span class="size-1.5 rounded-full {dep.status === 'HEALTHY' ? 'bg-green-500' : dep.status === 'UPDATING' ? 'bg-yellow-500' : 'bg-red-500'}"></span>
+                    <span class="text-muted-foreground flex-1">{name}</span>
+                    <span class="font-mono text-muted-foreground/60">{dep.status}</span>
+                  </div>
+                {/each}
+                <div class="flex items-center gap-3 text-[0.6rem] text-muted-foreground/60 pt-1">
+                  <span>GPU: {gpuDetails.gpu.name}</span>
+                  <span>{gpuDetails.cluster.memory_gb}GB</span>
+                  <span>{gpuDetails.cluster.cpu_available} CPU</span>
+                </div>
+              </div>
+            {/if}
             <button
-              class="text-[0.65rem] text-muted-foreground hover:text-foreground mt-1.5 cursor-pointer"
-              onclick={() => { gpuUrl = ''; gpuServerUrl.set(''); gpuStatus = 'idle'; }}
+              class="text-[0.65rem] text-muted-foreground hover:text-foreground mt-2 cursor-pointer"
+              onclick={() => { gpuUrl = ''; gpuServerUrl.set(''); gpuStatus = 'idle'; gpuDetails = null; }}
             >Disconnect (use WASM)</button>
           {:else}
             <div class="text-[0.65rem] text-muted-foreground mt-1.5">Using local WASM inference</div>

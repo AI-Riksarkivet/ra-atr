@@ -112,6 +112,15 @@ def health():
     }
 
 
+@app.get("/status")
+def status():
+    return {
+        "deployments": {"inference": {"status": "HEALTHY"}},
+        "gpu": _gpu_info(),
+        "cluster": {"cpu_available": 0, "gpu_available": 1, "memory_gb": 0},
+    }
+
+
 @app.post("/detect-layout")
 async def detect_layout(image: UploadFile = File(...)):
     """Detect layout regions in an image using RTMDet."""

@@ -77,6 +77,23 @@ function baseUrl(): string {
   return gpuServerUrl.get().replace(/\/$/, '');
 }
 
+export interface GpuStatus {
+  deployments: Record<string, { status: string; message?: string; replicas?: number }>;
+  gpu: { name: string; runtime: string };
+  cluster: { cpu_available: number; gpu_available: number; memory_gb: number };
+}
+
+export async function fetchGpuStatus(): Promise<GpuStatus | null> {
+  if (!isGpuServerEnabled()) return null;
+  try {
+    const res = await fetch(`${baseUrl()}/status`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function gpuDetectLayout(imageData: ArrayBuffer): Promise<{
   regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[];
 }> {
