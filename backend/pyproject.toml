@@ -1,3 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lejonet_backend"]
+
 [project]
 name = "lejonet-backend"
 version = "0.1.0"

@@ -32,7 +32,7 @@ test: ## Run tests
 serve: serve-backend serve-frontend ## Start backend + frontend
 
 serve-backend: ## Start backend on port 8000
-	cd backend && .venv/bin/uvicorn app:app --reload --port 8000 --host 0.0.0.0 &
+	cd backend && uv run uvicorn lejonet_backend.app:app --reload --port 8000 --host 0.0.0.0 &
 
 serve-frontend: ## Start frontend dev server
 	npx vite dev --port 5173 &

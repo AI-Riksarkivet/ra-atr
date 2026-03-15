@@ -7,8 +7,8 @@ import lancedb
 import pytest
 from fastapi.testclient import TestClient
 
-import app as app_module
-from app import SCHEMA, app
+import lejonet_backend.app as app_module
+from lejonet_backend.app import SCHEMA, app
 
 
 @pytest.fixture(autouse=True)

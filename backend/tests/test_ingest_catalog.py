@@ -8,7 +8,7 @@ SAMPLE_FILE = os.path.join(DATA_DIR, "SE_RA", "SE_RA_1111.xml")
 
 
 def test_parse_single_file_returns_volumes():
-    from ingest_catalog import parse_ead_file
+    from lejonet_backend.ingest_catalog import parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)
     assert len(rows) > 100  # SE_RA_1111 has 232 volumes
@@ -47,7 +47,7 @@ def test_parse_single_file_returns_volumes():
 
 def test_parse_file_with_dao_markers():
     """SE_RA_1111 has 132 userestrict type=dao markers."""
-    from ingest_catalog import parse_ead_file
+    from lejonet_backend.ingest_catalog import parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)
     digitized = [r for r in rows if r["digitized"]]
@@ -55,7 +55,7 @@ def test_parse_file_with_dao_markers():
 
 
 def test_parse_date_range():
-    from ingest_catalog import parse_date_range
+    from lejonet_backend.ingest_catalog import parse_date_range
 
     assert parse_date_range("1621--1723") == (1621, 1723)
     assert parse_date_range("1621,1622, 1624, 1626--1628") == (1621, 1628)
@@ -76,7 +76,7 @@ SAMPLE_FILES = [
 
 def test_parse_multiple_archives():
     """Parser handles different archive structures consistently."""
-    from ingest_catalog import parse_ead_file
+    from lejonet_backend.ingest_catalog import parse_ead_file
 
     for path in SAMPLE_FILES:
         if not os.path.exists(path):
@@ -91,7 +91,7 @@ def test_parse_multiple_archives():
 
 def test_parse_file_with_no_volumes():
     """Files with only fonds/series (no volumes) return empty list."""
-    from ingest_catalog import parse_ead_file
+    from lejonet_backend.ingest_catalog import parse_ead_file
 
     # SE_RA_0104 has only fonds-level components
     path = os.path.join(DATA_DIR, "SE_RA", "SE_RA_0104.xml")
@@ -103,7 +103,7 @@ def test_parse_file_with_no_volumes():
 
 def test_walk_directory():
     """walk_archive_dir yields rows from all XML files."""
-    from ingest_catalog import walk_archive_dir
+    from lejonet_backend.ingest_catalog import walk_archive_dir
 
     rows = list(walk_archive_dir(os.path.join(DATA_DIR, "SE_ViLA"), limit=5))
     assert len(rows) > 0
@@ -112,7 +112,7 @@ def test_walk_directory():
 
 
 def test_embed_texts():
-    from ingest_catalog import create_embedder, embed_batch
+    from lejonet_backend.ingest_catalog import create_embedder, embed_batch
 
     embedder = create_embedder()
     texts = ["Swedish council protocols", "Krigsarkivet military records"]
@@ -122,7 +122,7 @@ def test_embed_texts():
 
 
 def test_ingest_to_lancedb(tmp_path):
-    from ingest_catalog import ingest_rows, parse_ead_file
+    from lejonet_backend.ingest_catalog import ingest_rows, parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)[:20]  # Small sample
     db_path = str(tmp_path / "test_lance")
@@ -137,7 +137,7 @@ def test_ingest_to_lancedb(tmp_path):
 
 
 def test_ingest_with_embeddings(tmp_path):
-    from ingest_catalog import ingest_rows, parse_ead_file
+    from lejonet_backend.ingest_catalog import ingest_rows, parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)[:5]
     db_path = str(tmp_path / "test_lance_vec")
