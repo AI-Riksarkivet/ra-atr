@@ -5,12 +5,9 @@
   interface Props {
     onUpload: (files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) => void;
     disabled: boolean;
-    poolSize: number;
-    onPoolSizeChange: (n: number) => void;
-    poolLocked: boolean;
   }
 
-  let { onUpload, disabled, poolSize, onPoolSizeChange, poolLocked }: Props = $props();
+  let { onUpload, disabled }: Props = $props();
   let dragOver = $state(false);
   let loadingDemo = $state(false);
   let fileInput: HTMLInputElement;
@@ -75,23 +72,4 @@
     </Button>
   </div>
 
-  <div class="flex items-center justify-between rounded-lg border border-border px-4 py-2.5 {poolLocked ? 'opacity-50' : ''}">
-    <label class="text-sm text-muted-foreground" for="pool-size">Transcription workers</label>
-    <div class="flex items-center gap-2">
-      <input
-        id="pool-size"
-        type="range"
-        min="1"
-        max="4"
-        value={poolSize}
-        oninput={(e) => onPoolSizeChange(parseInt(e.currentTarget.value))}
-        class="w-24 accent-primary"
-        disabled={poolLocked}
-      />
-      <span class="text-sm font-mono w-4 text-center">{poolSize}</span>
-    </div>
-    {#if poolLocked}
-      <span class="text-xs text-muted-foreground">reload to change</span>
-    {/if}
-  </div>
 </div>

@@ -443,9 +443,6 @@
           <UploadPanel
             onUpload={handleUpload}
             disabled={!appState.htr.modelsReady}
-            poolSize={appState.htr.poolSize}
-            onPoolSizeChange={(n) => appState.htr.setPoolSize(n)}
-            poolLocked={appState.documents.length > 0}
           />
         </div>
       </div>
