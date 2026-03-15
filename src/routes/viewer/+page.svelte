@@ -217,8 +217,6 @@
     }
   }
 
-  const BATCH_SIZE = 5;
-
   async function transcribeVolume(manifestId: string) {
     const pages = appState.documents
       .filter(d => d.manifestId === manifestId)
@@ -226,35 +224,34 @@
 
     if (pages.length === 0) return;
 
-    // Process in batches to avoid memory issues
-    for (let i = 0; i < pages.length; i += BATCH_SIZE) {
-      const batch = pages.slice(i, i + BATCH_SIZE);
+    // Process one page at a time — LRU cache handles memory
+    for (const doc of pages) {
+      // Skip pages that already have groups (already transcribed)
+      if (doc.groups.length > 0) continue;
 
-      // Load images for this batch
-      for (const doc of batch) {
-        if (doc.placeholder) {
-          appState.switchDocument(doc.id);
-          await appState.loadDocumentImage(doc.id);
-        }
+      // Switch to page and load image
+      appState.switchDocument(doc.id);
+      if (doc.placeholder) {
+        await appState.loadDocumentImage(doc.id);
       }
 
-      // Run layout detection + line detection + transcription on each page
-      for (const doc of batch) {
-        // Skip pages that already have groups (already transcribed)
-        if (doc.groups.length > 0) continue;
-        await appState.htr.detectLayout(doc.id);
-        // Wait for transcription to finish before next page
-        await new Promise<void>((resolve) => {
-          const check = () => {
-            if (appState.htr.activeTranscriptions === 0 && appState.htr.activeRegions.size === 0) {
-              resolve();
-              return;
-            }
-            setTimeout(check, 500);
-          };
-          setTimeout(check, 1000);
-        });
-      }
+      // Run layout + lines + transcription
+      await appState.htr.detectLayout(doc.id);
+
+      // Wait for all transcription on this page to finish
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (appState.htr.activeTranscriptions === 0 && appState.htr.activeRegions.size === 0) {
+            resolve();
+            return;
+          }
+          setTimeout(check, 500);
+        };
+        setTimeout(check, 1000);
+      });
+
+      // Auto-save after each page
+      if (doc.manifestId) appState.scheduleAutoSave();
     }
   }
 
