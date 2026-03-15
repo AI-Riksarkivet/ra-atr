@@ -56,6 +56,11 @@ export async function probeGpuServer(url: string): Promise<boolean> {
  * Returns the URL if found, empty string if not.
  */
 export async function autoDetectGpuServer(): Promise<string> {
+  // Try proxy path first (avoids COEP/CORS issues)
+  if (await probeGpuServer('/gpu')) {
+    return '/gpu';
+  }
+  // Try direct connections
   const candidates = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',

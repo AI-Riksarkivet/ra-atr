@@ -24,6 +24,10 @@ export default defineConfig({
       '/transcriptions': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
       '/debug': 'http://localhost:8000',
+      '/gpu': {
+        target: 'http://localhost:8080',
+        rewrite: (path: string) => path.replace(/^\/gpu/, ''),
+      },
     },
     watch: {
       ignored: ['**/target/**', '**/models/**', '**/.venv/**', '**/.export-venv/**'],

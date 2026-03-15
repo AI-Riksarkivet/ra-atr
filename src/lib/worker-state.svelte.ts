@@ -265,11 +265,15 @@ export class HTRWorkerState {
   }
 
   addImage(imageId: string, imageData: ArrayBuffer) {
-    // Keep a copy for re-sending to new workers on pool resize
+    // Keep a copy for GPU client and re-sending to new workers
     this.storedImages.set(imageId, imageData.slice(0));
-    this.detectWorker.postMessage(
-      { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
-    );
+
+    // Only send to workers if they're initialized (not in GPU-only mode)
+    if (this.detectReady) {
+      this.detectWorker.postMessage(
+        { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
+      );
+    }
     for (const w of this.transcribeWorkers) {
       w.postMessage(
         { type: 'add_image', payload: { imageId, imageData: imageData.slice(0) } },
