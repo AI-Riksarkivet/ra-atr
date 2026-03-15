@@ -71,13 +71,15 @@ def decode_yolo(
         oy = (boxes[i, 1] - pad_y) / scale
         ow = (boxes[i, 2] - boxes[i, 0]) / scale
         oh = (boxes[i, 3] - boxes[i, 1]) / scale
-        lines.append({
-            "x": float(max(0, ox)),
-            "y": float(max(0, oy)),
-            "w": float(max(0, ow)),
-            "h": float(max(0, oh)),
-            "confidence": float(scores[i]),
-        })
+        lines.append(
+            {
+                "x": float(max(0, ox)),
+                "y": float(max(0, oy)),
+                "w": float(max(0, ow)),
+                "h": float(max(0, oh)),
+                "confidence": float(scores[i]),
+            }
+        )
 
     lines.sort(key=lambda l: (l["y"], l["x"]))
     return lines

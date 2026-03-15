@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import lancedb
@@ -17,28 +17,30 @@ TABLE_NAME = "transcriptions"
 DB_PATH = os.environ.get("LANCEDB_PATH", str(Path(__file__).parent / "data" / "lancedb"))
 PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "/tmp/parquet_export"))
 
-SCHEMA = pa.schema([
-    pa.field("id", pa.string()),
-    pa.field("version", pa.int32()),
-    pa.field("reference_code", pa.string()),
-    pa.field("manifest_id", pa.string()),
-    pa.field("page_number", pa.int32()),
-    pa.field("group_name", pa.string()),
-    pa.field("group_rect_x", pa.float32()),
-    pa.field("group_rect_y", pa.float32()),
-    pa.field("group_rect_w", pa.float32()),
-    pa.field("group_rect_h", pa.float32()),
-    pa.field("line_index", pa.int32()),
-    pa.field("bbox_x", pa.float32()),
-    pa.field("bbox_y", pa.float32()),
-    pa.field("bbox_w", pa.float32()),
-    pa.field("bbox_h", pa.float32()),
-    pa.field("text", pa.string()),
-    pa.field("confidence", pa.float32()),
-    pa.field("source", pa.string()),
-    pa.field("contributor", pa.string()),
-    pa.field("created_at", pa.timestamp("us", tz="UTC")),
-])
+SCHEMA = pa.schema(
+    [
+        pa.field("id", pa.string()),
+        pa.field("version", pa.int32()),
+        pa.field("reference_code", pa.string()),
+        pa.field("manifest_id", pa.string()),
+        pa.field("page_number", pa.int32()),
+        pa.field("group_name", pa.string()),
+        pa.field("group_rect_x", pa.float32()),
+        pa.field("group_rect_y", pa.float32()),
+        pa.field("group_rect_w", pa.float32()),
+        pa.field("group_rect_h", pa.float32()),
+        pa.field("line_index", pa.int32()),
+        pa.field("bbox_x", pa.float32()),
+        pa.field("bbox_y", pa.float32()),
+        pa.field("bbox_w", pa.float32()),
+        pa.field("bbox_h", pa.float32()),
+        pa.field("text", pa.string()),
+        pa.field("confidence", pa.float32()),
+        pa.field("source", pa.string()),
+        pa.field("contributor", pa.string()),
+        pa.field("created_at", pa.timestamp("us", tz="UTC")),
+    ]
+)
 
 db = None
 table = None
@@ -112,8 +114,11 @@ def _rebuild_fts():
     try:
         if table is not None and table.count_rows() > 0:
             table.create_fts_index(
-                "text", replace=True,
-                base_tokenizer="ngram", ngram_min_length=2, prefix_only=True,
+                "text",
+                replace=True,
+                base_tokenizer="ngram",
+                ngram_min_length=2,
+                prefix_only=True,
             )
     except Exception as e:
         print(f"FTS index build skipped: {e}")
@@ -251,6 +256,7 @@ app.add_middleware(
 # Prometheus metrics
 try:
     from starlette_exporter import PrometheusMiddleware, handle_metrics
+
     app.add_middleware(PrometheusMiddleware, app_name="lejonet_backend", prefix="lejonet")
     app.add_route("/metrics", handle_metrics)
 except ImportError:
@@ -277,11 +283,13 @@ def debug_tables():
     for name in db.table_names():
         t = db.open_table(name)
         schema = t.to_arrow().schema
-        tables.append({
-            "name": name,
-            "rows": t.count_rows(),
-            "columns": [{"name": f.name, "type": str(f.type)} for f in schema],
-        })
+        tables.append(
+            {
+                "name": name,
+                "rows": t.count_rows(),
+                "columns": [{"name": f.name, "type": str(f.type)} for f in schema],
+            }
+        )
     return {"tables": tables}
 
 
@@ -394,14 +402,16 @@ def list_transcriptions(request: Request, q: str | None = None):
     for mid in unique_mids:
         mask = pc.equal(manifest_ids, mid)
         subset = rows.filter(mask)
-        manifests.append({
-            "manifest_id": mid,
-            "reference_code": subset.column("reference_code")[0].as_py(),
-            "lines": len(subset),
-            "groups": len(pc.unique(subset.column("group_name")).to_pylist()),
-            "pages": len(pc.unique(subset.column("page_number")).to_pylist()),
-            "last_saved": pc.max(subset.column("created_at")).as_py().isoformat(),
-        })
+        manifests.append(
+            {
+                "manifest_id": mid,
+                "reference_code": subset.column("reference_code")[0].as_py(),
+                "lines": len(subset),
+                "groups": len(pc.unique(subset.column("group_name")).to_pylist()),
+                "pages": len(pc.unique(subset.column("page_number")).to_pylist()),
+                "last_saved": pc.max(subset.column("created_at")).as_py().isoformat(),
+            }
+        )
 
     manifests.sort(key=lambda m: m["last_saved"], reverse=True)
     return {"manifests": manifests}
@@ -461,30 +471,34 @@ def get_transcriptions(manifest_id: str, request: Request, q: str | None = None)
         first = indices[0]
         lines = []
         for i in indices:
-            lines.append({
-                "line_index": rows.column("line_index")[i].as_py(),
-                "bbox": {
-                    "x": rows.column("bbox_x")[i].as_py(),
-                    "y": rows.column("bbox_y")[i].as_py(),
-                    "w": rows.column("bbox_w")[i].as_py(),
-                    "h": rows.column("bbox_h")[i].as_py(),
+            lines.append(
+                {
+                    "line_index": rows.column("line_index")[i].as_py(),
+                    "bbox": {
+                        "x": rows.column("bbox_x")[i].as_py(),
+                        "y": rows.column("bbox_y")[i].as_py(),
+                        "w": rows.column("bbox_w")[i].as_py(),
+                        "h": rows.column("bbox_h")[i].as_py(),
+                    },
+                    "text": rows.column("text")[i].as_py(),
+                    "confidence": rows.column("confidence")[i].as_py(),
+                    "source": rows.column("source")[i].as_py(),
+                    "contributor": rows.column("contributor")[i].as_py(),
+                }
+            )
+        groups.append(
+            {
+                "page_number": page,
+                "group_name": gname,
+                "group_rect": {
+                    "x": rows.column("group_rect_x")[first].as_py(),
+                    "y": rows.column("group_rect_y")[first].as_py(),
+                    "w": rows.column("group_rect_w")[first].as_py(),
+                    "h": rows.column("group_rect_h")[first].as_py(),
                 },
-                "text": rows.column("text")[i].as_py(),
-                "confidence": rows.column("confidence")[i].as_py(),
-                "source": rows.column("source")[i].as_py(),
-                "contributor": rows.column("contributor")[i].as_py(),
-            })
-        groups.append({
-            "page_number": page,
-            "group_name": gname,
-            "group_rect": {
-                "x": rows.column("group_rect_x")[first].as_py(),
-                "y": rows.column("group_rect_y")[first].as_py(),
-                "w": rows.column("group_rect_w")[first].as_py(),
-                "h": rows.column("group_rect_h")[first].as_py(),
-            },
-            "lines": lines,
-        })
+                "lines": lines,
+            }
+        )
 
     return {"manifest_id": manifest_id, "groups": groups}
 
@@ -499,7 +513,7 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     if username is None:
         raise HTTPException(401, "Login with Hugging Face required")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Remove only this user's rows for this manifest, keep everyone else's
     before = table.count_rows()
@@ -511,28 +525,30 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     for group in body.groups:
         for line in group.lines:
             line_id = f"{manifest_id}/{username}/{group.page_number}_{group.group_name}_{line.line_index}"
-            new_rows.append({
-                "id": line_id,
-                "version": 1,
-                "reference_code": body.reference_code,
-                "manifest_id": manifest_id,
-                "page_number": group.page_number,
-                "group_name": group.group_name,
-                "group_rect_x": group.group_rect.x,
-                "group_rect_y": group.group_rect.y,
-                "group_rect_w": group.group_rect.w,
-                "group_rect_h": group.group_rect.h,
-                "line_index": line.line_index,
-                "bbox_x": line.bbox.x,
-                "bbox_y": line.bbox.y,
-                "bbox_w": line.bbox.w,
-                "bbox_h": line.bbox.h,
-                "text": line.text,
-                "confidence": line.confidence,
-                "source": line.source,
-                "contributor": username,
-                "created_at": now,
-            })
+            new_rows.append(
+                {
+                    "id": line_id,
+                    "version": 1,
+                    "reference_code": body.reference_code,
+                    "manifest_id": manifest_id,
+                    "page_number": group.page_number,
+                    "group_name": group.group_name,
+                    "group_rect_x": group.group_rect.x,
+                    "group_rect_y": group.group_rect.y,
+                    "group_rect_w": group.group_rect.w,
+                    "group_rect_h": group.group_rect.h,
+                    "line_index": line.line_index,
+                    "bbox_x": line.bbox.x,
+                    "bbox_y": line.bbox.y,
+                    "bbox_w": line.bbox.w,
+                    "bbox_h": line.bbox.h,
+                    "text": line.text,
+                    "confidence": line.confidence,
+                    "source": line.source,
+                    "contributor": username,
+                    "created_at": now,
+                }
+            )
 
     if new_rows:
         new_arrow = pa.Table.from_pylist(new_rows, schema=SCHEMA)
@@ -683,6 +699,7 @@ def _catalog_fts_search(q: str, limit: int, where: str | None = None) -> pa.Tabl
 def _catalog_vector_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
         from ingest_catalog import create_embedder, embed_batch
+
         if not hasattr(_catalog_vector_search, "_embedder"):
             _catalog_vector_search._embedder = create_embedder()
         vec = embed_batch(_catalog_vector_search._embedder, [q])[0]
@@ -733,10 +750,7 @@ def get_history(manifest_id: str):
         key = (contributors[i].as_py(), timestamps[i].as_py())
         seen[key] = seen.get(key, 0) + 1
 
-    contributions = [
-        {"contributor": k[0], "created_at": k[1].isoformat(), "lines": count}
-        for k, count in seen.items()
-    ]
+    contributions = [{"contributor": k[0], "created_at": k[1].isoformat(), "lines": count} for k, count in seen.items()]
     contributions.sort(key=lambda c: c["created_at"], reverse=True)
 
     return {"manifest_id": manifest_id, "contributions": contributions}

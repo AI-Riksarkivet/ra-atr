@@ -72,14 +72,16 @@ def decode_rtmdet(
 
     regions = []
     for i in keep:
-        regions.append({
-            "label": LABELS[0],
-            "confidence": float(scores[i]),
-            "x": float(max(0, boxes[i, 0])),
-            "y": float(max(0, boxes[i, 1])),
-            "w": float(max(0, boxes[i, 2] - boxes[i, 0])),
-            "h": float(max(0, boxes[i, 3] - boxes[i, 1])),
-        })
+        regions.append(
+            {
+                "label": LABELS[0],
+                "confidence": float(scores[i]),
+                "x": float(max(0, boxes[i, 0])),
+                "y": float(max(0, boxes[i, 1])),
+                "w": float(max(0, boxes[i, 2] - boxes[i, 0])),
+                "h": float(max(0, boxes[i, 3] - boxes[i, 1])),
+            }
+        )
 
     regions.sort(key=lambda r: (r["y"], r["x"]))
     return regions

@@ -56,9 +56,12 @@ def transcribe_line(
         (text, confidence)
     """
     # Encoder
-    encoder_out = encoder_session.run(None, {
-        encoder_session.get_inputs()[0].name: line_tensor,
-    })
+    encoder_out = encoder_session.run(
+        None,
+        {
+            encoder_session.get_inputs()[0].name: line_tensor,
+        },
+    )
     hidden_states = encoder_out[0]  # [1, seq_len, hidden_dim]
 
     # Greedy decode
@@ -103,10 +106,13 @@ def transcribe_line(
 
         generated.append(next_id)
         input_ids = np.array([generated], dtype=np.int64)
-        input_ids = np.concatenate([
-            np.array([[tokenizer.bos_id]], dtype=np.int64),
-            input_ids,
-        ], axis=1)
+        input_ids = np.concatenate(
+            [
+                np.array([[tokenizer.bos_id]], dtype=np.int64),
+                input_ids,
+            ],
+            axis=1,
+        )
 
     text = tokenizer.decode(generated)
     confidence = float(np.exp(total_logprob / max(len(generated), 1)))

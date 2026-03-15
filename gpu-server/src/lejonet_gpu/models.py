@@ -21,10 +21,7 @@ def _providers() -> list[str]:
     for gpu in ["CUDAExecutionProvider", "ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
         if gpu in available:
             return [gpu]
-    raise RuntimeError(
-        f"No GPU execution provider found. Available: {available}. "
-        "Install onnxruntime-gpu (NVIDIA) or onnxruntime-rocm (AMD)."
-    )
+    raise RuntimeError(f"No GPU execution provider found. Available: {available}. Install onnxruntime-gpu (NVIDIA) or onnxruntime-rocm (AMD).")
 
 
 def _create_session(model_path: Path) -> ort.InferenceSession:
@@ -75,10 +72,7 @@ class ModelStore:
         return self.get(DECODER_MODEL)
 
     def available_models(self) -> list[str]:
-        return [
-            name for name in [LAYOUT_MODEL, YOLO_MODEL, ENCODER_MODEL, DECODER_MODEL, TOKENIZER_FILE]
-            if (self.models_dir / name).exists()
-        ]
+        return [name for name in [LAYOUT_MODEL, YOLO_MODEL, ENCODER_MODEL, DECODER_MODEL, TOKENIZER_FILE] if (self.models_dir / name).exists()]
 
     def providers(self) -> list[str]:
         return _providers()

@@ -1,6 +1,5 @@
 """Tests for the transcription backend API."""
 
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -275,13 +274,16 @@ def test_catalog_search_fts(client):
 
 def test_catalog_search_filters(client):
     """Filters: digitized, date range, archive."""
-    res = client.get("/catalog/search", params={
-        "q": "protokoll",
-        "digitized": "true",
-        "date_start": 1600,
-        "date_end": 1700,
-        "archive": "SE_RA",
-    })
+    res = client.get(
+        "/catalog/search",
+        params={
+            "q": "protokoll",
+            "digitized": "true",
+            "date_start": 1600,
+            "date_end": 1700,
+            "archive": "SE_RA",
+        },
+    )
     assert res.status_code == 200
     data = res.json()
     assert "results" in data

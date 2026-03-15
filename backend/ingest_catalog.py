@@ -4,32 +4,34 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-import pyarrow as pa
 import lancedb
+import pyarrow as pa
 
 CATALOG_TABLE = "archive_catalog"
 EMBED_MODEL = "intfloat/multilingual-e5-small"
 EMBED_DIM = 384
 
-CATALOG_SCHEMA = pa.schema([
-    pa.field("id", pa.string()),
-    pa.field("reference_code", pa.string()),
-    pa.field("archive_code", pa.string()),
-    pa.field("fonds_id", pa.string()),
-    pa.field("fonds_title", pa.string()),
-    pa.field("fonds_description", pa.string()),
-    pa.field("creator", pa.string()),
-    pa.field("series_id", pa.string()),
-    pa.field("series_title", pa.string()),
-    pa.field("volume_id", pa.string()),
-    pa.field("date_text", pa.string()),
-    pa.field("date_start", pa.int32()),
-    pa.field("date_end", pa.int32()),
-    pa.field("description", pa.string()),
-    pa.field("digitized", pa.bool_()),
-    pa.field("search_text", pa.string()),
-    pa.field("vector", pa.list_(pa.float32(), EMBED_DIM)),
-])
+CATALOG_SCHEMA = pa.schema(
+    [
+        pa.field("id", pa.string()),
+        pa.field("reference_code", pa.string()),
+        pa.field("archive_code", pa.string()),
+        pa.field("fonds_id", pa.string()),
+        pa.field("fonds_title", pa.string()),
+        pa.field("fonds_description", pa.string()),
+        pa.field("creator", pa.string()),
+        pa.field("series_id", pa.string()),
+        pa.field("series_title", pa.string()),
+        pa.field("volume_id", pa.string()),
+        pa.field("date_text", pa.string()),
+        pa.field("date_start", pa.int32()),
+        pa.field("date_end", pa.int32()),
+        pa.field("description", pa.string()),
+        pa.field("digitized", pa.bool_()),
+        pa.field("search_text", pa.string()),
+        pa.field("vector", pa.list_(pa.float32(), EMBED_DIM)),
+    ]
+)
 
 NS = "http://xml.ra.se/EAD"
 
@@ -125,41 +127,46 @@ def parse_ead_file(path: str) -> list[dict]:
             description = " ".join(vol_desc_parts)
 
             # Digitized flag
-            digitized = any(
-                ur.get("type") == "dao"
-                for ur in vol_el.findall(_tag("userestrict"))
-            )
+            digitized = any(ur.get("type") == "dao" for ur in vol_el.findall(_tag("userestrict")))
 
-            ref_code = "/".join(
-                part for part in [country, repo, fonds_uid, series_id, vol_id] if part
-            )
+            ref_code = "/".join(part for part in [country, repo, fonds_uid, series_id, vol_id] if part)
             row_id = f"{eadid}/{series_id}/{vol_id}"
 
             search_text = " ".join(
-                part for part in [
-                    fonds_title, fonds_description, series_title,
-                    description, creator, ref_code, vol_id, date_text,
-                ] if part
+                part
+                for part in [
+                    fonds_title,
+                    fonds_description,
+                    series_title,
+                    description,
+                    creator,
+                    ref_code,
+                    vol_id,
+                    date_text,
+                ]
+                if part
             )
 
-            rows.append({
-                "id": row_id,
-                "reference_code": ref_code,
-                "archive_code": archive_code,
-                "fonds_id": fonds_uid,
-                "fonds_title": fonds_title,
-                "fonds_description": fonds_description,
-                "creator": creator,
-                "series_id": series_id,
-                "series_title": series_title,
-                "volume_id": vol_id,
-                "date_text": date_text,
-                "date_start": date_start,
-                "date_end": date_end,
-                "description": description,
-                "digitized": digitized,
-                "search_text": search_text,
-            })
+            rows.append(
+                {
+                    "id": row_id,
+                    "reference_code": ref_code,
+                    "archive_code": archive_code,
+                    "fonds_id": fonds_uid,
+                    "fonds_title": fonds_title,
+                    "fonds_description": fonds_description,
+                    "creator": creator,
+                    "series_id": series_id,
+                    "series_title": series_title,
+                    "volume_id": vol_id,
+                    "date_text": date_text,
+                    "date_start": date_start,
+                    "date_end": date_end,
+                    "description": description,
+                    "digitized": digitized,
+                    "search_text": search_text,
+                }
+            )
 
     return rows
 
@@ -183,6 +190,7 @@ def walk_archive_dir(directory: str, limit: int | None = None):
 
 def create_embedder():
     from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer(EMBED_MODEL)
 
 
@@ -235,7 +243,8 @@ def build_fts_index(db_path: str):
     table = db.open_table(CATALOG_TABLE)
     try:
         table.create_fts_index(
-            "search_text", replace=True,
+            "search_text",
+            replace=True,
         )
         print(f"FTS index built on {table.count_rows()} rows")
     except Exception as e:
@@ -311,7 +320,8 @@ def main():
     print("Streaming parse + ingest...")
     rows_iter = _stream_all_dirs(args.data_dir, sample=sample)
     written = ingest_streaming(
-        rows_iter, args.db_path,
+        rows_iter,
+        args.db_path,
         batch_size=args.batch_size,
         embed=not args.no_embed,
     )

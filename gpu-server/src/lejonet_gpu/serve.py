@@ -1,21 +1,17 @@
 """Ray Serve deployments for GPU inference pipeline."""
 
-import io
-from typing import List
-
-import numpy as np
 from PIL import Image
 from ray import serve
 
-from .models import ModelStore, TOKENIZER_FILE
-from .preprocessing import (
-    preprocess_rtmdet,
-    preprocess_yolo,
-    preprocess_trocr,
-    crop_region,
-)
-from .layout import decode_rtmdet
 from .detect import decode_yolo
+from .layout import decode_rtmdet
+from .models import TOKENIZER_FILE, ModelStore
+from .preprocessing import (
+    crop_region,
+    preprocess_rtmdet,
+    preprocess_trocr,
+    preprocess_yolo,
+)
 from .transcribe import Tokenizer, transcribe_line
 
 
@@ -71,19 +67,25 @@ class Transcriber:
         line_img = crop_region(img, bbox["x"], bbox["y"], bbox["w"], bbox["h"])
         tensor = preprocess_trocr(line_img)
         text, confidence = transcribe_line(
-            self.encoder, self.decoder, self.tokenizer, tensor,
+            self.encoder,
+            self.decoder,
+            self.tokenizer,
+            tensor,
         )
         return {"text": text, "confidence": confidence}
 
     @serve.batch(max_batch_size=8, batch_wait_timeout_s=0.05)
-    async def transcribe_batch(self, requests: List[tuple]) -> List[dict]:
+    async def transcribe_batch(self, requests: list[tuple]) -> list[dict]:
         """Batch transcribe multiple lines. Each request is (img, bbox)."""
         results = []
         for img, bbox in requests:
             line_img = crop_region(img, bbox["x"], bbox["y"], bbox["w"], bbox["h"])
             tensor = preprocess_trocr(line_img)
             text, confidence = transcribe_line(
-                self.encoder, self.decoder, self.tokenizer, tensor,
+                self.encoder,
+                self.decoder,
+                self.tokenizer,
+                tensor,
             )
             results.append({"text": text, "confidence": confidence})
         return results

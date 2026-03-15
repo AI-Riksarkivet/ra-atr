@@ -5,13 +5,12 @@ import subprocess
 from pathlib import Path
 
 import ray
-from ray import serve
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
+from ray import serve
 
-from .models import ModelStore, TOKENIZER_FILE
-from .serve import LayoutDetector, LineDetector, Transcriber
+from .models import ModelStore
 
 app = FastAPI(title="Lejonet GPU Inference")
 app.add_middleware(
@@ -43,7 +42,9 @@ def _gpu_info() -> dict:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             return {"name": result.stdout.strip(), "runtime": "CUDA"}
@@ -149,16 +150,20 @@ async def process_page(image: UploadFile = File(...)):
         transcribed_lines = []
         for line, fut in transcribe_futures:
             result = await fut
-            transcribed_lines.append({
-                "bbox": {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]},
-                "text": result["text"],
-                "confidence": result["confidence"],
-            })
+            transcribed_lines.append(
+                {
+                    "bbox": {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]},
+                    "text": result["text"],
+                    "confidence": result["confidence"],
+                }
+            )
 
-        all_groups.append({
-            "region": region,
-            "lines": transcribed_lines,
-        })
+        all_groups.append(
+            {
+                "region": region,
+                "lines": transcribed_lines,
+            }
+        )
 
     return {
         "groups": all_groups,

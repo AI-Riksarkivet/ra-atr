@@ -3,20 +3,19 @@
 import io
 from contextlib import asynccontextmanager
 
-import numpy as np
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
-from .models import ModelStore, TOKENIZER_FILE
-from .preprocessing import (
-    preprocess_rtmdet,
-    preprocess_yolo,
-    preprocess_trocr,
-    crop_region,
-)
-from .layout import decode_rtmdet
 from .detect import decode_yolo
+from .layout import decode_rtmdet
+from .models import TOKENIZER_FILE, ModelStore
+from .preprocessing import (
+    crop_region,
+    preprocess_rtmdet,
+    preprocess_trocr,
+    preprocess_yolo,
+)
 from .transcribe import Tokenizer, transcribe_line
 
 store = ModelStore()
@@ -54,6 +53,7 @@ def _read_image(data: bytes) -> Image.Image:
 def _gpu_info() -> dict:
     """Get GPU device info if available."""
     import subprocess
+
     # Try rocm-smi
     for cmd in [
         ["rocm-smi", "--showproductname", "--csv"],
@@ -71,7 +71,9 @@ def _gpu_info() -> dict:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             return {"name": result.stdout.strip(), "runtime": "CUDA"}
@@ -80,6 +82,7 @@ def _gpu_info() -> dict:
     # Try reading from sysfs (works without tools)
     try:
         from pathlib import Path
+
         for card in sorted(Path("/sys/class/drm").glob("card*/device")):
             vendor = (card / "vendor").read_text().strip()
             if vendor == "0x1002":  # AMD
@@ -175,7 +178,10 @@ async def transcribe(
     tensor = preprocess_trocr(line_img)
 
     text, confidence = transcribe_line(
-        store.encoder, store.decoder, tokenizer, tensor,
+        store.encoder,
+        store.decoder,
+        tokenizer,
+        tensor,
     )
     return {"text": text, "confidence": confidence}
 
@@ -192,7 +198,10 @@ async def process_page(image: UploadFile = File(...)):
     layout_tensor, layout_scale = preprocess_rtmdet(img)
     layout_result = store.layout.run(None, {"image": layout_tensor})
     regions = decode_rtmdet(
-        layout_result[0][0], layout_result[1][0], 640, layout_scale,
+        layout_result[0][0],
+        layout_result[1][0],
+        640,
+        layout_scale,
     )
 
     # 2. Line detection per region
@@ -201,7 +210,8 @@ async def process_page(image: UploadFile = File(...)):
         region_img = crop_region(img, region["x"], region["y"], region["w"], region["h"])
         yolo_tensor, scale, pad_x, pad_y = preprocess_yolo(region_img)
         yolo_result = store.yolo.run(
-            None, {store.yolo.get_inputs()[0].name: yolo_tensor},
+            None,
+            {store.yolo.get_inputs()[0].name: yolo_tensor},
         )
         lines = decode_yolo(yolo_result[0], region_img.width, region_img.height, scale, pad_x, pad_y)
 
@@ -213,18 +223,25 @@ async def process_page(image: UploadFile = File(...)):
             line_img = crop_region(img, abs_x, abs_y, line["w"], line["h"])
             trocr_tensor = preprocess_trocr(line_img)
             text, confidence = transcribe_line(
-                store.encoder, store.decoder, tokenizer, trocr_tensor,
+                store.encoder,
+                store.decoder,
+                tokenizer,
+                trocr_tensor,
             )
-            transcribed_lines.append({
-                "bbox": {"x": abs_x, "y": abs_y, "w": line["w"], "h": line["h"]},
-                "text": text,
-                "confidence": confidence,
-            })
+            transcribed_lines.append(
+                {
+                    "bbox": {"x": abs_x, "y": abs_y, "w": line["w"], "h": line["h"]},
+                    "text": text,
+                    "confidence": confidence,
+                }
+            )
 
-        all_groups.append({
-            "region": region,
-            "lines": transcribed_lines,
-        })
+        all_groups.append(
+            {
+                "region": region,
+                "lines": transcribed_lines,
+            }
+        )
 
     return {
         "groups": all_groups,

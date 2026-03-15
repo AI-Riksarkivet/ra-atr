@@ -1,10 +1,9 @@
 # backend/test_ingest_catalog.py
 import os
+
 import pytest
 
-DATA_DIR = os.environ.get(
-    "RIKSARKIVET_DATA", "/home/m/Downloads/Riksarkivet-2022-12-16"
-)
+DATA_DIR = os.environ.get("RIKSARKIVET_DATA", "/home/m/Downloads/Riksarkivet-2022-12-16")
 SAMPLE_FILE = os.path.join(DATA_DIR, "SE_RA", "SE_RA_1111.xml")
 
 
@@ -17,10 +16,21 @@ def test_parse_single_file_returns_volumes():
     row = rows[0]
     # Required fields present
     for key in [
-        "id", "reference_code", "archive_code", "fonds_id", "fonds_title",
-        "creator", "series_id", "series_title", "volume_id",
-        "date_text", "date_start", "date_end", "description",
-        "digitized", "search_text",
+        "id",
+        "reference_code",
+        "archive_code",
+        "fonds_id",
+        "fonds_title",
+        "creator",
+        "series_id",
+        "series_title",
+        "volume_id",
+        "date_text",
+        "date_start",
+        "date_end",
+        "description",
+        "digitized",
+        "search_text",
     ]:
         assert key in row, f"Missing key: {key}"
 
@@ -112,7 +122,7 @@ def test_embed_texts():
 
 
 def test_ingest_to_lancedb(tmp_path):
-    from ingest_catalog import parse_ead_file, ingest_rows
+    from ingest_catalog import ingest_rows, parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)[:20]  # Small sample
     db_path = str(tmp_path / "test_lance")
@@ -120,13 +130,14 @@ def test_ingest_to_lancedb(tmp_path):
     assert stats["rows_written"] == 20
 
     import lancedb
+
     db = lancedb.connect(db_path)
     table = db.open_table("archive_catalog")
     assert table.count_rows() == 20
 
 
 def test_ingest_with_embeddings(tmp_path):
-    from ingest_catalog import parse_ead_file, ingest_rows
+    from ingest_catalog import ingest_rows, parse_ead_file
 
     rows = parse_ead_file(SAMPLE_FILE)[:5]
     db_path = str(tmp_path / "test_lance_vec")
@@ -134,6 +145,7 @@ def test_ingest_with_embeddings(tmp_path):
     assert stats["rows_written"] == 5
 
     import lancedb
+
     db = lancedb.connect(db_path)
     table = db.open_table("archive_catalog")
     assert table.count_rows() == 5

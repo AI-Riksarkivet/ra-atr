@@ -3,20 +3,18 @@
 import io
 import subprocess
 from pathlib import Path
-from typing import List
 
 import ray
-from ray import serve
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
+from ray import serve
 
-from .models import ModelStore, TOKENIZER_FILE
-from .preprocessing import preprocess_rtmdet, preprocess_yolo, preprocess_trocr, crop_region
-from .layout import decode_rtmdet
 from .detect import decode_yolo
+from .layout import decode_rtmdet
+from .models import TOKENIZER_FILE, ModelStore
+from .preprocessing import crop_region, preprocess_rtmdet, preprocess_trocr, preprocess_yolo
 from .transcribe import Tokenizer, transcribe_line
-
 
 # --- Ray Serve Deployments ---
 
@@ -74,7 +72,7 @@ class TranscriberDeployment:
         return {"text": text, "confidence": confidence}
 
     @serve.batch(max_batch_size=8, batch_wait_timeout_s=0.05)
-    async def transcribe_batch(self, requests: List[tuple[Image.Image, dict]]) -> List[dict]:
+    async def transcribe_batch(self, requests: list[tuple[Image.Image, dict]]) -> list[dict]:
         results = []
         for img, bbox in requests:
             results.append(self.transcribe_one(img, bbox))
@@ -177,11 +175,13 @@ class APIIngress:
             transcribed = []
             for line, fut in futures:
                 result = await fut
-                transcribed.append({
-                    "bbox": {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]},
-                    "text": result["text"],
-                    "confidence": result["confidence"],
-                })
+                transcribed.append(
+                    {
+                        "bbox": {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]},
+                        "text": result["text"],
+                        "confidence": result["confidence"],
+                    }
+                )
 
             all_groups.append({"region": region, "lines": transcribed})
 
@@ -193,6 +193,7 @@ class APIIngress:
 
 def start():
     import os
+
     os.environ.setdefault("RAY_GRAFANA_HOST", "http://grafana:3000")
     os.environ.setdefault("RAY_PROMETHEUS_HOST", "http://prometheus:9090")
     os.environ.setdefault("RAY_GRAFANA_IFRAME_HOST", "http://localhost:3000")
@@ -222,6 +223,7 @@ def start():
 if __name__ == "__main__":
     start()
     import time
+
     try:
         while True:
             time.sleep(3600)
