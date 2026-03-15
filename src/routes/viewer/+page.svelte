@@ -224,21 +224,21 @@
 
     if (pages.length === 0) return;
 
-    // Process one page at a time — LRU cache handles memory
+    // Process one page at a time — load, transcribe, wait, then next
     for (const doc of pages) {
       // Skip pages that already have groups (already transcribed)
       if (doc.groups.length > 0) continue;
 
-      // Switch to page and load image
-      appState.switchDocument(doc.id);
-      if (doc.placeholder) {
-        await appState.loadDocumentImage(doc.id);
-      }
+      // Load image for this page (waits for completion)
+      await appState.loadDocumentImage(doc.id);
+
+      // Show this page in the viewer
+      appState.activeDocumentId = doc.id;
 
       // Run layout + lines + transcription
       await appState.htr.detectLayout(doc.id);
 
-      // Wait for all transcription on this page to finish
+      // Wait for all transcription on this page to finish before loading next
       await new Promise<void>((resolve) => {
         const check = () => {
           if (appState.htr.activeTranscriptions === 0 && appState.htr.activeRegions.size === 0) {
