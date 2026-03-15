@@ -237,6 +237,9 @@ def _resolve_user(request: Request) -> str | None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from lejonet_backend.telemetry import setup_telemetry
+
+    setup_telemetry()
     init_db()
     _rebuild_fts()
     init_catalog()

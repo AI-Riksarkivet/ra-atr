@@ -29,6 +29,10 @@ dev = [
 embeddings = [
     "sentence-transformers>=3,<4",
 ]
+telemetry = [
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+]
 
 [tool.ruff]
 line-length = 160
