@@ -1,75 +1,83 @@
 # Lejonet HTR
 
-Collaborative handwritten text recognition app for historical documents. Browse the Riksarkivet archive catalog, load digitized volumes, and transcribe with AI.
+Collaborative handwritten text recognition for historical documents from Sweden's National Archives (Riksarkivet).
+
+Browse 3.7M archive volumes, load digitized pages, and transcribe with AI — in-browser or on GPU.
 
 ## Quick Start
 
-### 1. Start the backend (catalog search + transcriptions)
-
 ```bash
-cd backend
-uv sync
-.venv/bin/uvicorn app:app --reload --port 8000
-```
-
-### 2. Start the frontend
-
-```bash
-npm install
-npm run dev
+make install   # Install dependencies
+make serve     # Start backend + frontend
 ```
 
 Open http://localhost:5173
 
-### 3. (Optional) Start the GPU inference server
+## Features
 
-For faster transcription using your GPU:
-
-```bash
-cd gpu-server
-
-# AMD GPU (ROCm)
-docker build -f Dockerfile.rocm -t lejonet-gpu:rocm .
-docker run --device /dev/kfd --device /dev/dri --group-add video \
-  -v $(pwd)/../public/models:/models -p 8080:8080 lejonet-gpu:rocm
-
-# NVIDIA GPU
-docker build -f Dockerfile.nvidia -t lejonet-gpu:nvidia .
-docker run --gpus all \
-  -v $(pwd)/../public/models:/models -p 8080:8080 lejonet-gpu:nvidia
-```
-
-The frontend auto-detects the GPU server at `localhost:8080`. You'll see "GPU" badge in the header instead of "WASM".
+- **In-browser HTR** — ONNX Runtime Web (WASM) for layout detection, line detection, and transcription
+- **GPU acceleration** — Optional Docker GPU server with Ray Serve batching (NVIDIA/AMD ROCm)
+- **Archive catalog** — Search 3.7M Riksarkivet volumes with full-text search
+- **Auto-save** — Transcriptions saved to LanceDB with per-user isolation
+- **Multi-model pipeline** — RTMDet → YOLO → TrOCR
 
 ## Architecture
 
 ```
-frontend (Svelte 5)  ←→  backend (FastAPI + LanceDB)
+Frontend (Svelte 5)  ←→  Backend (FastAPI + LanceDB)
        ↕                        ↕
-  WASM workers          archive catalog (3.7M volumes)
-  OR GPU server         transcription storage
+  WASM workers          Archive catalog (3.7M volumes)
+  OR GPU server         Transcription storage
 ```
-
-- **Frontend:** Svelte 5 + ONNX Runtime Web (WASM) for in-browser inference
-- **Backend:** FastAPI + LanceDB for catalog search and transcription storage
-- **GPU Server:** FastAPI + ONNX Runtime GPU (CUDA/ROCm) in Docker
-
-## Services
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| Frontend | 5173 | Svelte dev server |
+| Frontend | 5173 | Svelte 5 app |
 | Backend | 8000 | Catalog search, transcription API |
 | GPU Server | 8080 | GPU inference (optional) |
+| Ray Dashboard | 8265 | Ray Serve monitoring |
+| Prometheus | 9090 | Metrics collection |
+| Grafana | 3000 | Dashboards |
+
+## GPU Server (Optional)
+
+```bash
+# AMD ROCm
+make build-gpu && make serve-gpu
+
+# NVIDIA
+make build-gpu-nvidia
+docker run --gpus all -v ./public/models:/models -p 8080:8080 lejonet-gpu:nvidia
+```
+
+The frontend auto-detects the GPU server at `localhost:8080`.
+
+## Monitoring
+
+```bash
+make compose-up   # Start Prometheus + Grafana
+```
+
+## Development
+
+```bash
+make check   # Format + lint + typecheck
+make test    # Run tests
+make help    # Show all targets
+```
+
+See [CLAUDE.md](CLAUDE.md) for the full development guide.
 
 ## Models
 
-All models are ONNX format, stored in `public/models/`:
+| Model | Size | Source |
+|-------|------|--------|
+| `rtmdet-regions.onnx` | 97 MB | Riksarkivet/rtmdet_regions |
+| `yolo-lines.onnx` | 229 MB | Riksarkivet/yolov9-lines-within-regions-1 |
+| `encoder.onnx` | 329 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
+| `decoder.onnx` | 1.2 GB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
+| `tokenizer.json` | 2 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
 
-| Model | Size | Purpose |
-|-------|------|---------|
-| `rtmdet-regions.onnx` | 97 MB | Layout detection (text regions) |
-| `yolo-lines.onnx` | 229 MB | Line detection within regions |
-| `encoder.onnx` | 329 MB | TrOCR encoder |
-| `decoder.onnx` | 1.2 GB | TrOCR decoder |
-| `tokenizer.json` | 2 MB | BPE tokenizer |
+## License
+
+[Apache 2.0](LICENSE)
