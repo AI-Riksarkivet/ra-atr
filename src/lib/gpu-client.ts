@@ -187,8 +187,6 @@ export async function gpuTranscribe(
     w: String(bbox.w),
     h: String(bbox.h),
   });
-  const res = await fetch(`${baseUrl()}/transcribe`, { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`GPU transcription failed: ${res.status}`);
   return res.json();
 }
 
