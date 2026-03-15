@@ -1,7 +1,10 @@
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
+# Install CUDA runtime libs needed by onnxruntime-gpu
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 python3.11-venv python3.11-dev python3-pip \
+    cuda-nvrtc-12-6 \
+    zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -33,6 +36,10 @@ EXPOSE 8080 8265
 
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD python3.11 -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+
+# Entrypoint resizes /dev/shm and supports MODE=simple
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Ray Serve with batching and GPU pipeline
 CMD ["uv", "run", "python", "-m", "lejonet_gpu.main"]
