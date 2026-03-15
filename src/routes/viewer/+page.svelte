@@ -11,8 +11,7 @@
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import LinePreview from '$lib/components/LinePreview.svelte';
-  import { Button } from '$lib/components/ui/button';
-  import type { LineGroup, Line, BBox } from '$lib/types';
+  import type { Line, BBox } from '$lib/types';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -35,7 +34,6 @@
         appState.activeDocumentId = docId;
       }
     }
-    appState.selectMode = true;
     rightCollapsed = false;
   }
 
@@ -54,62 +52,6 @@
     return { current: idx + 1, total: siblings.length, hasPrev: idx > 0, hasNext: idx < siblings.length - 1 };
   });
 
-  function handleSelectLine(index: number, additive: boolean) {
-    if (index < 0) { appState.selectedLines = new Set(); return; }
-    if (additive) {
-      const next = new Set(appState.selectedLines);
-      if (next.has(index)) next.delete(index); else next.add(index);
-      appState.selectedLines = next;
-    } else {
-      appState.selectedLines = new Set([index]);
-    }
-  }
-
-  function handleMarqueeSelect(indices: number[]) {
-    appState.selectedLines = new Set(indices);
-  }
-
-  function createGroup() {
-    if (!activeDoc || appState.selectedLines.size === 0) return;
-    const sel = appState.selectedLines;
-    for (const g of activeDoc.groups) {
-      g.lineIndices = g.lineIndices.filter(i => !sel.has(i));
-    }
-    activeDoc.groups = activeDoc.groups.filter(g => g.lineIndices.length > 0);
-    activeDoc.groupCounter++;
-    const newGroup: LineGroup = {
-      id: `group-${activeDoc.groupCounter}`,
-      name: `Group ${activeDoc.groupCounter}`,
-      lineIndices: [...sel].sort((a, b) => a - b),
-      collapsed: false,
-    };
-    activeDoc.groups = [...activeDoc.groups, newGroup];
-    appState.documents = [...appState.documents];
-    appState.selectedLines = new Set();
-  }
-
-  function deleteSelectedLines() {
-    if (!activeDoc || appState.selectedLines.size === 0) return;
-    const removed = appState.selectedLines;
-    const remap = new Map<number, number>();
-    let newIdx = 0;
-    for (let i = 0; i < activeDoc.lines.length; i++) {
-      if (!removed.has(i)) remap.set(i, newIdx++);
-    }
-    activeDoc.lines = activeDoc.lines.filter((_, i) => !removed.has(i));
-    for (const g of activeDoc.groups) {
-      g.lineIndices = g.lineIndices.filter(i => !removed.has(i)).map(i => remap.get(i)!);
-    }
-    for (const g of activeDoc.groups) {
-      if (g.lineIndices.length === 0 && g.regionId) {
-        appState.htr.cancelRegion(g.regionId);
-      }
-    }
-    activeDoc.groups = activeDoc.groups.filter(g => g.lineIndices.length > 0);
-    appState.documents = [...appState.documents];
-    appState.selectedLines = new Set();
-    if (activeDoc.manifestId) appState.scheduleAutoSave();
-  }
 
   function deleteGroup(groupId: string) {
     if (!activeDoc) return;
@@ -154,10 +96,6 @@
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-    if ((e.key === 'Delete' || e.key === 'Backspace') && appState.selectedLines.size > 0) {
-      e.preventDefault();
-      deleteSelectedLines();
-    }
     if (e.key === 'ArrowLeft') { e.preventDefault(); appState.navigatePage(-1); }
     if (e.key === 'ArrowRight') { e.preventDefault(); appState.navigatePage(1); }
     if (e.key === 'ArrowUp') { e.preventDefault(); appState.navigateLine(-1); }
@@ -190,7 +128,6 @@
       rightCollapsed = false;
     }
 
-    appState.selectMode = true;
 
     if (newPages.length > 0) {
       fetchTranscriptions(manifestId).then(groups => {
@@ -383,14 +320,6 @@
 {/if}
 
 
-{#if appState.selectedLines.size > 0}
-  <div class="flex items-center gap-2 border-b border-yellow-400/20 bg-yellow-400/[0.08] px-4 py-1.5 shrink-0">
-    <span class="text-xs text-yellow-400">{appState.selectedLines.size} line{appState.selectedLines.size > 1 ? 's' : ''} selected</span>
-    <Button size="sm" onclick={createGroup}>Group selected</Button>
-    <Button size="sm" variant="destructive" onclick={deleteSelectedLines}>Delete</Button>
-    <Button size="sm" variant="outline" onclick={() => appState.selectedLines = new Set()}>Clear</Button>
-  </div>
-{/if}
 
 <div class="flex flex-1 overflow-hidden">
   <!-- Left: Catalog browser -->
@@ -421,9 +350,9 @@
         hoveredLine={appState.hoveredLine}
         onHoverLine={(i) => appState.hoveredLine = i}
         stage={appState.htr.stage}
-        selectedLines={appState.selectedLines}
-        onSelectLine={handleSelectLine}
-        onMarqueeSelect={handleMarqueeSelect}
+        selectedLines={new Set()}
+        onSelectLine={() => {}}
+        onMarqueeSelect={() => {}}
         onRedetectRegion={(x, y, w, h) => {
           if (!activeDoc) return '';
           const regionId = appState.htr.redetectRegion(activeDoc.id, x, y, w, h);
@@ -440,7 +369,7 @@
           return regionId;
         }}
         groups={groups}
-        selectMode={appState.selectMode}
+        selectMode={false}
       />
 
       <!-- Page navigation arrows -->
@@ -542,8 +471,8 @@
         onSwitchDocument={(id) => appState.switchDocument(id)}
         hoveredLine={appState.hoveredLine}
         onHoverLine={(i) => appState.hoveredLine = i}
-        selectedLines={appState.selectedLines}
-        onSelectLine={handleSelectLine}
+        selectedLines={new Set()}
+        onSelectLine={() => {}}
         onToggleGroup={toggleGroup}
         onRenameGroup={renameGroup}
         onDeleteGroup={deleteGroup}
@@ -561,7 +490,7 @@
             if (activeDoc.manifestId) appState.scheduleAutoSave();
           }
         }}
-        selectMode={appState.selectMode}
+        selectMode={false}
         activeRegions={appState.htr.activeRegions}
         activeImageIds={appState.htr.activeImageIds}
       />

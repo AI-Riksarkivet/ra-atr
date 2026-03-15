@@ -80,18 +80,6 @@
         {/if}
       </Button>
 
-      <Button
-        variant={appState.selectMode ? 'default' : 'ghost'}
-        size="icon-sm"
-        onclick={() => {
-          appState.selectMode = !appState.selectMode;
-          if (!appState.selectMode) appState.selectedLines = new Set();
-        }}
-        title={appState.selectMode ? 'Switch to pan mode' : 'Switch to select mode'}
-      >
-        <span class="text-xs">{appState.selectMode ? 'S' : 'P'}</span>
-      </Button>
-
       <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
         <Home class="size-4" />
       </Button>
