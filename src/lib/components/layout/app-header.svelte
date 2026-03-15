@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, LayoutGrid, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, ScanText, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -74,9 +74,9 @@
 
       <Button variant="ghost" size="icon-sm" onclick={(e: MouseEvent) => onDetectLayout?.(e.shiftKey)} title="Detect layout (Shift+click = all pages)" disabled={layoutRunning}>
         {#if layoutRunning}
-          <LayoutGrid class="size-4 animate-spin" />
+          <ScanText class="size-4 animate-pulse" />
         {:else}
-          <LayoutGrid class="size-4" />
+          <ScanText class="size-4" />
         {/if}
       </Button>
 
