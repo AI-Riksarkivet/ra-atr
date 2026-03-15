@@ -217,6 +217,46 @@
     }
   }
 
+  const BATCH_SIZE = 5;
+
+  async function transcribeVolume(manifestId: string) {
+    const pages = appState.documents
+      .filter(d => d.manifestId === manifestId)
+      .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
+
+    if (pages.length === 0) return;
+
+    // Process in batches to avoid memory issues
+    for (let i = 0; i < pages.length; i += BATCH_SIZE) {
+      const batch = pages.slice(i, i + BATCH_SIZE);
+
+      // Load images for this batch
+      for (const doc of batch) {
+        if (doc.placeholder) {
+          appState.switchDocument(doc.id);
+          await appState.loadDocumentImage(doc.id);
+        }
+      }
+
+      // Run layout detection + line detection + transcription on each page
+      for (const doc of batch) {
+        // Skip pages that already have groups (already transcribed)
+        if (doc.groups.length > 0) continue;
+        await appState.htr.detectLayout(doc.id);
+        // Wait for transcription to finish before next page
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            if (appState.htr.activeTranscriptions === 0 && appState.htr.activeRegions.size === 0) {
+              resolve();
+              return;
+            }
+            setTimeout(check, 500);
+          };
+          setTimeout(check, 1000);
+        });
+      }
+    }
+  }
 
   onMount(() => {
     // Route region detections to the right document
@@ -520,6 +560,7 @@
         onRenameGroup={renameGroup}
         onDeleteGroup={deleteGroup}
         onRemoveVolume={(manifestId) => appState.removeVolume(manifestId)}
+        onTranscribeVolume={(manifestId) => transcribeVolume(manifestId)}
         onFocusGroup={(indices, rect) => {
           if (indices.length > 0) docViewer?.focusLines(indices);
           else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);

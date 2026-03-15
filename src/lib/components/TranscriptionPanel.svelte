@@ -16,6 +16,7 @@
     onFocusLine: (index: number) => void;
     onEditLine: (index: number, text: string) => void;
     onRemoveVolume: (manifestId: string) => void;
+    onTranscribeVolume: (manifestId: string) => void;
     selectMode: boolean;
     activeRegions: Set<string>;
     activeImageIds: Set<string>;
@@ -26,7 +27,7 @@
     hoveredLine, onHoverLine,
     selectedLines, onSelectLine,
     onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine,
-    onRemoveVolume,
+    onRemoveVolume, onTranscribeVolume,
     selectMode, activeRegions, activeImageIds,
   }: Props = $props();
 
@@ -299,7 +300,14 @@ Provide only the transcription, nothing else.`;
       {#if volLines > 0}
         <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
       {/if}
-      {#if !volWorking}
+      {#if volWorking}
+        <span class="inline-block size-2 rounded-full border border-primary/40 border-t-primary animate-spin"></span>
+      {:else}
+        <button
+          class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/vol:opacity-50 hover:!opacity-100 hover:text-primary transition-opacity"
+          onclick={(e) => { e.stopPropagation(); onTranscribeVolume(vol.manifestId); }}
+          title="Transcribe all pages"
+        >&#x25B6;</button>
         {#if confirmRemoveVolume === vol.manifestId}
           <button
             class="bg-destructive text-destructive-foreground rounded px-1.5 py-0.5 text-[0.6rem] font-medium cursor-pointer hover:bg-destructive/90"
