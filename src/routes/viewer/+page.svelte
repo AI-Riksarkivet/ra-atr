@@ -159,12 +159,19 @@
       .filter(d => d.manifestId === manifestId)
       .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
 
-    if (pages.length === 0) return;
+    const toProcess = pages.filter(d => d.groups.length === 0);
+    if (toProcess.length === 0) return;
+
+    appState.htr.volumeProgress = { current: 0, total: toProcess.length };
 
     // Process one page at a time — load, transcribe, wait, then next
-    for (const doc of pages) {
-      // Skip pages that already have groups (already transcribed)
-      if (doc.groups.length > 0) continue;
+    for (let pi = 0; pi < toProcess.length; pi++) {
+      const doc = toProcess[pi];
+
+      // Check if stopped
+      if (appState.htr.stage === 'idle' && pi > 0) break;
+
+      appState.htr.volumeProgress = { current: pi, total: toProcess.length };
 
       // Load image for this page (waits for completion)
       await appState.loadDocumentImage(doc.id);
@@ -190,6 +197,8 @@
       // Auto-save after each page
       if (doc.manifestId) appState.scheduleAutoSave();
     }
+
+    appState.htr.volumeProgress = null;
   }
 
   onMount(() => {
@@ -530,6 +539,7 @@
       activeImageIds={appState.htr.activeImageIds}
       activeTranscriptions={appState.htr.activeTranscriptions}
       poolSize={appState.htr.poolSize}
+      volumeProgress={appState.htr.volumeProgress}
     />
   {/if}
 </footer>

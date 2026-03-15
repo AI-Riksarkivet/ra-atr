@@ -19,6 +19,9 @@ export class HTRWorkerState {
   imageReady = $state<boolean>(false);
   poolSize = $state(1);
 
+  /** Volume-level progress for batch transcription */
+  volumeProgress = $state<{ current: number; total: number } | null>(null);
+
   /** All regions currently being transcribed */
   activeRegions = $state<Set<string>>(new Set());
   /** Image IDs with active transcription */
@@ -491,6 +494,7 @@ export class HTRWorkerState {
     this.activeImageIds = new Set();
     this.activeTranscriptions = 0;
     this.regionPending.clear();
+    this.volumeProgress = null;
   }
 
   reset() {

@@ -7,9 +7,10 @@
     activeImageIds: Set<string>;
     activeTranscriptions: number;
     poolSize: number;
+    volumeProgress: { current: number; total: number } | null;
   }
 
-  let { stage, documents, activeImageIds, activeTranscriptions, poolSize }: Props = $props();
+  let { stage, documents, activeImageIds, activeTranscriptions, poolSize, volumeProgress }: Props = $props();
 
   let totalLines = $derived(documents.reduce((sum, d) => sum + d.lines.length, 0));
   let completedLines = $derived(documents.reduce((sum, d) => sum + d.lines.filter(l => l.complete).length, 0));
@@ -80,22 +81,25 @@
     <span class="truncate max-w-[200px]">{activeDocNames.join(', ')}</span>
   {/if}
 
+  {#if volumeProgress}
+    <span class="font-mono">Page {volumeProgress.current + 1}/{volumeProgress.total}</span>
+  {/if}
+
   {#if totalLines > 0}
     <span class="font-mono">{completedLines}/{totalLines} lines</span>
     {#if activeTranscriptions > 0}
       <span class="text-orange-500">{activeTranscriptions} in-flight</span>
-    {:else if pendingLines > 0 && stage === 'transcribing'}
-      <span class="text-orange-500">{pendingLines} pending</span>
     {/if}
   {/if}
 
-  <span>{poolSize} worker{poolSize !== 1 ? 's' : ''}</span>
-
-  {#if documents.length > 1}
-    <span>{documents.length} images</span>
-  {/if}
-
-  {#if etaSeconds > 0 && pendingLines > 0 && stage === 'transcribing'}
-    <span class="font-mono">~{formatTime(etaSeconds)} left</span>
+  {#if etaSeconds > 0 && stage === 'transcribing'}
+    {#if volumeProgress}
+      {@const pagesLeft = volumeProgress.total - volumeProgress.current}
+      {@const avgLinesPerPage = volumeProgress.current > 0 ? totalLines / volumeProgress.current : 14}
+      {@const totalEta = Math.round(etaSeconds + (pagesLeft - 1) * avgLinesPerPage * avgSecondsPerLine)}
+      <span class="font-mono">~{formatTime(totalEta)} left</span>
+    {:else if pendingLines > 0}
+      <span class="font-mono">~{formatTime(etaSeconds)} left</span>
+    {/if}
   {/if}
 </span>
