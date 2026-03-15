@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Play, PenTool, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Play, Square, PenTool, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -13,10 +13,11 @@
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
     onTranscribe?: (allPages: boolean) => void;
+    onStop?: () => void;
     transcribing?: boolean;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, transcribing }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, onStop, transcribing }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
   let showGpuSettings = $state(false);
@@ -86,13 +87,15 @@
 
       <div class="w-px h-5 bg-border mx-1"></div>
 
-      <Button variant="ghost" size="icon-sm" onclick={(e: MouseEvent) => onTranscribe?.(e.shiftKey)} title="Transcribe page (Shift+click = all pages)" disabled={transcribing}>
-        {#if transcribing}
-          <Play class="size-4 animate-pulse" />
-        {:else}
+      {#if transcribing}
+        <Button variant="destructive" size="icon-sm" onclick={() => onStop?.()} title="Stop transcription">
+          <Square class="size-3.5" />
+        </Button>
+      {:else}
+        <Button variant="ghost" size="icon-sm" onclick={(e: MouseEvent) => onTranscribe?.(e.shiftKey)} title="Transcribe page (Shift+click = all pages)">
           <Play class="size-4" />
-        {/if}
-      </Button>
+        </Button>
+      {/if}
 
       <Button
         variant={appState.selectMode ? 'secondary' : 'ghost'}

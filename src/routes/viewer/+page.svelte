@@ -300,7 +300,8 @@
       appState.htr.detectLayout(activeDoc.id);
     }
   }}
-  transcribing={appState.htr.layoutRunning || appState.htr.activeRegions.size > 0}
+  onStop={() => appState.htr.stopAll()}
+  transcribing={appState.htr.layoutRunning || appState.htr.activeRegions.size > 0 || appState.htr.activeTranscriptions > 0}
 />
 
 {#if appState.htr.error}

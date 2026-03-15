@@ -36,6 +36,7 @@ export class HTRWorkerState {
   private transcribeReadyCount = 0;
   layoutReady = $state(false);
   layoutRunning = $state(false);
+  private _abortController: AbortController | null = null;
 
   // Callbacks for multi-image routing
   onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => void) | null = null;
@@ -326,6 +327,7 @@ export class HTRWorkerState {
       this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
 
       // Transcribe all lines in parallel — keeps GPU saturated via Ray batching
+      if (this._abortController?.signal.aborted) return;
       this.activeTranscriptions += lines.length;
       const transcribePromises = lines.map((line, i) =>
         gpuTranscribe(imageData, { x: line.x, y: line.y, w: line.w, h: line.h }, imageId)
@@ -397,14 +399,18 @@ export class HTRWorkerState {
         const imageData = this.storedImages.get(imageId);
         if (!imageData) { this.layoutRunning = false; return; }
 
+        // Create abort controller for this pipeline run
+        this._abortController = new AbortController();
+
         // Step 1: Layout detection (one upload)
         const { regions } = await gpuDetectLayout(imageData, imageId);
         this.layoutRunning = false;
+        if (this._abortController?.signal.aborted) return;
         this.onLayoutDetected?.(imageId, regions);
 
         // Steps 2+3 happen via redetectRegion which is called by onLayoutDetected
-        // Each region triggers _gpuDetectAndTranscribe automatically
       } catch (err: any) {
+        if (err?.name === 'AbortError') return; // stopped by user
         this.layoutRunning = false;
         this.error = err.message ?? String(err);
       }
@@ -468,14 +474,29 @@ export class HTRWorkerState {
     this.regionPending.delete(regionId);
   }
 
-  reset() {
+  /** Stop all in-flight GPU requests and cancel WASM regions */
+  stopAll() {
+    // Abort GPU requests
+    this._abortController?.abort();
+    this._abortController = null;
+
+    // Cancel WASM regions
+    for (const regionId of this.activeRegions) {
+      this.cancelRegion(regionId);
+    }
+
+    this.layoutRunning = false;
     this.stage = 'idle';
-    this.imageReady = false;
-    this.error = null;
     this.activeRegions = new Set();
     this.activeImageIds = new Set();
     this.activeTranscriptions = 0;
     this.regionPending.clear();
+  }
+
+  reset() {
+    this.stopAll();
+    this.imageReady = false;
+    this.error = null;
   }
 
   destroy() {
