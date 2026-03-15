@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=1.26",
     "pillow>=10",
     "huggingface-hub>=0.27",
+    "ray[serve]>=2.40",
 ]
 
 [project.optional-dependencies]
