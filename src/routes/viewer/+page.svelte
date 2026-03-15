@@ -217,7 +217,7 @@
 
   onMount(() => {
     // Route region detections to the right document
-    appState.htr.onRegionDetected = (imageId, regionId, startIndex, bboxes) => {
+    appState.htr.onRegionDetected = (imageId, regionId, _startIndex, bboxes) => {
       docViewer?.clearRedetecting(regionId);
       const newLines: Line[] = bboxes.map((bbox) => ({
         bbox,
@@ -226,8 +226,10 @@
         complete: false,
       }));
       appState.updateDocumentLines(imageId, (doc) => {
+        // Use actual current line count as start index (not worker counter which can drift after deletions)
+        const actualStart = doc.lines.length;
         doc.lines = [...doc.lines, ...newLines];
-        const lineIndices = Array.from({ length: bboxes.length }, (_, i) => startIndex + i);
+        const lineIndices = Array.from({ length: bboxes.length }, (_, i) => actualStart + i);
         doc.groups = doc.groups.map(g =>
           g.regionId === regionId ? { ...g, lineIndices } : g
         );

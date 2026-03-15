@@ -334,12 +334,6 @@ Provide only the transcription, nothing else.`;
           </div>
 
           {#if !isCollapsed && isActive}
-            {@const ungroupedIndices = (() => {
-              const grouped = new Set<number>();
-              for (const g of doc.groups) for (const idx of g.lineIndices) grouped.add(idx);
-              return Array.from({ length: doc.lines.length }, (_, i) => i).filter(i => !grouped.has(i));
-            })()}
-
             <div class="pl-3">
               {#each doc.groups as group, gi}
                 {#if !filter || groupHasMatches(doc, group.lineIndices)}
@@ -347,15 +341,6 @@ Provide only the transcription, nothing else.`;
                   {@render groupBlock(doc, group, gi, groupWorking)}
                 {/if}
               {/each}
-
-              {#if ungroupedIndices.length > 0}
-                {#if doc.groups.length > 0}
-                  <div class="text-xs text-muted-foreground font-sans pt-2 px-2 pb-0.5 uppercase tracking-wide">Ungrouped</div>
-                {/if}
-                {#each ungroupedIndices as lineIdx}
-                  {@render lineRow(doc, lineIdx)}
-                {/each}
-              {/if}
 
               {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
                 <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Draw regions to detect text lines</p>
@@ -403,12 +388,6 @@ Provide only the transcription, nothing else.`;
     </div>
 
     {#if !isCollapsed && isActive}
-      {@const ungroupedIndices = (() => {
-        const grouped = new Set<number>();
-        for (const g of doc.groups) for (const idx of g.lineIndices) grouped.add(idx);
-        return Array.from({ length: doc.lines.length }, (_, i) => i).filter(i => !grouped.has(i));
-      })()}
-
       <div class="pl-2">
         {#each doc.groups as group, gi}
           {#if !filter || groupHasMatches(doc, group.lineIndices)}
@@ -416,15 +395,6 @@ Provide only the transcription, nothing else.`;
             {@render groupBlock(doc, group, gi, groupWorking)}
           {/if}
         {/each}
-
-        {#if ungroupedIndices.length > 0}
-          {#if doc.groups.length > 0}
-            <div class="text-xs text-muted-foreground font-sans pt-2 px-2 pb-0.5 uppercase tracking-wide">Ungrouped</div>
-          {/if}
-          {#each ungroupedIndices as lineIdx}
-            {@render lineRow(doc, lineIdx)}
-          {/each}
-        {/if}
 
         {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
           <p class="text-muted-foreground italic text-center text-sm mt-4">Draw regions to detect text lines</p>
