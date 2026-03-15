@@ -27,6 +27,7 @@ export default defineConfig({
       '/gpu': {
         target: process.env.GPU_SERVER_URL || 'http://localhost:8080',
         changeOrigin: true,
+        secure: false,
         rewrite: (path: string) => path.replace(/^\/gpu/, ''),
       },
     },
