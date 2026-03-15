@@ -196,6 +196,7 @@ def start():
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
+        dashboard_host="0.0.0.0",
     )
 
     serve.start(http_options={"host": "0.0.0.0", "port": 8080})
