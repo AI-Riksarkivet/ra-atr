@@ -307,7 +307,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Ingest Riksarkivet EAD metadata into LanceDB")
     parser.add_argument("data_dir", help="Path to Riksarkivet-2022-12-16 directory")
-    default_db = os.path.join(os.path.dirname(__file__), "data", "lancedb")
+    default_db = os.path.join(os.path.dirname(__file__), "..", "..", "data", "lancedb")
     parser.add_argument("--db-path", default=default_db, help="LanceDB directory")
     parser.add_argument("--sample", type=int, default=0, help="Only process N files per archive (0=all)")
     parser.add_argument("--batch-size", type=int, default=10_000)

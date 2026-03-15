@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 DATASET_REPO = os.environ.get("DATASET_REPO", "lejonet/transcriptions")
 TABLE_NAME = "transcriptions"
-DB_PATH = os.environ.get("LANCEDB_PATH", str(Path(__file__).parent / "data" / "lancedb"))
+DB_PATH = os.environ.get("LANCEDB_PATH", str(Path(__file__).parents[2] / "data" / "lancedb"))
 PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "/tmp/parquet_export"))
 
 SCHEMA = pa.schema(
