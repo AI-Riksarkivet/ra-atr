@@ -42,7 +42,8 @@ export class HTRWorkerState {
   private _abortController: AbortController | null = null;
 
   // Callbacks for multi-image routing
-  onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => void) | null = null;
+  /** Returns array of assigned line IDs (one per bbox) */
+  onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => number[]) | null = null;
   onRegionComplete: ((imageId: string, regionId: string) => void) | null = null;
   onLineComplete: ((imageId: string, lineIndex: number, text: string, confidence: number) => void) | null = null;
   onToken: ((imageId: string, lineIndex: number, token: string) => void) | null = null;
@@ -154,13 +155,13 @@ export class HTRWorkerState {
         }
 
         this.regionPending.set(regionId, { imageId, total: lines.length, done: 0 });
-        this.onRegionDetected?.(imageId, regionId, startIndex, lines);
+        const assignedIds = this.onRegionDetected?.(imageId, regionId, startIndex, lines) ?? [];
 
-        // Distribute lines round-robin
+        // Distribute lines round-robin using assigned line IDs
         const poolSz = this.transcribeWorkers.length;
         for (let i = 0; i < lines.length; i++) {
           const det = lines[i];
-          const lineIndex = startIndex + i;
+          const lineIndex = assignedIds[i] ?? (startIndex + i);
           const worker = this.transcribeWorkers[this.nextWorker % poolSz];
           this.nextWorker++;
           this.pendingLines++;
@@ -317,22 +318,23 @@ export class HTRWorkerState {
       const { lines } = await gpuDetectLines(imageData, { x, y, w, h }, imageId);
       const startIndex = this._getNextLineIndex(imageId, lines.length);
       const bboxes: BBox[] = lines.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h, confidence: l.confidence }));
-      this.onRegionDetected?.(imageId, regionId, startIndex, bboxes);
+      const assignedIds = this.onRegionDetected?.(imageId, regionId, startIndex, bboxes) ?? [];
 
       // Transcribe all lines in parallel — keeps GPU saturated via Ray batching
       if (this._abortController?.signal.aborted) return;
       this.pendingLines += lines.length;
-      const transcribePromises = lines.map((line, i) =>
-        gpuTranscribe(imageData, { x: line.x, y: line.y, w: line.w, h: line.h }, imageId)
+      const transcribePromises = lines.map((line, i) => {
+        const lineId = assignedIds[i] ?? (startIndex + i);
+        return gpuTranscribe(imageData, { x: line.x, y: line.y, w: line.w, h: line.h }, imageId)
           .then(({ text, confidence }) => {
             this.pendingLines = Math.max(0, this.pendingLines - 1);
-            this.onLineComplete?.(imageId, startIndex + i, text, confidence);
+            this.onLineComplete?.(imageId, lineId, text, confidence);
           })
           .catch(() => {
             this.pendingLines = Math.max(0, this.pendingLines - 1);
-            this.onLineComplete?.(imageId, startIndex + i, '[error]', 0);
-          })
-      );
+            this.onLineComplete?.(imageId, lineId, '[error]', 0);
+          });
+      });
       await Promise.all(transcribePromises);
 
       // Region done

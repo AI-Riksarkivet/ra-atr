@@ -37,6 +37,7 @@ export interface BBox {
 export type PipelineStage = 'idle' | 'loading_models' | 'segmenting' | 'transcribing' | 'done';
 
 export interface Line {
+  id: number;
   bbox: BBox;
   text: string;
   confidence: number;
@@ -46,7 +47,7 @@ export interface Line {
 export interface LineGroup {
   id: string;
   name: string;
-  lineIndices: number[];
+  lineIds: number[];
   collapsed: boolean;
   /** Links to in-flight region detection for cancellation */
   regionId?: string;
@@ -61,6 +62,7 @@ export interface ImageDocument {
   /** Kept for re-sending to worker if needed */
   imageData: ArrayBuffer;
   lines: Line[];
+  lineCounter: number;
   groups: LineGroup[];
   groupCounter: number;
   /** Riksarkivet metadata for lazy loading */

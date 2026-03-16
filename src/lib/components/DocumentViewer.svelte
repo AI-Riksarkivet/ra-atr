@@ -34,12 +34,13 @@
     controller.render();
   }
 
-  export function focusLines(indices: number[]) {
-    if (!controller || indices.length === 0) return;
+  export function focusLines(lineIds: number[]) {
+    if (!controller || lineIds.length === 0) return;
+    const idSet = new Set(lineIds);
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const idx of indices) {
-      const b = lines[idx]?.bbox;
-      if (!b) continue;
+    for (const line of lines) {
+      if (!idSet.has(line.id)) continue;
+      const b = line.bbox;
       minX = Math.min(minX, b.x);
       minY = Math.min(minY, b.y);
       maxX = Math.max(maxX, b.x + b.w);
@@ -83,13 +84,13 @@
   function hitTestLine(clientX: number, clientY: number): number {
     if (!controller || lines.length === 0) return -1;
     const pt = controller.screenToImage(clientX, clientY);
-    for (let i = 0; i < lines.length; i++) {
-      const poly = lines[i].bbox.polygon;
+    for (const line of lines) {
+      const poly = line.bbox.polygon;
       if (poly && poly.length >= 3) {
-        if (pointInPolygon(pt.x, pt.y, poly)) return i;
+        if (pointInPolygon(pt.x, pt.y, poly)) return line.id;
       } else {
-        const b = lines[i].bbox;
-        if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return i;
+        const b = line.bbox;
+        if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return line.id;
       }
     }
     return -1;
@@ -100,12 +101,12 @@
     const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
     const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
     const result: number[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const b = lines[i].bbox;
+    for (const line of lines) {
+      const b = line.bbox;
       const cx = b.x + b.w / 2;
       const cy = b.y + b.h / 2;
       if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) {
-        result.push(i);
+        result.push(line.id);
       }
     }
     return result;
@@ -200,9 +201,9 @@
 
   const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
-  function getGroupColor(lineIndex: number): string | null {
+  function getGroupColor(lineId: number): string | null {
     for (let g = 0; g < groups.length; g++) {
-      if (groups[g].lineIndices.includes(lineIndex)) {
+      if (groups[g].lineIds.includes(lineId)) {
         return GROUP_COLORS[g % GROUP_COLORS.length];
       }
     }
@@ -220,12 +221,11 @@
     controller = new CanvasController(canvasEl, {
       onAfterDraw: (ctx, transform) => {
         if (!img) return;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const isCurrent = i === currentLine;
-          const isHovered = i === hoveredLine;
-          const isSelected = selectedLines.has(i);
-          const groupColor = getGroupColor(i);
+        for (const line of lines) {
+          const isCurrent = line.id === currentLine;
+          const isHovered = line.id === hoveredLine;
+          const isSelected = selectedLines.has(line.id);
+          const groupColor = getGroupColor(line.id);
           const highlight = isCurrent || isHovered;
 
           if (isSelected) {

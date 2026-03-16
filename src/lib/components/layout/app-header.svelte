@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Play, PenTool, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Play, RotateCcw, PenTool, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -85,8 +85,16 @@
 
       <div class="w-px h-5 bg-border mx-1"></div>
 
-      <Button variant="ghost" size="icon-sm" onclick={(e: MouseEvent) => onTranscribe?.(e.shiftKey)} title="Transcribe page (Shift+click = all pages)">
-        <Play class="size-4" />
+      {@const doc = appState.activeDocument}
+      {@const pageEmpty = doc && !doc.placeholder && doc.lines.length === 0 && doc.groups.length === 0}
+      {@const pageTranscribed = doc && doc.lines.length > 0 && doc.lines.every(l => l.complete)}
+      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
+      <Button variant="ghost" size="icon-sm" disabled={isRunning} class={pageEmpty ? 'animate-pulse text-primary' : ''} onclick={(e: MouseEvent) => onTranscribe?.(e.shiftKey)} title={pageTranscribed ? 'Re-transcribe page (Shift+click = all pages)' : 'Transcribe page (Shift+click = all pages)'}>
+        {#if pageTranscribed}
+          <RotateCcw class="size-4" />
+        {:else}
+          <Play class="size-4" />
+        {/if}
       </Button>
 
       <Button

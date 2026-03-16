@@ -40,6 +40,7 @@ class AppState {
       imageUrl,
       imageData,
       lines: [],
+      lineCounter: 0,
       groups: [],
       groupCounter: 0,
       manifestId,
@@ -60,6 +61,7 @@ class AppState {
       imageUrl: '',
       imageData: new ArrayBuffer(0),
       lines: [],
+      lineCounter: 0,
       groups: [],
       groupCounter: 0,
       manifestId,
@@ -159,12 +161,23 @@ class AppState {
   navigateLine(delta: -1 | 1) {
     const doc = this.activeDocument;
     if (!doc || doc.lines.length === 0) return;
+    // Build ordered list of line IDs from groups
+    const allLineIds: number[] = [];
+    for (const g of doc.groups) {
+      for (const id of g.lineIds) allLineIds.push(id);
+    }
+    if (allLineIds.length === 0) return;
     const current = this.hoveredLine;
     if (current < 0) {
-      this.hoveredLine = delta === 1 ? 0 : doc.lines.length - 1;
+      this.hoveredLine = delta === 1 ? allLineIds[0] : allLineIds[allLineIds.length - 1];
     } else {
-      const next = current + delta;
-      if (next >= 0 && next < doc.lines.length) this.hoveredLine = next;
+      const idx = allLineIds.indexOf(current);
+      if (idx < 0) {
+        this.hoveredLine = allLineIds[0];
+      } else {
+        const nextIdx = idx + delta;
+        if (nextIdx >= 0 && nextIdx < allLineIds.length) this.hoveredLine = allLineIds[nextIdx];
+      }
     }
   }
 
@@ -173,7 +186,6 @@ class AppState {
     const doc = this.documents.find(d => d.id === docId);
     if (doc) {
       updater(doc);
-      // Trigger reactivity
       this.documents = [...this.documents];
       // Auto-save if this is a Riksarkivet document
       if (doc.manifestId) this.scheduleAutoSave();
@@ -191,25 +203,28 @@ class AppState {
       // Skip if this doc already has groups (already populated or HTR ran)
       if (doc.groups.length > 0) continue;
 
-      const newLines: Line[] = group.lines.map(l => ({
-        bbox: { ...l.bbox, confidence: l.confidence, polygon: undefined },
-        text: l.text,
-        confidence: l.confidence,
-        complete: true,
-      }));
+      const lineIds: number[] = [];
+      for (const l of group.lines) {
+        const lineId = doc.lineCounter++;
+        doc.lines.push({
+          id: lineId,
+          bbox: { ...l.bbox, confidence: l.confidence, polygon: undefined },
+          text: l.text,
+          confidence: l.confidence,
+          complete: true,
+        });
+        lineIds.push(lineId);
+      }
 
-      const startIndex = doc.lines.length;
       doc.groupCounter++;
       const lineGroup: LineGroup = {
         id: `group-${doc.groupCounter}`,
         name: group.group_name,
-        lineIndices: newLines.map((_, i) => startIndex + i),
+        lineIds,
         collapsed: false,
         rect: group.group_rect,
       };
 
-      // Use assignment (not push) to trigger Svelte reactivity
-      doc.lines = [...doc.lines, ...newLines];
       doc.groups = [...doc.groups, lineGroup];
     }
     this.documents = [...this.documents];
@@ -226,9 +241,9 @@ class AppState {
     for (const doc of docs) {
       if (doc.manifestId !== manifestId) continue;
       for (const group of doc.groups) {
-        const lines = group.lineIndices
-          .map(i => doc.lines[i])
-          .filter(line => line && line.complete && line.text.trim() !== '')
+        const lines = group.lineIds
+          .map(id => doc.lines.find(l => l.id === id))
+          .filter((line): line is Line => !!line && line.complete && line.text.trim() !== '')
           .map((line, idx) => ({
             line_index: idx,
             bbox: { x: line.bbox.x, y: line.bbox.y, w: line.bbox.w, h: line.bbox.h },

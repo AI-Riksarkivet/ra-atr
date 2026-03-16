@@ -13,9 +13,9 @@
     onToggleGroup: (groupId: string) => void;
     onRenameGroup: (groupId: string, name: string) => void;
     onDeleteGroup: (groupId: string) => void;
-    onFocusGroup: (lineIndices: number[], rect?: { x: number; y: number; w: number; h: number }) => void;
-    onFocusLine: (index: number) => void;
-    onEditLine: (index: number, text: string) => void;
+    onFocusGroup: (lineIds: number[], rect?: { x: number; y: number; w: number; h: number }) => void;
+    onFocusLine: (lineId: number) => void;
+    onEditLine: (lineId: number, text: string) => void;
     onRemoveVolume: (manifestId: string) => void;
     onTranscribeVolume: (manifestId: string) => void;
     selectMode: boolean;
@@ -50,10 +50,10 @@
     editingGroupId = null;
   }
 
-  function startEditLine(idx: number) {
-    editingLineIdx = idx;
+  function startEditLine(lineId: number) {
+    editingLineIdx = lineId;
     const doc = documents.find(d => d.id === activeDocumentId);
-    editLineText = doc?.lines[idx]?.text ?? '';
+    editLineText = doc?.lines.find(l => l.id === lineId)?.text ?? '';
   }
 
   function finishEditLine() {
@@ -73,12 +73,12 @@
 
   let copiedGroupId = $state<string | null>(null);
 
-  async function copyGroupLines(group: { id: string; lineIndices: number[]; rect?: { x: number; y: number; w: number; h: number } }) {
+  async function copyGroupLines(group: { id: string; lineIds: number[]; rect?: { x: number; y: number; w: number; h: number } }) {
     const doc = documents.find(d => d.id === activeDocumentId);
     if (!doc) return;
 
-    const text = group.lineIndices
-      .map(i => doc.lines[i]?.text ?? '')
+    const text = group.lineIds
+      .map(id => doc.lines.find(l => l.id === id)?.text ?? '')
       .filter(t => t.trim())
       .join('\n');
 
@@ -117,14 +117,14 @@
   let copiedLineIdx = $state<number>(-1);
   let confirmRemoveVolume = $state<string | null>(null);
 
-  async function copyLinePrompt(doc: ImageDocument, lineIdx: number) {
-    const group = doc.groups.find(g => g.lineIndices.includes(lineIdx));
-    const groupLines = group ? group.lineIndices : [lineIdx];
+  async function copyLinePrompt(doc: ImageDocument, lineId: number) {
+    const group = doc.groups.find(g => g.lineIds.includes(lineId));
+    const groupLineIds = group ? group.lineIds : [lineId];
 
     const contextLines: string[] = [];
-    for (const idx of groupLines) {
-      const text = doc.lines[idx]?.text ?? '';
-      if (idx === lineIdx) {
+    for (const id of groupLineIds) {
+      const text = doc.lines.find(l => l.id === id)?.text ?? '';
+      if (id === lineId) {
         contextLines.push('[THIS LINE]');
       } else if (text.trim()) {
         contextLines.push(text);
@@ -142,12 +142,12 @@ Read the handwritten text in the image. Use the surrounding text for context.
 Provide only the transcription, nothing else.`;
 
     await navigator.clipboard.writeText(prompt);
-    copiedLineIdx = lineIdx;
-    setTimeout(() => { if (copiedLineIdx === lineIdx) copiedLineIdx = -1; }, 1500);
+    copiedLineIdx = lineId;
+    setTimeout(() => { if (copiedLineIdx === lineId) copiedLineIdx = -1; }, 1500);
   }
 
-  async function copyLineImage(doc: ImageDocument, lineIdx: number) {
-    const line = doc.lines[lineIdx];
+  async function copyLineImage(doc: ImageDocument, lineId: number) {
+    const line = doc.lines.find(l => l.id === lineId);
     if (!doc.imageUrl || !line?.bbox) return;
 
     try {
@@ -172,8 +172,8 @@ Provide only the transcription, nothing else.`;
         canvas.toBlob(b => resolve(b!), 'image/png')
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      copiedLineIdx = lineIdx;
-      setTimeout(() => { if (copiedLineIdx === lineIdx) copiedLineIdx = -1; }, 1500);
+      copiedLineIdx = lineId;
+      setTimeout(() => { if (copiedLineIdx === lineId) copiedLineIdx = -1; }, 1500);
     } catch { /* ignore */ }
   }
 
@@ -192,14 +192,14 @@ Provide only the transcription, nothing else.`;
     }];
   }
 
-  function lineMatches(doc: ImageDocument, lineIdx: number): boolean {
+  function lineMatches(doc: ImageDocument, lineId: number): boolean {
     if (!filter) return true;
-    return doc.lines[lineIdx]?.text?.toLowerCase().includes(filter) ?? false;
+    return doc.lines.find(l => l.id === lineId)?.text?.toLowerCase().includes(filter) ?? false;
   }
 
-  function groupHasMatches(doc: ImageDocument, lineIndices: number[]): boolean {
+  function groupHasMatches(doc: ImageDocument, lineIds: number[]): boolean {
     if (!filter) return true;
-    return lineIndices.some(i => lineMatches(doc, i));
+    return lineIds.some(id => lineMatches(doc, id));
   }
 
   function docHasMatches(doc: ImageDocument): boolean {
@@ -359,14 +359,14 @@ Provide only the transcription, nothing else.`;
           {#if !isCollapsed && isActive}
             <div class="pl-3">
               {#each doc.groups as group, gi}
-                {#if !filter || groupHasMatches(doc, group.lineIndices)}
+                {#if !filter || groupHasMatches(doc, group.lineIds)}
                   {@const groupWorking = group.regionId ? pendingRegions.has(group.regionId) : false}
                   {@render groupBlock(doc, group, gi, groupWorking)}
                 {/if}
               {/each}
 
               {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
-                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Draw regions to detect text lines</p>
+                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Press <kbd class="not-italic rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono">&#9654;</kbd> to transcribe this page</p>
               {/if}
             </div>
           {:else if !isCollapsed}
@@ -397,7 +397,7 @@ Provide only the transcription, nothing else.`;
   <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
     <div
       class="flex items-center gap-1.5 px-2 py-1.5 bg-muted/30 text-xs font-sans select-none cursor-pointer"
-      onclick={() => onFocusGroup(group.lineIndices, group.rect)}
+      onclick={() => onFocusGroup(group.lineIds, group.rect)}
     >
       <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); onToggleGroup(group.id); }}>
         {group.collapsed ? '\u25B6' : '\u25BC'}
@@ -416,33 +416,34 @@ Provide only the transcription, nothing else.`;
       {:else}
         <span class="font-semibold cursor-default" style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" ondblclick={() => startRename(group)}>{group.name}</span>
       {/if}
-      <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIndices.length}</span>
+      <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIds.length}</span>
       <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); copyGroupLines(group); }} title="Copy all lines">{copiedGroupId === group.id ? '\u2713' : '\u2398'}</button>
-      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIndices, group.rect); }} title="Zoom to group">&#x2316;</button>
+      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIds, group.rect); }} title="Zoom to group">&#x2316;</button>
       <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'} disabled={groupWorking}>x</button>
     </div>
     {#if !group.collapsed}
       <div class="pl-1">
-        {#each group.lineIndices as lineIdx}
-          {@render lineRow(doc, lineIdx)}
+        {#each group.lineIds as lineId}
+          {@render lineRow(doc, lineId)}
         {/each}
       </div>
     {/if}
   </div>
 {/snippet}
 
-{#snippet lineRow(doc: ImageDocument, lineIdx: number)}
-  {#if doc.lines[lineIdx] && lineMatches(doc, lineIdx)}
+{#snippet lineRow(doc: ImageDocument, lineId: number)}
+  {@const line = doc.lines.find(l => l.id === lineId)}
+  {#if line && lineMatches(doc, lineId)}
     <div
-      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineIdx === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineIdx) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
-      data-line={lineIdx}
-      onmouseenter={() => onHoverLine(lineIdx)}
+      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineId === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineId) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
+      data-line={lineId}
+      onmouseenter={() => onHoverLine(lineId)}
       onmouseleave={() => onHoverLine(-1)}
-      onclick={(e) => handleLineClick(lineIdx, e)}
-      ondblclick={() => startEditLine(lineIdx)}
+      onclick={(e) => handleLineClick(lineId, e)}
+      ondblclick={() => startEditLine(lineId)}
     >
-      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineIdx + 1}</span>
-      {#if editingLineIdx === lineIdx}
+      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineId + 1}</span>
+      {#if editingLineIdx === lineId}
         <input
           class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
           bind:value={editLineText}
@@ -453,20 +454,20 @@ Provide only the transcription, nothing else.`;
         />
       {:else}
         <span class="flex-1">
-          {#each highlightText(doc.lines[lineIdx].text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !doc.lines[lineIdx].complete && doc.lines[lineIdx].text}<span class="animate-pulse text-orange-500">|</span>{/if}
+          {#each highlightText(line.text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !line.complete && line.text}<span class="animate-pulse text-orange-500">|</span>{/if}
         </span>
-        {#if doc.lines[lineIdx].complete}
-          <span class="text-xs text-muted-foreground font-mono">{(doc.lines[lineIdx].confidence * 100).toFixed(0)}%</span>
+        {#if line.complete}
+          <span class="text-xs text-muted-foreground font-mono">{(line.confidence * 100).toFixed(0)}%</span>
           <button
             class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
-            onclick={(e) => { e.stopPropagation(); copyLinePrompt(doc, lineIdx); }}
+            onclick={(e) => { e.stopPropagation(); copyLinePrompt(doc, lineId); }}
             title="Copy prompt text"
-          >{copiedLineIdx === lineIdx ? '\u2713' : 'T'}</button>
+          >{copiedLineIdx === lineId ? '\u2713' : 'T'}</button>
           <button
             class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
-            onclick={(e) => { e.stopPropagation(); copyLineImage(doc, lineIdx); }}
+            onclick={(e) => { e.stopPropagation(); copyLineImage(doc, lineId); }}
             title="Copy line image"
-          >{copiedLineIdx === lineIdx ? '\u2713' : '\u{1F5BC}'}</button>
+          >{copiedLineIdx === lineId ? '\u2713' : '\u{1F5BC}'}</button>
         {/if}
       {/if}
     </div>

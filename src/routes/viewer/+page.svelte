@@ -12,6 +12,7 @@
   import StatusBar from '$lib/components/StatusBar.svelte';
   import LinePreview from '$lib/components/LinePreview.svelte';
   import type { Line, BBox } from '$lib/types';
+  import { Maximize2 } from 'lucide-svelte';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -60,20 +61,9 @@
     if (group.regionId) {
       appState.htr.cancelRegion(group.regionId);
     }
-    const removed = new Set(group.lineIndices);
-    if (removed.size > 0) {
-      const remap = new Map<number, number>();
-      let newIdx = 0;
-      for (let i = 0; i < activeDoc.lines.length; i++) {
-        if (!removed.has(i)) remap.set(i, newIdx++);
-      }
-      activeDoc.lines = activeDoc.lines.filter((_, i) => !removed.has(i));
-      for (const g of activeDoc.groups) {
-        if (g.id !== groupId) {
-          g.lineIndices = g.lineIndices.filter(i => !removed.has(i)).map(i => remap.get(i)!);
-        }
-      }
-    }
+    // Delete the group's lines
+    const removeIds = new Set(group.lineIds);
+    activeDoc.lines = activeDoc.lines.filter(l => !removeIds.has(l.id));
     activeDoc.groups = activeDoc.groups.filter(g => g.id !== groupId);
     appState.documents = [...appState.documents];
     if (activeDoc.manifestId) appState.scheduleAutoSave();
@@ -162,12 +152,13 @@
     if (doc.groups.length > 0) {
       // Re-run on existing regions
       doc.lines = [];
+      doc.lineCounter = 0;
       for (const group of doc.groups) {
         if (group.rect) {
           group.regionId = appState.htr.transcribeRegion(
             doc.id, group.rect.x, group.rect.y, group.rect.w, group.rect.h,
           );
-          group.lineIndices = [];
+          group.lineIds = [];
         }
       }
       appState.documents = [...appState.documents];
@@ -218,41 +209,44 @@
     // Route region detections to the right document
     appState.htr.onRegionDetected = (imageId, regionId, _startIndex, bboxes) => {
       docViewer?.clearRedetecting(regionId);
-      const newLines: Line[] = bboxes.map((bbox) => ({
-        bbox,
-        text: '',
-        confidence: 0,
-        complete: false,
-      }));
+      const assignedIds: number[] = [];
       appState.updateDocumentLines(imageId, (doc) => {
-        // Use actual current line count as start index (not worker counter which can drift after deletions)
-        const actualStart = doc.lines.length;
-        doc.lines = [...doc.lines, ...newLines];
-        const lineIndices = Array.from({ length: bboxes.length }, (_, i) => actualStart + i);
+        for (const bbox of bboxes) {
+          const lineId = doc.lineCounter++;
+          doc.lines = [...doc.lines, {
+            id: lineId,
+            bbox,
+            text: '',
+            confidence: 0,
+            complete: false,
+          }];
+          assignedIds.push(lineId);
+        }
         doc.groups = doc.groups.map(g =>
-          g.regionId === regionId ? { ...g, lineIndices } : g
+          g.regionId === regionId ? { ...g, lineIds: assignedIds } : g
         );
       });
+      return assignedIds;
     };
 
     // Route token updates to the right document
-    appState.htr.onToken = (imageId, lineIndex, token) => {
-      const doc = appState.documents.find(d => d.id === imageId);
-      if (doc?.lines[lineIndex]) {
-        doc.lines[lineIndex].text += token;
-        appState.documents = [...appState.documents];
-      }
+    appState.htr.onToken = (imageId, lineId, token) => {
+      appState.updateDocumentLines(imageId, (doc) => {
+        const line = doc.lines.find(l => l.id === lineId);
+        if (line) line.text += token;
+      });
     };
 
     // Route line completions to the right document
-    appState.htr.onLineComplete = (imageId, lineIndex, text, confidence) => {
-      const doc = appState.documents.find(d => d.id === imageId);
-      if (doc?.lines[lineIndex]) {
-        doc.lines[lineIndex].text = text;
-        doc.lines[lineIndex].confidence = confidence;
-        doc.lines[lineIndex].complete = true;
-        appState.documents = [...appState.documents];
-      }
+    appState.htr.onLineComplete = (imageId, lineId, text, confidence) => {
+      appState.updateDocumentLines(imageId, (doc) => {
+        const line = doc.lines.find(l => l.id === lineId);
+        if (line) {
+          line.text = text;
+          line.confidence = confidence;
+          line.complete = true;
+        }
+      });
     };
 
     // Route region completion
@@ -274,7 +268,7 @@
         doc.groups = [...doc.groups, {
           id: `group-${doc.groupCounter}`,
           name: `${region.label} (${Math.round(region.confidence * 100)}%)`,
-          lineIndices: [],
+          lineIds: [],
           collapsed: false,
           regionId,
           rect: { x: region.x, y: region.y, w: region.w, h: region.h },
@@ -381,7 +375,7 @@
           activeDoc.groups = [...activeDoc.groups, {
             id: `group-${activeDoc.groupCounter}`,
             name: `Group ${activeDoc.groupCounter}`,
-            lineIndices: [],
+            lineIds: [],
             collapsed: false,
             regionId,
             rect: { x, y, w, h },
@@ -419,22 +413,22 @@
       {/if}
 
       <!-- Zoom controls -->
-      <div class="absolute bottom-3 right-3 flex gap-1">
+      <div class="absolute top-2 right-2 flex flex-col gap-1">
         <button
-          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm"
+          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm font-medium"
           onclick={() => docViewer?.zoomIn()}
           title="Zoom in"
         >+</button>
         <button
           class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm"
+          onclick={() => docViewer?.resetView()}
+          title="Fit to page"
+        ><Maximize2 class="size-3.5" /></button>
+        <button
+          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm font-medium"
           onclick={() => docViewer?.zoomOut()}
           title="Zoom out"
         >&minus;</button>
-        <button
-          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-xs"
-          onclick={() => docViewer?.resetView()}
-          title="Reset view"
-        >&#x21BA;</button>
       </div>
     {:else}
       <div class="absolute inset-0 flex items-center justify-center">
@@ -496,16 +490,33 @@
         onDeleteGroup={deleteGroup}
         onRemoveVolume={(manifestId) => appState.removeVolume(manifestId)}
         onTranscribeVolume={(manifestId) => transcribeVolume(manifestId)}
-        onFocusGroup={(indices, rect) => {
-          if (indices.length > 0) docViewer?.focusLines(indices);
-          else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
+        onFocusGroup={(lineIds, rect) => {
+          if (lineIds.length > 0) {
+            // Resolve line IDs to Line objects for focusing
+            const bboxes = lineIds.map(id => activeDoc?.lines.find(l => l.id === id)?.bbox).filter(Boolean);
+            if (bboxes.length > 0) {
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              for (const b of bboxes) {
+                if (!b) continue;
+                minX = Math.min(minX, b.x);
+                minY = Math.min(minY, b.y);
+                maxX = Math.max(maxX, b.x + b.w);
+                maxY = Math.max(maxY, b.y + b.h);
+              }
+              docViewer?.focusRect(minX, minY, maxX - minX, maxY - minY);
+            }
+          } else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
         }}
-        onFocusLine={(i) => docViewer?.focusLines([i])}
-        onEditLine={(i, text) => {
-          if (activeDoc?.lines[i]) {
-            activeDoc.lines[i].text = text;
+        onFocusLine={(lineId) => {
+          const line = activeDoc?.lines.find(l => l.id === lineId);
+          if (line) docViewer?.focusRect(line.bbox.x, line.bbox.y, line.bbox.w, line.bbox.h);
+        }}
+        onEditLine={(lineId, text) => {
+          const line = activeDoc?.lines.find(l => l.id === lineId);
+          if (line) {
+            line.text = text;
             appState.documents = [...appState.documents];
-            if (activeDoc.manifestId) appState.scheduleAutoSave();
+            if (activeDoc?.manifestId) appState.scheduleAutoSave();
           }
         }}
         selectMode={appState.selectMode}
@@ -518,7 +529,7 @@
 
 <LinePreview
   imageUrl={activeDoc?.imageUrl ?? null}
-  bbox={appState.hoveredLine >= 0 ? (activeDoc?.lines[appState.hoveredLine]?.bbox ?? null) : null}
+  bbox={appState.hoveredLine >= 0 ? (activeDoc?.lines.find(l => l.id === appState.hoveredLine)?.bbox ?? null) : null}
 />
 
 <footer class="flex items-center gap-3 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground shrink-0">
