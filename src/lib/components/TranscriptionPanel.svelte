@@ -117,31 +117,9 @@
   let copiedLineIdx = $state<number>(-1);
   let confirmRemoveVolume = $state<string | null>(null);
 
-  async function copyLinePrompt(doc: ImageDocument, lineId: number) {
-    const group = doc.groups.find(g => g.lineIds.includes(lineId));
-    const groupLineIds = group ? group.lineIds : [lineId];
-
-    const contextLines: string[] = [];
-    for (const id of groupLineIds) {
-      const text = doc.lines.find(l => l.id === id)?.text ?? '';
-      if (id === lineId) {
-        contextLines.push('[THIS LINE]');
-      } else if (text.trim()) {
-        contextLines.push(text);
-      }
-    }
-
-    const prompt = `This is a handwritten line from a 17th-19th century Swedish document.
-
-Surrounding text from the same region:
-${contextLines.map(l => `> ${l}`).join('\n')}
-
-[IMAGE: see attached line cutout]
-
-Read the handwritten text in the image. Use the surrounding text for context.
-Provide only the transcription, nothing else.`;
-
-    await navigator.clipboard.writeText(prompt);
+  async function copyLineText(doc: ImageDocument, lineId: number) {
+    const text = doc.lines.find(l => l.id === lineId)?.text ?? '';
+    await navigator.clipboard.writeText(text);
     copiedLineIdx = lineId;
     setTimeout(() => { if (copiedLineIdx === lineId) copiedLineIdx = -1; }, 1500);
   }
@@ -460,8 +438,8 @@ Provide only the transcription, nothing else.`;
           <span class="text-xs text-muted-foreground font-mono">{(line.confidence * 100).toFixed(0)}%</span>
           <button
             class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
-            onclick={(e) => { e.stopPropagation(); copyLinePrompt(doc, lineId); }}
-            title="Copy prompt text"
+            onclick={(e) => { e.stopPropagation(); copyLineText(doc, lineId); }}
+            title="Copy line text"
           >{copiedLineIdx === lineId ? '\u2713' : 'T'}</button>
           <button
             class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"

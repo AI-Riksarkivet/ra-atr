@@ -25,6 +25,7 @@
   $effect(() => {
     const currentBbox = bbox;
     const currentImg = img;
+    const currentHeight = height; // track for reactivity
     if (!currentBbox || !currentImg || !visible) return;
 
     tick().then(() => {
@@ -39,18 +40,18 @@
       const sh = Math.min(currentImg.height - sy, currentBbox.h + pad * 2);
 
       const displayW = containerEl.clientWidth;
-      const scale = Math.min(displayW / sw, height / sh);
+      const scale = Math.min(displayW / sw, currentHeight / sh);
       const drawW = Math.round(sw * scale);
       const drawH = Math.round(sh * scale);
 
       canvasEl.width = displayW;
-      canvasEl.height = height;
+      canvasEl.height = currentHeight;
 
-      ctx.clearRect(0, 0, displayW, height);
+      ctx.clearRect(0, 0, displayW, currentHeight);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       const offsetX = Math.round((displayW - drawW) / 2);
-      const offsetY = Math.round((height - drawH) / 2);
+      const offsetY = Math.round((currentHeight - drawH) / 2);
       ctx.drawImage(currentImg, sx, sy, sw, sh, offsetX, offsetY, drawW, drawH);
     });
   });

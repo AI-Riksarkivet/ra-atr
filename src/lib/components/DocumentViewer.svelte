@@ -143,6 +143,9 @@
     }
     const idx = hitTestLine(e.clientX, e.clientY);
     onHoverLine(idx);
+    // Show transcribed text as tooltip
+    const line = idx >= 0 ? lines.find(l => l.id === idx) : null;
+    canvasEl.title = line?.complete ? line.text : '';
   }
 
   function onCanvasPointerUp(e: PointerEvent) {

@@ -13,11 +13,14 @@
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
     onTranscribe?: (allPages: boolean) => void;
+    onSearch?: (query: string) => void;
     linePreviewOpen?: boolean;
     onToggleLinePreview?: () => void;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, linePreviewOpen, onToggleLinePreview }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, onSearch, linePreviewOpen, onToggleLinePreview }: Props = $props();
+
+  let headerSearch = $state('');
 
   const isViewer = $derived(page.url.pathname === '/viewer');
   let showGpuSettings = $state(false);
@@ -66,13 +69,34 @@
 </script>
 
 <header class="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
-  <img src="/head-logo-lion.svg" alt="Lejonet HTR" class="h-8 dark:invert-0 invert" />
+  <img src="/head-logo-lion.svg" alt="RA-HTR" class="h-8 dark:invert-0 invert" />
+
+  {#if isViewer}
+    <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
+      <Search class="size-4" />
+    </Button>
+    {#if !catalogOpen}
+      <input
+        type="text"
+        bind:value={headerSearch}
+        placeholder="Search catalog..."
+        class="w-40 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:w-56 transition-all"
+        onkeydown={(e) => {
+          if (e.key === 'Enter' && headerSearch.trim()) {
+            onSearch?.(headerSearch.trim());
+            headerSearch = '';
+          }
+          if (e.key === 'Escape') {
+            headerSearch = '';
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+    {/if}
+  {/if}
 
   <div class="ml-auto flex items-center gap-1">
     {#if isViewer}
-      <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
-        <Search class="size-4" />
-      </Button>
       <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
         <FileText class="size-4" />
       </Button>

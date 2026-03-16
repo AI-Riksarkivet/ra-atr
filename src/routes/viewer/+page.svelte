@@ -11,7 +11,7 @@
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import type { Line, BBox } from '$lib/types';
-  import { Maximize2 } from 'lucide-svelte';
+  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw } from 'lucide-svelte';
   import LinePreview from '$lib/components/LinePreview.svelte';
 
   let leftWidth = $state(20);
@@ -22,6 +22,7 @@
   let docViewer: DocumentViewer;
   let focusedLineId = $state<number>(-1);
   let linePreviewOpen = $state(false);
+  let isFullscreen = $state(false);
 
   // Redirect to home if models not loaded (wait for cache check first)
   $effect(() => {
@@ -51,6 +52,14 @@
     if (docId !== lastDocId) { focusedLineId = -1; lastDocId = docId; }
   });
   let groups = $derived(activeDoc?.groups ?? []);
+
+  // Recenter viewer when panels open/close
+  $effect(() => {
+    void leftCollapsed;
+    void rightCollapsed;
+    void linePreviewOpen;
+    setTimeout(() => docViewer?.resetView(), 50);
+  });
 
   // Page navigation info
   let pageNav = $derived.by(() => {
@@ -103,7 +112,6 @@
 
   let catalogLoading = $state('');
   let catalogError = $state('');
-  let homeSearch = $state('');
   let catalogPanel: CatalogPanel;
 
   function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
@@ -287,8 +295,17 @@
       rightCollapsed = false;
     };
 
+    function onFullscreenChange() {
+      isFullscreen = !!document.fullscreenElement;
+      setTimeout(() => docViewer?.resetView(), 100);
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+
     window.addEventListener('keydown', onKeyDown);
-    return () => { window.removeEventListener('keydown', onKeyDown); };
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    };
   });
 
   function onDividerPointerDown(side: 'left' | 'right', e: PointerEvent) {
@@ -317,6 +334,11 @@
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
   onToggleTranscription={() => rightCollapsed = !rightCollapsed}
+  onSearch={async (q) => {
+    leftCollapsed = false;
+    await tick();
+    catalogPanel?.setSearch(q);
+  }}
   linePreviewOpen={linePreviewOpen}
   onToggleLinePreview={() => linePreviewOpen = !linePreviewOpen}
   onTranscribe={(all) => {
@@ -398,74 +420,104 @@
         selectMode={appState.selectMode}
       />
 
-      <!-- Page navigation arrows -->
+      <!-- Page navigation -->
       {#if pageNav}
         {#if pageNav.hasPrev}
           <button
-            class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border size-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm"
+            class="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition-all cursor-pointer"
             onclick={() => appState.navigatePage(-1)}
             title="Previous page"
-          >
-            <span class="text-sm">&#x25C0;</span>
-          </button>
+          ><ChevronLeft class="size-5" /></button>
         {/if}
         {#if pageNav.hasNext}
           <button
-            class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border size-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm"
+            class="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition-all cursor-pointer"
             onclick={() => appState.navigatePage(1)}
             title="Next page"
-          >
-            <span class="text-sm">&#x25B6;</span>
-          </button>
+          ><ChevronRight class="size-5" /></button>
         {/if}
-        <div class="absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-card/80 backdrop-blur-sm border border-border px-3 py-1 text-[0.6rem] text-muted-foreground font-mono shadow-sm">
-          {pageNav.current} / {pageNav.total}
+      {/if}
+
+      <!-- Fullscreen bottom bar -->
+      {#if isFullscreen}
+        {@const pageTranscribed = activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every(l => l.complete)}
+        {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
+        {@const totalLines = activeDoc?.lines.length ?? 0}
+        {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
+        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/50 backdrop-blur-md px-4 py-2 text-[0.7rem] text-white/70">
+          {#if activeDoc?.manifestId}
+            {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
+            <span class="font-mono">p. {activeDoc.pageNumber ?? '?'} / {siblings.length}</span>
+            <span class="text-white/20">|</span>
+            <span>{activeDoc.manifestId}</span>
+          {/if}
+          {#if totalLines > 0}
+            <span class="text-white/20">|</span>
+            <span class="font-mono">{completedLines}/{totalLines} lines</span>
+          {/if}
+          {#if appState.htr.pendingLines > 0}
+            <span class="text-orange-400 font-mono">{appState.htr.pendingLines} in-flight</span>
+          {/if}
+          <span class="text-white/20">|</span>
+          <button
+            class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={isRunning}
+            onclick={() => { if (activeDoc) transcribePage(activeDoc); }}
+            title={pageTranscribed ? 'Re-transcribe page' : 'Transcribe page'}
+          >
+            {#if pageTranscribed}
+              <RotateCcw class="size-4" />
+            {:else}
+              <Play class="size-4" />
+            {/if}
+          </button>
         </div>
       {/if}
 
       <!-- Zoom controls -->
-      <div class="absolute top-2 right-2 flex flex-col gap-1">
+      <div class="absolute top-3 right-3 flex flex-col rounded-lg bg-black/40 backdrop-blur-md overflow-hidden">
         <button
-          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm font-medium"
+          class="size-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           onclick={() => docViewer?.zoomIn()}
           title="Zoom in"
-        >+</button>
+        ><Plus class="size-4" /></button>
+        <div class="h-px bg-white/10"></div>
         <button
-          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm"
+          class="size-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           onclick={() => docViewer?.resetView()}
           title="Fit to page"
         ><Maximize2 class="size-3.5" /></button>
+        <div class="h-px bg-white/10"></div>
         <button
-          class="rounded bg-card/80 backdrop-blur-sm border border-border size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer shadow-sm text-sm font-medium"
+          class="size-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           onclick={() => docViewer?.zoomOut()}
           title="Zoom out"
-        >&minus;</button>
+        ><Minus class="size-4" /></button>
+        <div class="h-px bg-white/10"></div>
+        <button
+          class="size-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+          onclick={() => { document.querySelector('.relative.overflow-hidden.flex-1')?.requestFullscreen(); setTimeout(() => docViewer?.resetView(), 100); }}
+          title="Fullscreen"
+        ><Maximize class="size-3.5" /></button>
+        <div class="h-px bg-white/10"></div>
+        <button
+          class="size-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+          onclick={() => {
+            if (!activeDoc?.imageUrl) return;
+            const w = window.open('');
+            if (w) {
+              w.document.write(`<img src="${activeDoc.imageUrl}" style="max-width:100%">`);
+              w.document.close();
+              w.onload = () => { w.print(); w.close(); };
+            }
+          }}
+          title="Print page"
+        ><Printer class="size-3.5" /></button>
       </div>
     {:else}
       <div class="absolute inset-0 flex items-center justify-center">
         <video class="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none" src="/flying-papers.mp4" loop muted autoplay playsinline></video>
         <div class="relative w-full max-w-md space-y-5 p-8">
-          <h2 class="text-xl font-semibold text-center text-foreground/80">Lejonet HTR</h2>
-          <input
-            type="text"
-            bind:value={homeSearch}
-            placeholder="Search the archive catalog..."
-            class="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-            onkeydown={async (e) => {
-              if (e.key === 'Enter' && homeSearch.trim()) {
-                const q = homeSearch.trim();
-                homeSearch = '';
-                leftCollapsed = false;
-                await tick();
-                catalogPanel?.setSearch(q);
-              }
-            }}
-          />
-          <div class="flex items-center gap-3 text-xs text-muted-foreground">
-            <div class="flex-1 border-t border-border"></div>
-            <span>or upload from disk</span>
-            <div class="flex-1 border-t border-border"></div>
-          </div>
           <UploadPanel
             onUpload={handleUpload}
             disabled={!appState.htr.modelsReady}
