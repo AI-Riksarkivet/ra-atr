@@ -19,8 +19,8 @@
     onRemoveVolume: (manifestId: string) => void;
     onTranscribeVolume: (manifestId: string) => void;
     selectMode: boolean;
-    activeRegions: Set<string>;
-    activeImageIds: Set<string>;
+    pendingRegions: Set<string>;
+    pendingImageIds: Set<string>;
   }
 
   let {
@@ -29,7 +29,7 @@
     selectedLines, onSelectLine,
     onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine,
     onRemoveVolume, onTranscribeVolume,
-    selectMode, activeRegions, activeImageIds,
+    selectMode, pendingRegions, pendingImageIds,
   }: Props = $props();
 
   let panelEl: HTMLDivElement;
@@ -284,7 +284,7 @@ Provide only the transcription, nothing else.`;
     {@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
     {@const volLines = vol.docs.reduce((n, d) => n + d.lines.length, 0)}
     {@const volCompleted = vol.docs.reduce((n, d) => n + d.lines.filter(l => l.complete).length, 0)}
-    {@const volWorking = vol.docs.some(d => activeImageIds.has(d.id))}
+    {@const volWorking = vol.docs.some(d => pendingImageIds.has(d.id))}
 
     <div
       class="group/vol flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
@@ -334,7 +334,7 @@ Provide only the transcription, nothing else.`;
           {#if !filter || docHasMatches(doc)}
           {@const isActive = doc.id === activeDocumentId}
           {@const isCollapsed = collapsedDocs.has(doc.id)}
-          {@const isWorking = activeImageIds.has(doc.id)}
+          {@const isWorking = pendingImageIds.has(doc.id)}
           {@const totalLines = doc.lines.length}
           {@const completedLines = doc.lines.filter(l => l.complete).length}
 
@@ -360,7 +360,7 @@ Provide only the transcription, nothing else.`;
             <div class="pl-3">
               {#each doc.groups as group, gi}
                 {#if !filter || groupHasMatches(doc, group.lineIndices)}
-                  {@const groupWorking = group.regionId ? activeRegions.has(group.regionId) : false}
+                  {@const groupWorking = group.regionId ? pendingRegions.has(group.regionId) : false}
                   {@render groupBlock(doc, group, gi, groupWorking)}
                 {/if}
               {/each}

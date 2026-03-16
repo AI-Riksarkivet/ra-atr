@@ -19,6 +19,9 @@ from .transcribe import Tokenizer, transcribe_line
 # --- Ray Serve Deployments ---
 
 
+import numpy as np
+
+
 @serve.deployment(num_replicas=1, ray_actor_options={"num_gpus": 0.25})
 class LayoutDetector:
     def __init__(self):
@@ -26,8 +29,8 @@ class LayoutDetector:
         self.session = self.store.layout
         print(f"[LayoutDetector] Loaded with {self.store.providers()}")
 
-    def detect(self, img: Image.Image) -> list[dict]:
-        tensor, scale = preprocess_rtmdet(img)
+    def detect(self, tensor: np.ndarray, scale: float) -> list[dict]:
+        """Run layout detection on preprocessed tensor [1,3,640,640]."""
         result = self.session.run(None, {"image": tensor})
         return decode_rtmdet(result[0][0], result[1][0], 640, scale)
 
@@ -39,19 +42,13 @@ class LineDetector:
         self.session = self.store.yolo
         print(f"[LineDetector] Loaded with {self.store.providers()}")
 
-    def detect(self, img: Image.Image, region: dict | None = None) -> list[dict]:
-        if region and region.get("w", 0) > 0:
-            cropped = crop_region(img, region["x"], region["y"], region["w"], region["h"])
-            ox, oy = region["x"], region["y"]
-        else:
-            cropped = img
-            ox, oy = 0, 0
-        tensor, scale, px, py = preprocess_yolo(cropped)
+    def detect(self, tensor: np.ndarray, orig_w: int, orig_h: int, scale: float, pad_x: int, pad_y: int, offset_x: float, offset_y: float) -> list[dict]:
+        """Run line detection on preprocessed YOLO tensor [1,3,640,640]."""
         result = self.session.run(None, {self.session.get_inputs()[0].name: tensor})
-        lines = decode_yolo(result[0], cropped.width, cropped.height, scale, px, py)
+        lines = decode_yolo(result[0], orig_w, orig_h, scale, pad_x, pad_y)
         for l in lines:
-            l["x"] += ox
-            l["y"] += oy
+            l["x"] += offset_x
+            l["y"] += offset_y
         return lines
 
 
@@ -65,18 +62,10 @@ class TranscriberDeployment:
         self.tokenizer = Tokenizer(tok_path)
         print(f"[Transcriber] Loaded with {self.store.providers()}")
 
-    def transcribe_one(self, img: Image.Image, bbox: dict) -> dict:
-        line_img = crop_region(img, bbox["x"], bbox["y"], bbox["w"], bbox["h"])
-        tensor = preprocess_trocr(line_img)
+    def transcribe_one(self, tensor: np.ndarray) -> dict:
+        """Run TrOCR on preprocessed tensor [1,3,384,384]."""
         text, confidence = transcribe_line(self.encoder, self.decoder, self.tokenizer, tensor)
         return {"text": text, "confidence": confidence}
-
-    @serve.batch(max_batch_size=8, batch_wait_timeout_s=0.05)
-    async def transcribe_batch(self, requests: list[tuple[Image.Image, dict]]) -> list[dict]:
-        results = []
-        for img, bbox in requests:
-            results.append(self.transcribe_one(img, bbox))
-        return results
 
 
 # --- FastAPI Ingress ---
@@ -194,37 +183,54 @@ class APIIngress:
     @app.post("/detect-layout")
     async def detect_layout(self, image: UploadFile = File(None), image_id: str = Form(None)):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
-        regions = await self.layout.detect.remote(img)
+        # Preprocess on CPU side — only send small tensor to GPU actor
+        tensor, scale = preprocess_rtmdet(img)
+        regions = await self.layout.detect.remote(tensor, scale)
         return {"regions": regions, "image_size": [img.width, img.height]}
 
     @app.post("/detect-lines")
     async def detect_lines(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(0), y: float = Form(0), w: float = Form(0), h: float = Form(0)):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
-        region = {"x": x, "y": y, "w": w, "h": h} if w > 0 and h > 0 else None
-        lines = await self.line_det.detect.remote(img, region)
+        if w > 0 and h > 0:
+            cropped = crop_region(img, x, y, w, h)
+            offset_x, offset_y = x, y
+        else:
+            cropped = img
+            offset_x, offset_y = 0, 0
+        tensor, scale, pad_x, pad_y = preprocess_yolo(cropped)
+        lines = await self.line_det.detect.remote(tensor, cropped.width, cropped.height, scale, pad_x, pad_y, offset_x, offset_y)
         return {"lines": lines}
 
     @app.post("/transcribe")
     async def transcribe(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(...), y: float = Form(...), w: float = Form(...), h: float = Form(...)):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
-        result = await self.transcriber.transcribe_one.remote(img, {"x": x, "y": y, "w": w, "h": h})
+        # Crop and preprocess on CPU — send only 384x384 tensor to GPU
+        line_img = crop_region(img, x, y, w, h)
+        tensor = preprocess_trocr(line_img)
+        result = await self.transcriber.transcribe_one.remote(tensor)
         return result
 
     @app.post("/process-page")
     async def process_page(self, image: UploadFile = File(...)):
         img = _read_image(await image.read())
 
-        regions = await self.layout.detect.remote(img)
+        # Preprocess and detect layout
+        layout_tensor, layout_scale = preprocess_rtmdet(img)
+        regions = await self.layout.detect.remote(layout_tensor, layout_scale)
 
         all_groups = []
         for region in regions:
-            lines = await self.line_det.detect.remote(img, region)
+            # Preprocess and detect lines
+            cropped = crop_region(img, region["x"], region["y"], region["w"], region["h"])
+            yolo_tensor, scale, px, py = preprocess_yolo(cropped)
+            lines = await self.line_det.detect.remote(yolo_tensor, cropped.width, cropped.height, scale, px, py, region["x"], region["y"])
 
-            # Send all lines for transcription in parallel
+            # Preprocess all line crops and send tensors in parallel
             futures = []
             for line in lines:
-                bbox = {"x": line["x"], "y": line["y"], "w": line["w"], "h": line["h"]}
-                futures.append((line, self.transcriber.transcribe_one.remote(img, bbox)))
+                line_img = crop_region(img, line["x"], line["y"], line["w"], line["h"])
+                tensor = preprocess_trocr(line_img)
+                futures.append((line, self.transcriber.transcribe_one.remote(tensor)))
 
             transcribed = []
             for line, fut in futures:
@@ -253,14 +259,10 @@ def start():
     os.environ.setdefault("RAY_GRAFANA_IFRAME_HOST", "http://localhost:3000")
 
     os.environ.setdefault("RAY_METRICS_EXPORT_PORT", "9100")
-    os.environ.setdefault("RAY_OBJECT_STORE_ALLOW_SLOW_STORAGE", "1")
-
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
         dashboard_host="0.0.0.0",
-        _plasma_directory="/tmp",
-        object_store_memory=2_000_000_000,
     )
 
     serve.start(http_options={"host": "0.0.0.0", "port": 8080})

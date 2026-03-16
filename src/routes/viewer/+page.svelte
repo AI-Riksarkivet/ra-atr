@@ -154,51 +154,64 @@
     }
   }
 
+  /** Run the HTR pipeline on a single page: layout → lines → transcription */
+  function transcribePage(doc: import('$lib/types').ImageDocument) {
+    // Don't re-run if already working on this page
+    if (appState.htr.pendingImageIds.has(doc.id) || appState.htr.running) return;
+
+    if (doc.groups.length > 0) {
+      // Re-run on existing regions
+      doc.lines = [];
+      for (const group of doc.groups) {
+        if (group.rect) {
+          group.regionId = appState.htr.transcribeRegion(
+            doc.id, group.rect.x, group.rect.y, group.rect.w, group.rect.h,
+          );
+          group.lineIndices = [];
+        }
+      }
+      appState.documents = [...appState.documents];
+    } else {
+      appState.htr.run(doc.id);
+    }
+  }
+
+  /** Wait until all in-flight transcriptions finish */
+  function waitForIdle(): Promise<void> {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (appState.htr.pendingLines === 0 && appState.htr.pendingRegions.size === 0) {
+          resolve();
+          return;
+        }
+        setTimeout(check, 500);
+      };
+      setTimeout(check, 1000);
+    });
+  }
+
   async function transcribeVolume(manifestId: string) {
     const pages = appState.documents
       .filter(d => d.manifestId === manifestId)
       .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
 
-    const toProcess = pages.filter(d => d.groups.length === 0);
+    const toProcess = pages.filter(d => d.groups.length === 0 || d.lines.some(l => !l.complete));
     if (toProcess.length === 0) return;
 
-    appState.htr.volumeProgress = { current: 0, total: toProcess.length };
+    appState.htr.batchProgress = { current: 0, total: toProcess.length };
 
-    // Process one page at a time — load, transcribe, wait, then next
     for (let pi = 0; pi < toProcess.length; pi++) {
-      const doc = toProcess[pi];
-
-      // Check if stopped
       if (appState.htr.stage === 'idle' && pi > 0) break;
+      appState.htr.batchProgress = { current: pi, total: toProcess.length };
 
-      appState.htr.volumeProgress = { current: pi, total: toProcess.length };
-
-      // Load image for this page (waits for completion)
-      await appState.loadDocumentImage(doc.id);
-
-      // Show this page in the viewer
-      appState.activeDocumentId = doc.id;
-
-      // Run layout + lines + transcription
-      await appState.htr.detectLayout(doc.id);
-
-      // Wait for all transcription on this page to finish before loading next
-      await new Promise<void>((resolve) => {
-        const check = () => {
-          if (appState.htr.activeTranscriptions === 0 && appState.htr.activeRegions.size === 0) {
-            resolve();
-            return;
-          }
-          setTimeout(check, 500);
-        };
-        setTimeout(check, 1000);
-      });
-
-      // Auto-save after each page
-      if (doc.manifestId) appState.scheduleAutoSave();
+      await appState.loadDocumentImage(toProcess[pi].id);
+      appState.activeDocumentId = toProcess[pi].id;
+      transcribePage(toProcess[pi]);
+      await waitForIdle();
+      if (toProcess[pi].manifestId) appState.scheduleAutoSave();
     }
 
-    appState.htr.volumeProgress = null;
+    appState.htr.batchProgress = null;
   }
 
   onMount(() => {
@@ -232,7 +245,7 @@
     };
 
     // Route line completions to the right document
-    appState.htr.onLineDone = (imageId, lineIndex, text, confidence) => {
+    appState.htr.onLineComplete = (imageId, lineIndex, text, confidence) => {
       const doc = appState.documents.find(d => d.id === imageId);
       if (doc?.lines[lineIndex]) {
         doc.lines[lineIndex].text = text;
@@ -243,7 +256,7 @@
     };
 
     // Route region completion
-    appState.htr.onRegionDone = (imageId, regionId) => {
+    appState.htr.onRegionComplete = (imageId, regionId) => {
       // Auto-save when a region finishes transcribing
       const doc = appState.documents.find(d => d.id === imageId);
       if (doc?.manifestId) appState.scheduleAutoSave();
@@ -255,7 +268,7 @@
       if (!doc) return;
       for (const region of regions) {
         doc.groupCounter++;
-        const regionId = appState.htr.redetectRegion(
+        const regionId = appState.htr.transcribeRegion(
           imageId, region.x, region.y, region.w, region.h,
         );
         doc.groups = [...doc.groups, {
@@ -306,11 +319,9 @@
     if (all && activeDoc.manifestId) {
       transcribeVolume(activeDoc.manifestId);
     } else {
-      appState.htr.detectLayout(activeDoc.id);
+      transcribePage(activeDoc);
     }
   }}
-  onStop={() => appState.htr.stopAll()}
-  transcribing={appState.htr.layoutRunning || appState.htr.activeRegions.size > 0 || appState.htr.activeTranscriptions > 0}
 />
 
 {#if appState.htr.error}
@@ -365,7 +376,7 @@
         onMarqueeSelect={() => {}}
         onRedetectRegion={(x, y, w, h) => {
           if (!activeDoc) return '';
-          const regionId = appState.htr.redetectRegion(activeDoc.id, x, y, w, h);
+          const regionId = appState.htr.transcribeRegion(activeDoc.id, x, y, w, h);
           activeDoc.groupCounter++;
           activeDoc.groups = [...activeDoc.groups, {
             id: `group-${activeDoc.groupCounter}`,
@@ -498,8 +509,8 @@
           }
         }}
         selectMode={appState.selectMode}
-        activeRegions={appState.htr.activeRegions}
-        activeImageIds={appState.htr.activeImageIds}
+        pendingRegions={appState.htr.pendingRegions}
+        pendingImageIds={appState.htr.pendingImageIds}
       />
     </div>
   {/if}
@@ -536,10 +547,10 @@
     <StatusBar
       stage={appState.htr.stage}
       documents={appState.documents}
-      activeImageIds={appState.htr.activeImageIds}
-      activeTranscriptions={appState.htr.activeTranscriptions}
+      pendingImageIds={appState.htr.pendingImageIds}
+      inFlightLines={appState.htr.pendingLines}
       poolSize={appState.htr.poolSize}
-      volumeProgress={appState.htr.volumeProgress}
+      batchProgress={appState.htr.batchProgress}
     />
   {/if}
 </footer>

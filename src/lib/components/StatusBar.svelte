@@ -4,20 +4,20 @@
   interface Props {
     stage: PipelineStage;
     documents: ImageDocument[];
-    activeImageIds: Set<string>;
-    activeTranscriptions: number;
+    pendingImageIds: Set<string>;
+    inFlightLines: number;
     poolSize: number;
-    volumeProgress: { current: number; total: number } | null;
+    batchProgress: { current: number; total: number } | null;
   }
 
-  let { stage, documents, activeImageIds, activeTranscriptions, poolSize, volumeProgress }: Props = $props();
+  let { stage, documents, pendingImageIds, inFlightLines, poolSize, batchProgress }: Props = $props();
 
   let totalLines = $derived(documents.reduce((sum, d) => sum + d.lines.length, 0));
   let completedLines = $derived(documents.reduce((sum, d) => sum + d.lines.filter(l => l.complete).length, 0));
   let pendingLines = $derived(totalLines - completedLines);
 
   let activeDocNames = $derived(
-    documents.filter(d => activeImageIds.has(d.id)).map(d => d.name)
+    documents.filter(d => pendingImageIds.has(d.id)).map(d => d.name)
   );
 
   const stageLabels: Record<PipelineStage, string> = {
@@ -81,21 +81,21 @@
     <span class="truncate max-w-[200px]">{activeDocNames.join(', ')}</span>
   {/if}
 
-  {#if volumeProgress}
-    <span class="font-mono">Page {volumeProgress.current + 1}/{volumeProgress.total}</span>
+  {#if batchProgress}
+    <span class="font-mono">Page {batchProgress.current + 1}/{batchProgress.total}</span>
   {/if}
 
   {#if totalLines > 0}
     <span class="font-mono">{completedLines}/{totalLines} lines</span>
-    {#if activeTranscriptions > 0}
-      <span class="text-orange-500">{activeTranscriptions} in-flight</span>
+    {#if inFlightLines > 0}
+      <span class="text-orange-500">{inFlightLines} in-flight</span>
     {/if}
   {/if}
 
   {#if etaSeconds > 0 && stage === 'transcribing'}
-    {#if volumeProgress}
-      {@const pagesLeft = volumeProgress.total - volumeProgress.current}
-      {@const avgLinesPerPage = volumeProgress.current > 0 ? totalLines / volumeProgress.current : 14}
+    {#if batchProgress}
+      {@const pagesLeft = batchProgress.total - batchProgress.current}
+      {@const avgLinesPerPage = batchProgress.current > 0 ? totalLines / batchProgress.current : 14}
       {@const totalEta = Math.round(etaSeconds + (pagesLeft - 1) * avgLinesPerPage * avgSecondsPerLine)}
       <span class="font-mono">~{formatTime(totalEta)} left</span>
     {:else if pendingLines > 0}

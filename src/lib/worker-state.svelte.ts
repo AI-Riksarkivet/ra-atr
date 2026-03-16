@@ -20,14 +20,14 @@ export class HTRWorkerState {
   poolSize = $state(1);
 
   /** Volume-level progress for batch transcription */
-  volumeProgress = $state<{ current: number; total: number } | null>(null);
+  batchProgress = $state<{ current: number; total: number } | null>(null);
 
   /** All regions currently being transcribed */
-  activeRegions = $state<Set<string>>(new Set());
+  pendingRegions = $state<Set<string>>(new Set());
   /** Image IDs with active transcription */
-  activeImageIds = $state<Set<string>>(new Set());
+  pendingImageIds = $state<Set<string>>(new Set());
   /** Number of lines currently being transcribed across all workers */
-  activeTranscriptions = $state(0);
+  pendingLines = $state(0);
 
   private detectWorker!: Worker;
   private layoutWorker: Worker | null = null;
@@ -37,14 +37,14 @@ export class HTRWorkerState {
 
   private detectReady = false;
   private transcribeReadyCount = 0;
-  layoutReady = $state(false);
-  layoutRunning = $state(false);
+  private layoutReady = $state(false);
+  running = $state(false);
   private _abortController: AbortController | null = null;
 
   // Callbacks for multi-image routing
   onRegionDetected: ((imageId: string, regionId: string, startIndex: number, lines: BBox[]) => void) | null = null;
-  onRegionDone: ((imageId: string, regionId: string) => void) | null = null;
-  onLineDone: ((imageId: string, lineIndex: number, text: string, confidence: number) => void) | null = null;
+  onRegionComplete: ((imageId: string, regionId: string) => void) | null = null;
+  onLineComplete: ((imageId: string, lineIndex: number, text: string, confidence: number) => void) | null = null;
   onToken: ((imageId: string, lineIndex: number, token: string) => void) | null = null;
   onLayoutDetected: ((imageId: string, regions: { label: string; confidence: number; x: number; y: number; w: number; h: number }[]) => void) | null = null;
 
@@ -55,44 +55,34 @@ export class HTRWorkerState {
   constructor() {
     this.createDetectWorker();
 
-    // Try GPU server first, fall back to WASM
     this._init();
   }
 
   private async _init() {
-    // Auto-detect GPU server if not already configured
-    if (!isGpuServerEnabled()) {
-      // Retry a few times — GPU server may still be booting
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const url = await autoDetectGpuServer();
-        if (url) {
-          gpuServerUrl.set(url);
-          console.log(`[htr] Auto-detected GPU server at ${url}`);
-          break;
-        }
-        if (attempt < 4) {
-          console.log(`[htr] GPU server not ready, retrying in 3s... (${attempt + 1}/5)`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-      }
-    }
-
-    if (isGpuServerEnabled()) {
-      // GPU server available — skip WASM model loading
-      console.log(`[htr] Using GPU server: ${gpuServerUrl.get()}`);
-      this.cacheChecked = true;
-      this.modelsReady = true;
-      this.layoutReady = true;
-      this.stage = 'idle';
-      return;
-    }
-
-    // Fall back to WASM
-    console.log('[htr] No GPU server found, using WASM');
+    // Always start with WASM — GPU is an optional upgrade
+    console.log('[htr] Starting with WASM inference');
     const cached = await areAllModelsCached(MODEL_URLS);
     this.cacheChecked = true;
     if (cached) {
       this.loadModels();
+    }
+
+    // Try to detect GPU server in the background (non-blocking)
+    this._detectGpuInBackground();
+  }
+
+  private async _detectGpuInBackground() {
+    // Check if already configured via localStorage
+    if (isGpuServerEnabled()) {
+      console.log(`[htr] GPU server already configured: ${gpuServerUrl.get()}`);
+      return;
+    }
+
+    // Try auto-detect once (non-blocking, no retries)
+    const url = await autoDetectGpuServer();
+    if (url) {
+      gpuServerUrl.set(url);
+      console.log(`[htr] GPU server auto-detected at ${url}`);
     }
   }
 
@@ -157,8 +147,8 @@ export class HTRWorkerState {
         break;
       case 'region_lines': {
         const { imageId, regionId, startIndex, lines } = msg.payload;
-        this.activeRegions = new Set([...this.activeRegions, regionId]);
-        this.activeImageIds = new Set([...this.activeImageIds, imageId]);
+        this.pendingRegions = new Set([...this.pendingRegions, regionId]);
+        this.pendingImageIds = new Set([...this.pendingImageIds, imageId]);
         if (this.stage === 'done' || this.stage === 'idle') {
           this.stage = 'transcribing';
         }
@@ -173,7 +163,7 @@ export class HTRWorkerState {
           const lineIndex = startIndex + i;
           const worker = this.transcribeWorkers[this.nextWorker % poolSz];
           this.nextWorker++;
-          this.activeTranscriptions++;
+          this.pendingLines++;
           worker.postMessage({
             type: 'transcribe_line',
             payload: {
@@ -212,8 +202,8 @@ export class HTRWorkerState {
       }
       case 'line_done': {
         const { imageId, regionId, lineIndex, text, confidence } = msg.payload;
-        this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
-        this.onLineDone?.(imageId, lineIndex, text, confidence);
+        this.pendingLines = Math.max(0, this.pendingLines - 1);
+        this.onLineComplete?.(imageId, lineIndex, text, confidence);
 
         const pending = this.regionPending.get(regionId);
         if (pending) {
@@ -221,24 +211,24 @@ export class HTRWorkerState {
           if (pending.done >= pending.total) {
             this.regionPending.delete(regionId);
             // Remove from active sets
-            const nextRegions = new Set(this.activeRegions);
+            const nextRegions = new Set(this.pendingRegions);
             nextRegions.delete(regionId);
-            this.activeRegions = nextRegions;
+            this.pendingRegions = nextRegions;
             // Check if this image still has active regions
             const imageStillActive = [...this.regionPending.values()].some(r => r.imageId === imageId);
             if (!imageStillActive) {
-              const nextImages = new Set(this.activeImageIds);
+              const nextImages = new Set(this.pendingImageIds);
               nextImages.delete(imageId);
-              this.activeImageIds = nextImages;
+              this.pendingImageIds = nextImages;
             }
-            this.onRegionDone?.(imageId, regionId);
+            this.onRegionComplete?.(imageId, regionId);
           }
         }
 
-        if (this.activeTranscriptions === 0 && this.regionPending.size === 0) {
+        if (this.pendingLines === 0 && this.regionPending.size === 0) {
           this.stage = 'done';
-          this.activeRegions = new Set();
-          this.activeImageIds = new Set();
+          this.pendingRegions = new Set();
+          this.pendingImageIds = new Set();
         }
         break;
       }
@@ -293,7 +283,7 @@ export class HTRWorkerState {
     }
   }
 
-  redetectRegion(imageId: string, x: number, y: number, w: number, h: number): string {
+  transcribeRegion(imageId: string, x: number, y: number, w: number, h: number): string {
     this.regionCounter++;
     const regionId = `region-${this.regionCounter}`;
 
@@ -317,8 +307,8 @@ export class HTRWorkerState {
     if (!imageData) return;
 
     try {
-      this.activeRegions = new Set([...this.activeRegions, regionId]);
-      this.activeImageIds = new Set([...this.activeImageIds, imageId]);
+      this.pendingRegions = new Set([...this.pendingRegions, regionId]);
+      this.pendingImageIds = new Set([...this.pendingImageIds, imageId]);
       if (this.stage === 'done' || this.stage === 'idle') {
         this.stage = 'transcribing';
       }
@@ -331,49 +321,49 @@ export class HTRWorkerState {
 
       // Transcribe all lines in parallel — keeps GPU saturated via Ray batching
       if (this._abortController?.signal.aborted) return;
-      this.activeTranscriptions += lines.length;
+      this.pendingLines += lines.length;
       const transcribePromises = lines.map((line, i) =>
         gpuTranscribe(imageData, { x: line.x, y: line.y, w: line.w, h: line.h }, imageId)
           .then(({ text, confidence }) => {
-            this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
-            this.onLineDone?.(imageId, startIndex + i, text, confidence);
+            this.pendingLines = Math.max(0, this.pendingLines - 1);
+            this.onLineComplete?.(imageId, startIndex + i, text, confidence);
           })
           .catch(() => {
-            this.activeTranscriptions = Math.max(0, this.activeTranscriptions - 1);
-            this.onLineDone?.(imageId, startIndex + i, '[error]', 0);
+            this.pendingLines = Math.max(0, this.pendingLines - 1);
+            this.onLineComplete?.(imageId, startIndex + i, '[error]', 0);
           })
       );
       await Promise.all(transcribePromises);
 
       // Region done
-      const nextRegions = new Set(this.activeRegions);
+      const nextRegions = new Set(this.pendingRegions);
       nextRegions.delete(regionId);
-      this.activeRegions = nextRegions;
+      this.pendingRegions = nextRegions;
       // Check if image still has active regions
-      const imageStillActive = [...this.activeRegions].some(rid => {
+      const imageStillActive = [...this.pendingRegions].some(rid => {
         // Check regionPending for WASM regions
         const pending = this.regionPending.get(rid);
         return pending?.imageId === imageId;
       });
       if (!imageStillActive) {
-        const nextImages = new Set(this.activeImageIds);
+        const nextImages = new Set(this.pendingImageIds);
         nextImages.delete(imageId);
-        this.activeImageIds = nextImages;
+        this.pendingImageIds = nextImages;
       }
-      this.onRegionDone?.(imageId, regionId);
+      this.onRegionComplete?.(imageId, regionId);
 
-      if (this.activeTranscriptions === 0 && this.activeRegions.size === 0) {
+      if (this.pendingLines === 0 && this.pendingRegions.size === 0) {
         this.stage = 'done';
-        this.activeImageIds = new Set();
+        this.pendingImageIds = new Set();
       }
     } catch (err: any) {
       this.error = err.message ?? String(err);
-      const nextRegions = new Set(this.activeRegions);
+      const nextRegions = new Set(this.pendingRegions);
       nextRegions.delete(regionId);
-      this.activeRegions = nextRegions;
-      if (this.activeRegions.size === 0) {
+      this.pendingRegions = nextRegions;
+      if (this.pendingRegions.size === 0) {
         this.stage = 'done';
-        this.activeImageIds = new Set();
+        this.pendingImageIds = new Set();
       }
     }
   }
@@ -386,42 +376,42 @@ export class HTRWorkerState {
   }
 
   /** Run layout detection on multiple images sequentially */
-  async detectLayoutMultiple(imageIds: string[]) {
+  async runMultiple(imageIds: string[]) {
     for (const id of imageIds) {
-      await this.detectLayout(id);
+      await this.run(id);
     }
   }
 
   /** Run full pipeline on an image (layout → lines → transcription) */
-  async detectLayout(imageId: string) {
-    if (this.layoutRunning) return;
-    this.layoutRunning = true;
+  async run(imageId: string) {
+    if (this.running) return;
+    this.running = true;
 
     if (isGpuServerEnabled()) {
       try {
         const imageData = this.storedImages.get(imageId);
-        if (!imageData) { this.layoutRunning = false; return; }
+        if (!imageData) { this.running = false; return; }
 
         // Create abort controller for this pipeline run
         this._abortController = new AbortController();
 
         // Step 1: Layout detection (one upload)
         const { regions } = await gpuDetectLayout(imageData, imageId);
-        this.layoutRunning = false;
+        this.running = false;
         if (this._abortController?.signal.aborted) return;
         this.onLayoutDetected?.(imageId, regions);
 
-        // Steps 2+3 happen via redetectRegion which is called by onLayoutDetected
+        // Steps 2+3 happen via transcribeRegion which is called by onLayoutDetected
       } catch (err: any) {
         if (err?.name === 'AbortError') return; // stopped by user
-        this.layoutRunning = false;
+        this.running = false;
         this.error = err.message ?? String(err);
       }
       return;
     }
 
     // WASM path
-    if (!this.layoutWorker || !this.layoutReady) { this.layoutRunning = false; return; }
+    if (!this.layoutWorker || !this.layoutReady) { this.running = false; return; }
 
     const imageData = this.storedImages.get(imageId);
     if (imageData) {
@@ -458,12 +448,12 @@ export class HTRWorkerState {
         break;
       case 'layout_result': {
         const { imageId, regions } = msg.payload;
-        this.layoutRunning = false;
+        this.running = false;
         this.onLayoutDetected?.(imageId, regions);
         break;
       }
       case 'error':
-        this.layoutRunning = false;
+        this.running = false;
         this.error = msg.payload.message;
         break;
     }
@@ -484,17 +474,17 @@ export class HTRWorkerState {
     this._abortController = null;
 
     // Cancel WASM regions
-    for (const regionId of this.activeRegions) {
+    for (const regionId of this.pendingRegions) {
       this.cancelRegion(regionId);
     }
 
-    this.layoutRunning = false;
+    this.running = false;
     this.stage = 'idle';
-    this.activeRegions = new Set();
-    this.activeImageIds = new Set();
-    this.activeTranscriptions = 0;
+    this.pendingRegions = new Set();
+    this.pendingImageIds = new Set();
+    this.pendingLines = 0;
     this.regionPending.clear();
-    this.volumeProgress = null;
+    this.batchProgress = null;
   }
 
   reset() {
