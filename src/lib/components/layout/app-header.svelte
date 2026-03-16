@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Play, RotateCcw, PenTool, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Play, RotateCcw, PenTool, Server, ScanLine } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -13,9 +13,11 @@
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
     onTranscribe?: (allPages: boolean) => void;
+    linePreviewOpen?: boolean;
+    onToggleLinePreview?: () => void;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, linePreviewOpen, onToggleLinePreview }: Props = $props();
 
   const isViewer = $derived(page.url.pathname === '/viewer');
   let showGpuSettings = $state(false);
@@ -64,15 +66,7 @@
 </script>
 
 <header class="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
-  <h1 class="text-lg font-semibold">Lejonet HTR</h1>
-
-  {#if appState.htr.modelsReady && gpuServerUrl.get()}
-    <Badge variant="success" title={gpuName || getGpuName() || 'GPU server'}>GPU {gpuName || getGpuName() ? `(${gpuName || getGpuName()})` : ''}</Badge>
-  {:else if appState.htr.modelsReady}
-    <Badge variant="success">WASM</Badge>
-  {:else if appState.htr.stage === 'loading_models'}
-    <Badge variant="outline" class="animate-pulse">Loading...</Badge>
-  {/if}
+  <img src="/head-logo-lion.svg" alt="Lejonet HTR" class="h-8 dark:invert-0 invert" />
 
   <div class="ml-auto flex items-center gap-1">
     {#if isViewer}
@@ -81,6 +75,9 @@
       </Button>
       <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
         <FileText class="size-4" />
+      </Button>
+      <Button variant={linePreviewOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleLinePreview} title="Toggle line preview">
+        <ScanLine class="size-4" />
       </Button>
 
       <div class="w-px h-5 bg-border mx-1"></div>
@@ -111,6 +108,13 @@
       </Button>
     {/if}
 
+    {#if appState.htr.modelsReady && gpuServerUrl.get()}
+      <Badge variant="success" title={gpuName || getGpuName() || 'GPU server'}>GPU{gpuName || getGpuName() ? ` (${gpuName || getGpuName()})` : ''}</Badge>
+    {:else if appState.htr.modelsReady}
+      <Badge variant="success">WASM</Badge>
+    {:else if appState.htr.stage === 'loading_models'}
+      <Badge variant="outline" class="animate-pulse">Loading...</Badge>
+    {/if}
     <div class="relative">
       <Button
         variant={gpuServerUrl.get() ? 'secondary' : 'ghost'}

@@ -10,9 +10,9 @@
   import CatalogPanel from '$lib/components/CatalogPanel.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
-  import LinePreview from '$lib/components/LinePreview.svelte';
   import type { Line, BBox } from '$lib/types';
   import { Maximize2 } from 'lucide-svelte';
+  import LinePreview from '$lib/components/LinePreview.svelte';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -20,6 +20,8 @@
   let rightCollapsed = $state(true);
   let draggingDivider = $state<'left' | 'right' | null>(null);
   let docViewer: DocumentViewer;
+  let focusedLineId = $state<number>(-1);
+  let linePreviewOpen = $state(false);
 
   // Redirect to home if models not loaded (wait for cache check first)
   $effect(() => {
@@ -41,6 +43,13 @@
   // Active document derived state
   let activeDoc = $derived(appState.activeDocument);
   let lines = $derived(activeDoc?.lines ?? []);
+
+  // Reset line preview when switching pages
+  let lastDocId = '';
+  $effect(() => {
+    const docId = activeDoc?.id ?? '';
+    if (docId !== lastDocId) { focusedLineId = -1; lastDocId = docId; }
+  });
   let groups = $derived(activeDoc?.groups ?? []);
 
   // Page navigation info
@@ -308,6 +317,8 @@
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
   onToggleTranscription={() => rightCollapsed = !rightCollapsed}
+  linePreviewOpen={linePreviewOpen}
+  onToggleLinePreview={() => linePreviewOpen = !linePreviewOpen}
   onTranscribe={(all) => {
     if (!activeDoc) return;
     if (all && activeDoc.manifestId) {
@@ -508,6 +519,7 @@
           } else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
         }}
         onFocusLine={(lineId) => {
+          focusedLineId = lineId;
           const line = activeDoc?.lines.find(l => l.id === lineId);
           if (line) docViewer?.focusRect(line.bbox.x, line.bbox.y, line.bbox.w, line.bbox.h);
         }}
@@ -529,7 +541,8 @@
 
 <LinePreview
   imageUrl={activeDoc?.imageUrl ?? null}
-  bbox={appState.hoveredLine >= 0 ? (activeDoc?.lines.find(l => l.id === appState.hoveredLine)?.bbox ?? null) : null}
+  bbox={focusedLineId >= 0 ? (activeDoc?.lines.find(l => l.id === focusedLineId)?.bbox ?? null) : null}
+  visible={linePreviewOpen}
 />
 
 <footer class="flex items-center gap-3 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground shrink-0">

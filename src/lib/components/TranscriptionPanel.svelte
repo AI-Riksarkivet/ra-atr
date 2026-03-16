@@ -423,15 +423,15 @@ Provide only the transcription, nothing else.`;
     </div>
     {#if !group.collapsed}
       <div class="pl-1">
-        {#each group.lineIds as lineId}
-          {@render lineRow(doc, lineId)}
+        {#each group.lineIds as lineId, li}
+          {@render lineRow(doc, lineId, li)}
         {/each}
       </div>
     {/if}
   </div>
 {/snippet}
 
-{#snippet lineRow(doc: ImageDocument, lineId: number)}
+{#snippet lineRow(doc: ImageDocument, lineId: number, lineNum: number)}
   {@const line = doc.lines.find(l => l.id === lineId)}
   {#if line && lineMatches(doc, lineId)}
     <div
@@ -442,7 +442,7 @@ Provide only the transcription, nothing else.`;
       onclick={(e) => handleLineClick(lineId, e)}
       ondblclick={() => startEditLine(lineId)}
     >
-      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineId + 1}</span>
+      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineNum + 1}</span>
       {#if editingLineIdx === lineId}
         <input
           class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"

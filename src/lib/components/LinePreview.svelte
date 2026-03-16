@@ -5,13 +5,13 @@
   interface Props {
     imageUrl: string | null;
     bbox: BBox | null;
+    visible?: boolean;
   }
 
-  let { imageUrl, bbox }: Props = $props();
+  let { imageUrl, bbox, visible = true }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
   let img: HTMLImageElement | null = $state(null);
-  let collapsed = $state(true);
   let height = $state(80);
   let isDragging = $state(false);
 
@@ -25,7 +25,7 @@
   $effect(() => {
     const currentBbox = bbox;
     const currentImg = img;
-    if (!currentBbox || !currentImg || collapsed) return;
+    if (!currentBbox || !currentImg || !visible) return;
 
     tick().then(() => {
       if (!canvasEl || !containerEl) return;
@@ -69,6 +69,7 @@
   }
 </script>
 
+{#if visible}
 <div class="border-t border-border bg-card shrink-0">
   <!-- Resize handle -->
   <div
@@ -79,20 +80,12 @@
     onpointerup={onResizePointerUp}
     role="separator"
   ></div>
-  <div class="flex items-center gap-2 px-3 py-0.5">
-    <button
-      class="text-[0.65rem] text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer p-0 font-sans"
-      onclick={() => collapsed = !collapsed}
-    >{collapsed ? '\u25B6' : '\u25BC'}</button>
-    <span class="text-xs text-muted-foreground select-none">Line preview</span>
+  <div class="w-full px-1 pb-1" bind:this={containerEl} style="height: {height}px">
+    {#if bbox && img}
+      <canvas bind:this={canvasEl} class="block w-full h-full rounded"></canvas>
+    {:else}
+      <div class="flex items-center justify-center h-full text-xs text-muted-foreground italic">Click a line to preview</div>
+    {/if}
   </div>
-  {#if !collapsed}
-    <div class="w-full px-1 pb-1" bind:this={containerEl} style="height: {height}px">
-      {#if bbox && img}
-        <canvas bind:this={canvasEl} class="block w-full h-full rounded"></canvas>
-      {:else}
-        <div class="flex items-center justify-center h-full text-xs text-muted-foreground italic">Hover a line to preview</div>
-      {/if}
-    </div>
-  {/if}
 </div>
+{/if}
