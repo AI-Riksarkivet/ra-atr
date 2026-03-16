@@ -1,6 +1,6 @@
 import { HTRWorkerState } from '$lib/worker-state.svelte';
 import type { ImageDocument, Line, LineGroup } from '$lib/types';
-import type { TranscriptionGroup } from '$lib/api';
+import type { TranscriptionGroup, CatalogResult } from '$lib/api';
 
 const AUTOSAVE_DELAY = 2000;
 const MAX_CACHED_IMAGES = 10;
@@ -15,6 +15,8 @@ class AppState {
   saving = $state(false);
   saveError = $state<string | null>(null);
   lastSaved = $state<string | null>(null);
+  /** Volume metadata from catalog, keyed by manifestId */
+  volumeMetadata = $state<Map<string, CatalogResult>>(new Map());
   private docCounter = 0;
   private uploadCounter = 0;
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;

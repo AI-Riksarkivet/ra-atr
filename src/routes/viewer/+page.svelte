@@ -9,10 +9,8 @@
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
   import CatalogPanel from '$lib/components/CatalogPanel.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
-  import StatusBar from '$lib/components/StatusBar.svelte';
   import type { Line, BBox } from '$lib/types';
-  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw } from 'lucide-svelte';
-  import LinePreview from '$lib/components/LinePreview.svelte';
+  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw, PenTool, Info, Type } from 'lucide-svelte';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -20,9 +18,9 @@
   let rightCollapsed = $state(true);
   let draggingDivider = $state<'left' | 'right' | null>(null);
   let docViewer: DocumentViewer;
-  let focusedLineId = $state<number>(-1);
-  let linePreviewOpen = $state(false);
   let isFullscreen = $state(false);
+  let metadataOpen = $state(false);
+  let showTextOverlay = $state(false);
 
   // Redirect to home if models not loaded (wait for cache check first)
   $effect(() => {
@@ -49,7 +47,7 @@
   let lastDocId = '';
   $effect(() => {
     const docId = activeDoc?.id ?? '';
-    if (docId !== lastDocId) { focusedLineId = -1; lastDocId = docId; }
+    if (docId !== lastDocId) { lastDocId = docId; }
   });
   let groups = $derived(activeDoc?.groups ?? []);
 
@@ -57,7 +55,6 @@
   $effect(() => {
     void leftCollapsed;
     void rightCollapsed;
-    void linePreviewOpen;
     setTimeout(() => docViewer?.resetView(), 50);
   });
 
@@ -143,7 +140,7 @@
     }
   }
 
-  async function handleCatalogLoad(referenceCode: string) {
+  async function handleCatalogLoad(referenceCode: string, metadata?: import('$lib/api').CatalogResult) {
     if (catalogLoading) return;
     catalogLoading = 'Resolving...';
     catalogError = '';
@@ -153,6 +150,10 @@
         else if (p.stage === 'manifest') catalogLoading = `Found ${p.manifestId}, loading manifest...`;
         else if (p.stage === 'done') catalogLoading = `Loading ${p.totalPages} pages...`;
       });
+      if (metadata) {
+        appState.volumeMetadata.set(manifestId, metadata);
+        appState.volumeMetadata = new Map(appState.volumeMetadata);
+      }
       handleRiksarkivetResolved(manifestId, pages);
     } catch (e) {
       catalogError = e instanceof Error ? e.message : 'Failed to load volume';
@@ -339,16 +340,6 @@
     await tick();
     catalogPanel?.setSearch(q);
   }}
-  linePreviewOpen={linePreviewOpen}
-  onToggleLinePreview={() => linePreviewOpen = !linePreviewOpen}
-  onTranscribe={(all) => {
-    if (!activeDoc) return;
-    if (all && activeDoc.manifestId) {
-      transcribeVolume(activeDoc.manifestId);
-    } else {
-      transcribePage(activeDoc);
-    }
-  }}
 />
 
 {#if appState.htr.error}
@@ -373,7 +364,7 @@
   <!-- Left: Catalog browser -->
   {#if !leftCollapsed}
     <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
-      <CatalogPanel bind:this={catalogPanel} onLoadVolume={handleCatalogLoad} />
+      <CatalogPanel bind:this={catalogPanel} onLoadVolume={(ref, meta) => handleCatalogLoad(ref, meta)} />
     </div>
     <div
       class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary group relative"
@@ -418,6 +409,7 @@
         }}
         groups={groups}
         selectMode={appState.selectMode}
+        showTextOverlay={showTextOverlay}
       />
 
       <!-- Page navigation -->
@@ -438,41 +430,75 @@
         {/if}
       {/if}
 
-      <!-- Fullscreen bottom bar -->
-      {#if isFullscreen}
-        {@const pageTranscribed = activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every(l => l.complete)}
-        {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
-        {@const totalLines = activeDoc?.lines.length ?? 0}
-        {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
-        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/50 backdrop-blur-md px-4 py-2 text-[0.7rem] text-white/70">
-          {#if activeDoc?.manifestId}
-            {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
-            <span class="font-mono">p. {activeDoc.pageNumber ?? '?'} / {siblings.length}</span>
-            <span class="text-white/20">|</span>
-            <span>{activeDoc.manifestId}</span>
-          {/if}
-          {#if totalLines > 0}
-            <span class="text-white/20">|</span>
-            <span class="font-mono">{completedLines}/{totalLines} lines</span>
-          {/if}
-          {#if appState.htr.pendingLines > 0}
-            <span class="text-orange-400 font-mono">{appState.htr.pendingLines} in-flight</span>
-          {/if}
-          <span class="text-white/20">|</span>
-          <button
-            class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-            disabled={isRunning}
-            onclick={() => { if (activeDoc) transcribePage(activeDoc); }}
-            title={pageTranscribed ? 'Re-transcribe page' : 'Transcribe page'}
-          >
-            {#if pageTranscribed}
-              <RotateCcw class="size-4" />
-            {:else}
-              <Play class="size-4" />
-            {/if}
-          </button>
-        </div>
+      <!-- Metadata panel -->
+      {#if metadataOpen && activeDoc?.manifestId}
+        {@const meta = appState.volumeMetadata.get(activeDoc.manifestId)}
+        {#if meta}
+          <div class="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-lg bg-black/60 backdrop-blur-md px-4 py-3 text-[0.7rem] text-white/80 leading-relaxed space-y-1 min-w-[280px] max-w-[400px] shadow-lg">
+            <div class="font-semibold text-white">{meta.fonds_title}</div>
+            {#if meta.creator}<div class="text-white/60">{meta.creator}</div>{/if}
+            {#if meta.series_title}<div>{meta.series_title}{meta.volume_id ? `, vol. ${meta.volume_id}` : ''}</div>{/if}
+            {#if meta.date_text}<div class="text-white/50">{meta.date_text}</div>{/if}
+            {#if meta.description}<div class="text-white/50 line-clamp-4">{meta.description}</div>{/if}
+            <div class="text-white/30 font-mono text-[0.6rem] pt-1">{meta.reference_code}</div>
+          </div>
+        {/if}
       {/if}
+
+      <!-- Floating toolbar -->
+      {@const pageTranscribed = activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every(l => l.complete)}
+      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
+      {@const totalLines = activeDoc?.lines.length ?? 0}
+      {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
+      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/50 backdrop-blur-md px-4 py-2 text-[0.7rem] text-white/70">
+        {#if activeDoc?.manifestId}
+          {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
+          {@const meta = appState.volumeMetadata.get(activeDoc.manifestId)}
+          <span class="font-mono tabular-nums" title="Page {activeDoc.pageNumber ?? '?'} of {siblings.length}">{activeDoc.pageNumber ?? '?'}<span class="text-white/40">/{siblings.length}</span></span>
+          {#if meta}
+            <span class="text-white/20">&middot;</span>
+            <span class="truncate max-w-[200px]">{meta.fonds_title}</span>
+          {/if}
+          <button
+            class="size-6 rounded-full flex items-center justify-center transition-all cursor-pointer {metadataOpen ? 'bg-white/30 text-white' : 'bg-white/10 text-white/50 hover:text-white hover:bg-white/20'}"
+            onclick={() => metadataOpen = !metadataOpen}
+            title="Volume details"
+          ><Info class="size-3" /></button>
+        {/if}
+        {#if totalLines > 0}
+          <span class="text-white/20">&middot;</span>
+          <span class="font-mono tabular-nums" title="{completedLines} of {totalLines} lines transcribed">{completedLines}/{totalLines}</span>
+        {/if}
+        {#if appState.htr.pendingLines > 0}
+          <span class="text-orange-400 font-mono" title="{appState.htr.pendingLines} lines currently being transcribed">{appState.htr.pendingLines} in-flight</span>
+        {/if}
+        {#if appState.saving}
+          <span class="text-white/40 animate-pulse" title="Saving transcriptions to server">saving</span>
+        {/if}
+        <span class="text-white/20">|</span>
+        <button
+          class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={isRunning}
+          onclick={() => { if (activeDoc) transcribePage(activeDoc); }}
+          title={pageTranscribed ? 'Re-transcribe page' : 'Transcribe page'}
+        >
+          {#if pageTranscribed}
+            <RotateCcw class="size-4" />
+          {:else}
+            <Play class="size-4" />
+          {/if}
+        </button>
+        <button
+          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {appState.selectMode ? 'bg-white/30 text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+          onclick={() => appState.selectMode = !appState.selectMode}
+          title={appState.selectMode ? 'Switch to pan mode' : 'Draw region to transcribe'}
+        ><PenTool class="size-4" /></button>
+        <button
+          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showTextOverlay ? 'bg-white/30 text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+          onclick={() => showTextOverlay = !showTextOverlay}
+          title={showTextOverlay ? 'Hide text overlay' : 'Show transcriptions on image'}
+        ><Type class="size-4" /></button>
+      </div>
 
       <!-- Zoom controls -->
       <div class="absolute top-3 right-3 flex flex-col rounded-lg bg-black/40 backdrop-blur-md overflow-hidden">
@@ -571,7 +597,6 @@
           } else if (rect) docViewer?.focusRect(rect.x, rect.y, rect.w, rect.h);
         }}
         onFocusLine={(lineId) => {
-          focusedLineId = lineId;
           const line = activeDoc?.lines.find(l => l.id === lineId);
           if (line) docViewer?.focusRect(line.bbox.x, line.bbox.y, line.bbox.w, line.bbox.h);
         }}
@@ -591,42 +616,4 @@
   {/if}
 </div>
 
-<LinePreview
-  imageUrl={activeDoc?.imageUrl ?? null}
-  bbox={focusedLineId >= 0 ? (activeDoc?.lines.find(l => l.id === focusedLineId)?.bbox ?? null) : null}
-  visible={linePreviewOpen}
-/>
 
-<footer class="flex items-center gap-3 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground shrink-0">
-  {#if activeDoc?.manifestId}
-    {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
-    {@const pageIdx = siblings.sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0)).findIndex(d => d.id === activeDoc.id)}
-    <span class="font-mono">p. {activeDoc.pageNumber ?? '?'} / {siblings.length}</span>
-    <span class="text-muted-foreground/50">|</span>
-    <span>{activeDoc.manifestId}</span>
-    <span class="text-muted-foreground/50">|</span>
-    <span class="text-[0.65rem]">&larr;&rarr; pages &uarr;&darr; lines</span>
-  {/if}
-
-  <span class="ml-auto">
-    {#if appState.saving}
-      <span class="animate-pulse">Saving...</span>
-    {:else if appState.saveError}
-      <span class="text-destructive">{appState.saveError}</span>
-    {:else if appState.lastSaved}
-      <span>{appState.lastSaved}</span>
-    {/if}
-  </span>
-
-  {#if appState.htr.stage !== 'idle' || appState.htr.modelsReady}
-    <span class="text-muted-foreground/50">|</span>
-    <StatusBar
-      stage={appState.htr.stage}
-      documents={appState.documents}
-      pendingImageIds={appState.htr.pendingImageIds}
-      inFlightLines={appState.htr.pendingLines}
-      poolSize={appState.htr.poolSize}
-      batchProgress={appState.htr.batchProgress}
-    />
-  {/if}
-</footer>

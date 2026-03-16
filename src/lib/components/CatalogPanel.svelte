@@ -2,7 +2,7 @@
   import { searchCatalog, type CatalogResult } from '$lib/api';
 
   interface Props {
-    onLoadVolume: (referenceCode: string) => void;
+    onLoadVolume: (referenceCode: string, metadata?: CatalogResult) => void;
   }
 
   let { onLoadVolume }: Props = $props();
@@ -177,7 +177,7 @@
             {#each series.volumes as vol}
               <div
                 class="flex items-center gap-2 px-2 py-1 rounded mb-0.5 {vol.digitized ? 'cursor-pointer hover:bg-muted/50' : 'opacity-40'}"
-                onclick={() => { if (vol.digitized) onLoadVolume(vol.reference_code); }}
+                onclick={() => { if (vol.digitized) onLoadVolume(vol.reference_code, vol); }}
               >
                 <span class="truncate flex-1">
                   vol. {vol.volume_id}

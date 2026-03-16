@@ -16,9 +16,10 @@
     onRedetectRegion: (x: number, y: number, w: number, h: number) => string;
     groups: LineGroup[];
     selectMode: boolean;
+    showTextOverlay: boolean;
   }
 
-  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode }: Props = $props();
+  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode, showTextOverlay }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
@@ -143,9 +144,13 @@
     }
     const idx = hitTestLine(e.clientX, e.clientY);
     onHoverLine(idx);
-    // Show transcribed text as tooltip
-    const line = idx >= 0 ? lines.find(l => l.id === idx) : null;
-    canvasEl.title = line?.complete ? line.text : '';
+    // Show transcribed text as tooltip (skip when text overlay is on)
+    if (showTextOverlay) {
+      canvasEl.title = '';
+    } else {
+      const line = idx >= 0 ? lines.find(l => l.id === idx) : null;
+      canvasEl.title = line?.complete ? line.text : '';
+    }
   }
 
   function onCanvasPointerUp(e: PointerEvent) {
@@ -273,6 +278,65 @@
             ctx.arc(dotX, dotY, 3 / transform.scale, 0, Math.PI * 2);
             ctx.fill();
           }
+
+          // Text overlay mode
+          if (showTextOverlay) {
+            const b = line.bbox;
+            const isHoveredLine = line.id === hoveredLine;
+
+            if (!line.complete) {
+              // Animated shimmer for lines being transcribed
+              const t = performance.now() / 1000;
+              const shimmerAlpha = 0.08 + 0.06 * Math.sin(t * 3 + line.id);
+              ctx.fillStyle = `rgba(59, 130, 246, ${shimmerAlpha})`;
+              ctx.fillRect(b.x, b.y, b.w, b.h);
+              if (line.text) {
+                // Show partial text
+                const fontSize = b.h * 0.75;
+                ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                const pad = b.h * 0.15;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.fillStyle = 'rgba(147, 197, 253, 0.9)';
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(b.x, b.y, b.w, b.h);
+                ctx.clip();
+                ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
+                ctx.restore();
+                // Progress bar
+                const progress = Math.min(1, line.text.length / 40);
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+                ctx.fillRect(b.x, b.y + b.h - 2 / transform.scale, b.w * progress, 2 / transform.scale);
+              }
+            } else if (line.text) {
+              // Completed line — dim unless hovered
+              const dimmed = hoveredLine >= 0 && !isHoveredLine;
+              const fontSize = b.h * 0.75;
+              ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
+              const pad = b.h * 0.15;
+              ctx.fillStyle = dimmed ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.7)';
+              ctx.fillRect(b.x, b.y, b.w, b.h);
+              ctx.fillStyle = dimmed ? 'rgba(255, 255, 255, 0.3)' : '#fff';
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(b.x, b.y, b.w, b.h);
+              ctx.clip();
+              ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
+              ctx.restore();
+            }
+          } else if (!line.complete && !isSelected && !highlight) {
+            // Non-overlay mode: subtle shimmer only
+            const b = line.bbox;
+            const t = performance.now() / 1000;
+            const shimmerAlpha = 0.06 + 0.04 * Math.sin(t * 3 + line.id);
+            ctx.fillStyle = `rgba(59, 130, 246, ${shimmerAlpha})`;
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+          }
         }
 
         // Draw persistent group region boxes with labels
@@ -392,12 +456,14 @@
     void hoveredLine;
     void selectedLines;
     void groups;
+    void showTextOverlay;
     controller?.render();
   });
 
-  // Animate spinner while any region is pending
+  // Animate while regions pending or lines being transcribed
   $effect(() => {
-    if (pendingRegions.size === 0) return;
+    const hasActiveWork = pendingRegions.size > 0 || lines.some(l => !l.complete && l.text !== undefined);
+    if (!hasActiveWork) return;
     let animId = 0;
     function tick() {
       controller?.render();

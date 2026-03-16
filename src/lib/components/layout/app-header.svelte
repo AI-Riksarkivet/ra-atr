@@ -1,8 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Play, RotateCcw, PenTool, Server, ScanLine } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
@@ -12,13 +11,10 @@
     transcriptionOpen?: boolean;
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
-    onTranscribe?: (allPages: boolean) => void;
     onSearch?: (query: string) => void;
-    linePreviewOpen?: boolean;
-    onToggleLinePreview?: () => void;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onTranscribe, onSearch, linePreviewOpen, onToggleLinePreview }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onSearch }: Props = $props();
 
   let headerSearch = $state('');
 
@@ -72,6 +68,9 @@
   <img src="/head-logo-lion.svg" alt="RA-HTR" class="h-8 dark:invert-0 invert" />
 
   {#if isViewer}
+    <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
+      <Home class="size-4" />
+    </Button>
     <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
       <Search class="size-4" />
     </Button>
@@ -100,54 +99,26 @@
       <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
         <FileText class="size-4" />
       </Button>
-      <Button variant={linePreviewOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleLinePreview} title="Toggle line preview">
-        <ScanLine class="size-4" />
-      </Button>
-
-      <div class="w-px h-5 bg-border mx-1"></div>
-
-      {@const doc = appState.activeDocument}
-      {@const pageEmpty = doc && !doc.placeholder && doc.lines.length === 0 && doc.groups.length === 0}
-      {@const pageTranscribed = doc && doc.lines.length > 0 && doc.lines.every(l => l.complete)}
-      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
-      <Button variant="ghost" size="icon-sm" disabled={isRunning} class={pageEmpty ? 'animate-pulse text-primary' : ''} onclick={(e: MouseEvent) => onTranscribe?.(e.shiftKey)} title={pageTranscribed ? 'Re-transcribe page (Shift+click = all pages)' : 'Transcribe page (Shift+click = all pages)'}>
-        {#if pageTranscribed}
-          <RotateCcw class="size-4" />
-        {:else}
-          <Play class="size-4" />
-        {/if}
-      </Button>
-
-      <Button
-        variant={appState.selectMode ? 'secondary' : 'ghost'}
-        size="icon-sm"
-        onclick={() => { appState.selectMode = !appState.selectMode; }}
-        title={appState.selectMode ? 'Switch to pan mode' : 'Draw region to transcribe'}
-      >
-        <PenTool class="size-4" />
-      </Button>
-
-      <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
-        <Home class="size-4" />
-      </Button>
     {/if}
 
-    {#if appState.htr.modelsReady && gpuServerUrl.get()}
-      <Badge variant="success" title={gpuName || getGpuName() || 'GPU server'}>GPU{gpuName || getGpuName() ? ` (${gpuName || getGpuName()})` : ''}</Badge>
-    {:else if appState.htr.modelsReady}
-      <Badge variant="success">WASM</Badge>
-    {:else if appState.htr.stage === 'loading_models'}
-      <Badge variant="outline" class="animate-pulse">Loading...</Badge>
-    {/if}
     <div class="relative">
-      <Button
-        variant={gpuServerUrl.get() ? 'secondary' : 'ghost'}
-        size="icon-sm"
-        onclick={() => showGpuSettings = !showGpuSettings}
-        title="GPU server settings"
-      >
-        <Server class="size-4" />
-      </Button>
+      {#if appState.htr.modelsReady && gpuServerUrl.get()}
+        <button class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
+          <Server class="size-3" />GPU{gpuName || getGpuName() ? ` (${gpuName || getGpuName()})` : ''}
+        </button>
+      {:else if appState.htr.modelsReady}
+        <button class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
+          <Server class="size-3" />WASM
+        </button>
+      {:else if appState.htr.stage === 'loading_models'}
+        <button class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground animate-pulse cursor-pointer hover:bg-muted/50 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
+          <Server class="size-3" />Loading...
+        </button>
+      {:else}
+        <button class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
+          <Server class="size-3" />
+        </button>
+      {/if}
       {#if showGpuSettings}
         <div class="absolute right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg p-3 w-72">
           <div class="text-xs font-medium mb-2">GPU Inference Server</div>
