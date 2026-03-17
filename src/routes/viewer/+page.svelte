@@ -3,14 +3,14 @@
   import { onMount, tick } from 'svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { resolveVolume } from '$lib/riksarkivet';
-  import { fetchTranscriptions } from '$lib/api';
+  import { fetchTranscriptions, BACKEND_ENABLED } from '$lib/api';
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
   import CatalogPanel from '$lib/components/CatalogPanel.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import type { Line, BBox } from '$lib/types';
-  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw, PenTool, Info, Type } from 'lucide-svelte';
+  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw, PenTool, Info, Type, SunMedium } from 'lucide-svelte';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -21,6 +21,8 @@
   let isFullscreen = $state(false);
   let metadataOpen = $state(false);
   let showTextOverlay = $state(false);
+  let imageFilters = $state({ brightness: 100, contrast: 100, saturate: 100 });
+  let showFilters = $state(false);
 
   // Redirect to home if models not loaded (wait for cache check first)
   $effect(() => {
@@ -133,7 +135,7 @@
     }
 
 
-    if (newPages.length > 0) {
+    if (newPages.length > 0 && BACKEND_ENABLED) {
       fetchTranscriptions(manifestId).then(groups => {
         if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
       }).catch(() => {});
@@ -362,7 +364,7 @@
 
 <div class="flex flex-1 overflow-hidden">
   <!-- Left: Catalog browser -->
-  {#if !leftCollapsed}
+  {#if BACKEND_ENABLED && !leftCollapsed}
     <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
       <CatalogPanel bind:this={catalogPanel} onLoadVolume={(ref, meta) => handleCatalogLoad(ref, meta)} />
     </div>
@@ -410,6 +412,7 @@
         groups={groups}
         selectMode={appState.selectMode}
         showTextOverlay={showTextOverlay}
+        imageFilter={`brightness(${imageFilters.brightness}%) contrast(${imageFilters.contrast}%) saturate(${imageFilters.saturate}%)`}
       />
 
       <!-- Page navigation -->
@@ -498,6 +501,36 @@
           onclick={() => showTextOverlay = !showTextOverlay}
           title={showTextOverlay ? 'Hide text overlay' : 'Show transcriptions on image'}
         ><Type class="size-4" /></button>
+        <div class="relative">
+          <button
+            class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showFilters ? 'bg-white/30 text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+            onclick={() => showFilters = !showFilters}
+            title="Image adjustments"
+          ><SunMedium class="size-4" /></button>
+          {#if showFilters}
+            <div class="absolute bottom-full right-0 mb-2 rounded-lg bg-black/70 backdrop-blur-md p-3 space-y-2 min-w-[180px] shadow-lg">
+              <div class="flex items-center justify-between text-[0.65rem] text-white/70">
+                <span>Brightness</span>
+                <span class="font-mono text-white/40">{imageFilters.brightness}%</span>
+              </div>
+              <input type="range" min="20" max="250" bind:value={imageFilters.brightness} class="w-full h-1 accent-white/70" />
+              <div class="flex items-center justify-between text-[0.65rem] text-white/70">
+                <span>Contrast</span>
+                <span class="font-mono text-white/40">{imageFilters.contrast}%</span>
+              </div>
+              <input type="range" min="20" max="300" bind:value={imageFilters.contrast} class="w-full h-1 accent-white/70" />
+              <div class="flex items-center justify-between text-[0.65rem] text-white/70">
+                <span>Saturation</span>
+                <span class="font-mono text-white/40">{imageFilters.saturate}%</span>
+              </div>
+              <input type="range" min="0" max="200" bind:value={imageFilters.saturate} class="w-full h-1 accent-white/70" />
+              <button
+                class="w-full text-[0.6rem] text-white/40 hover:text-white/70 transition-colors cursor-pointer pt-1"
+                onclick={() => imageFilters = { brightness: 100, contrast: 100, saturate: 100 }}
+              >Reset</button>
+            </div>
+          {/if}
+        </div>
       </div>
 
       <!-- Zoom controls -->

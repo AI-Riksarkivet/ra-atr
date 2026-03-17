@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
+export const BACKEND_ENABLED = import.meta.env.VITE_DISABLE_BACKEND !== 'true';
 
 function getToken(): string {
   return sessionStorage.getItem('hf_token') || 'local';

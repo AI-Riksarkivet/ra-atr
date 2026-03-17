@@ -11,10 +11,11 @@ const params = new URL(import.meta.url).searchParams;
 const poolSize = parseInt(params.get('pool') ?? '2', 10);
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor(cores / (poolSize + 1))) : 1;
 
+const DEV = self.location?.hostname === 'localhost';
 const workerId = params.get('id') ?? '0';
-console.log(`[transcribe-${workerId}] threads: ${ort.env.wasm.numThreads}, pool: ${poolSize}`);
+if (DEV) console.log(`[transcribe-${workerId}] threads: ${ort.env.wasm.numThreads}, pool: ${poolSize}`);
 
-const MODEL_URLS = {
+let modelUrls = {
   encoder: '/models/encoder.onnx',
   decoder: '/models/decoder.onnx',
   tokenizer: '/models/tokenizer.json',
@@ -42,6 +43,8 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
       case 'load_models': {
+        if (e.data.payload?.modelUrls) modelUrls = { ...modelUrls, ...e.data.payload.modelUrls };
+        const headers: Record<string, string> = e.data.payload?.headers ?? {};
         const progress = (p: { model: string; percent: number }) => {
           self.postMessage({
             type: 'model_status',
@@ -50,9 +53,9 @@ self.onmessage = async (e: MessageEvent) => {
         };
 
         const [encoderBytes, decoderBytes, tokenizerBytes] = await Promise.all([
-          downloadAndCacheModel(MODEL_URLS.encoder, 'trocr-encoder', progress),
-          downloadAndCacheModel(MODEL_URLS.decoder, 'trocr-decoder', progress),
-          downloadAndCacheModel(MODEL_URLS.tokenizer, 'tokenizer', progress),
+          downloadAndCacheModel(modelUrls.encoder, 'trocr-encoder', progress, headers),
+          downloadAndCacheModel(modelUrls.decoder, 'trocr-decoder', progress, headers),
+          downloadAndCacheModel(modelUrls.tokenizer, 'tokenizer', progress, headers),
         ]);
 
         const sessionOpts: ort.InferenceSession.SessionOptions = {
@@ -78,7 +81,7 @@ self.onmessage = async (e: MessageEvent) => {
         const { imageId, imageData } = e.data.payload;
         const decoded = await decodeImage(imageData);
         imageStore.set(imageId, decoded);
-        console.log(`[transcribe-${workerId}] image added: ${imageId}`);
+        if (DEV) console.log(`[transcribe-${workerId}] image added: ${imageId}`);
         break;
       }
 
@@ -208,7 +211,7 @@ async function processNext() {
 
     if (!cancelledRegions.has(regionId)) {
       const fullText = tokenizer.decode(tokenIds.slice(1));
-      console.log(`[transcribe-${workerId} line ${lineIndex}] "${fullText}"`);
+      if (DEV) console.log(`[transcribe-${workerId} line ${lineIndex}] "${fullText}"`);
       self.postMessage({
         type: 'line_done',
         payload: { imageId, regionId, lineIndex, text: fullText, confidence },

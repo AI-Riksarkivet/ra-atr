@@ -3,6 +3,7 @@
   import { toggleMode } from 'mode-watcher';
   import { Sun, Moon, Home, Search, FileText, Server } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
+  import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { page } from '$app/state';
 
@@ -71,26 +72,28 @@
     <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
       <Home class="size-4" />
     </Button>
-    <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
-      <Search class="size-4" />
-    </Button>
-    {#if !catalogOpen}
-      <input
-        type="text"
-        bind:value={headerSearch}
-        placeholder="Search catalog..."
-        class="w-40 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:w-56 transition-all"
-        onkeydown={(e) => {
-          if (e.key === 'Enter' && headerSearch.trim()) {
-            onSearch?.(headerSearch.trim());
-            headerSearch = '';
-          }
-          if (e.key === 'Escape') {
-            headerSearch = '';
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-      />
+    {#if BACKEND_ENABLED}
+      <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
+        <Search class="size-4" />
+      </Button>
+      {#if !catalogOpen}
+        <input
+          type="text"
+          bind:value={headerSearch}
+          placeholder="Search catalog..."
+          class="w-40 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:w-56 transition-all"
+          onkeydown={(e) => {
+            if (e.key === 'Enter' && headerSearch.trim()) {
+              onSearch?.(headerSearch.trim());
+              headerSearch = '';
+            }
+            if (e.key === 'Escape') {
+              headerSearch = '';
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+      {/if}
     {/if}
   {/if}
 

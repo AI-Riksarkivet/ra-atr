@@ -4,10 +4,11 @@ import { decodeImage } from './lib/preprocessing';
 import { parseRTMDetOutput } from './lib/rtmdet';
 
 // Layout detection worker: Riksarkivet RTMDet regions
+const DEV = self.location?.hostname === 'localhost';
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4)) : 1;
 
-const MODEL_URL = '/models/rtmdet-regions.onnx';
+let modelUrl = '/models/rtmdet-regions.onnx';
 const INPUT_SIZE = 640;
 const CONF_THRESHOLD = 0.3;
 const IOU_THRESHOLD = 0.45;
@@ -20,15 +21,17 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
       case 'load_model': {
+        if (e.data.payload?.modelUrl) modelUrl = e.data.payload.modelUrl;
+        const headers: Record<string, string> = e.data.payload?.headers ?? {};
         const progress = (p: { model: string; percent: number }) => {
           self.postMessage({ type: 'model_status', payload: { model: p.model, status: 'downloading', progress: p.percent } });
         };
-        const bytes = await downloadAndCacheModel(MODEL_URL, 'layout', progress);
+        const bytes = await downloadAndCacheModel(modelUrl, 'layout', progress, headers);
         session = await ort.InferenceSession.create(bytes, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
-        console.log('[layout] RTMDet loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
+        if (DEV) console.log('[layout] RTMDet loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'layout', status: 'loaded' } });
         self.postMessage({ type: 'ready' });
         break;
@@ -74,7 +77,7 @@ self.onmessage = async (e: MessageEvent) => {
           chw[2 * INPUT_SIZE * INPUT_SIZE + i] = pixels[i * 4 + 2] / 255.0;
         }
 
-        console.time(`[layout] inference`);
+        if (DEV) console.time(`[layout] inference`);
         const imageTensor = new ort.Tensor('float32', chw, [1, 3, INPUT_SIZE, INPUT_SIZE]);
 
         const result = await session.run({ image: imageTensor });
@@ -82,7 +85,7 @@ self.onmessage = async (e: MessageEvent) => {
         const bboxPreds = result['bbox_preds'].data as Float32Array;
         const numAnchors = result['cls_scores'].dims[1];
         const numClasses = result['cls_scores'].dims[2];
-        console.timeEnd(`[layout] inference`);
+        if (DEV) console.timeEnd(`[layout] inference`);
 
         // Decode: image at top-left, scale maps padded 640 coords back to original
         const regions = parseRTMDetOutput(
@@ -94,9 +97,11 @@ self.onmessage = async (e: MessageEvent) => {
           LABELS,
         );
 
-        console.log(`[layout] ${regions.length} regions detected, image ${origW}x${origH}`);
-        for (const r of regions.slice(0, 5)) {
-          console.log(`[layout]   ${r.label} ${(r.confidence * 100).toFixed(0)}% [${r.x.toFixed(0)},${r.y.toFixed(0)} ${r.w.toFixed(0)}x${r.h.toFixed(0)}]`);
+        if (DEV) {
+          console.log(`[layout] ${regions.length} regions detected, image ${origW}x${origH}`);
+          for (const r of regions.slice(0, 5)) {
+            console.log(`[layout]   ${r.label} ${(r.confidence * 100).toFixed(0)}% [${r.x.toFixed(0)},${r.y.toFixed(0)} ${r.w.toFixed(0)}x${r.h.toFixed(0)}]`);
+          }
         }
         self.postMessage({ type: 'layout_result', payload: { imageId, regions } });
         break;

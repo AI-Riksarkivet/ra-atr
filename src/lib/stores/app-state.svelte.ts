@@ -1,6 +1,6 @@
 import { HTRWorkerState } from '$lib/worker-state.svelte';
 import type { ImageDocument, Line, LineGroup } from '$lib/types';
-import type { TranscriptionGroup, CatalogResult } from '$lib/api';
+import { BACKEND_ENABLED, type TranscriptionGroup, type CatalogResult } from '$lib/api';
 
 const AUTOSAVE_DELAY = 2000;
 const MAX_CACHED_IMAGES = 10;
@@ -271,6 +271,7 @@ class AppState {
 
   /** Schedule a debounced auto-save to backend */
   scheduleAutoSave() {
+    if (!BACKEND_ENABLED) return;
     if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
     this.autoSaveTimer = setTimeout(() => this.save(), AUTOSAVE_DELAY);
   }

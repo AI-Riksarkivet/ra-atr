@@ -34,7 +34,8 @@ export async function getCachedModel(url: string): Promise<ArrayBuffer | null> {
 export async function downloadAndCacheModel(
   url: string,
   modelName: string,
-  onProgress: (p: DownloadProgress) => void
+  onProgress: (p: DownloadProgress) => void,
+  headers?: Record<string, string>,
 ): Promise<ArrayBuffer> {
   const cached = await getCachedModel(url);
   if (cached) {
@@ -42,7 +43,7 @@ export async function downloadAndCacheModel(
     return cached;
   }
 
-  const response = await fetch(url);
+  const response = await fetch(url, headers && Object.keys(headers).length > 0 ? { headers } : undefined);
   if (!response.ok) {
     throw new Error(`Failed to download ${modelName}: ${response.status}`);
   }

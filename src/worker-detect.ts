@@ -4,11 +4,12 @@ import { preprocessYolo, decodeImage, cropImageData } from './lib/preprocessing'
 import { parseYoloOutput } from './lib/yolo';
 
 // Detection worker: YOLO only, lightweight thread usage
+const DEV = self.location?.hostname === 'localhost';
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4)) : 1;
-console.log(`[detect] threads: ${ort.env.wasm.numThreads}`);
+if (DEV) console.log(`[detect] threads: ${ort.env.wasm.numThreads}`);
 
-const MODEL_URL = '/models/yolo-lines.onnx';
+let modelUrl = '/models/yolo-lines.onnx';
 
 let yoloSession: ort.InferenceSession | null = null;
 let ready = false;
@@ -27,6 +28,8 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
       case 'load_models': {
+        if (e.data.payload?.modelUrl) modelUrl = e.data.payload.modelUrl;
+        const headers: Record<string, string> = e.data.payload?.headers ?? {};
         const progress = (p: { model: string; percent: number }) => {
           self.postMessage({
             type: 'model_status',
@@ -34,12 +37,12 @@ self.onmessage = async (e: MessageEvent) => {
           });
         };
 
-        const yoloBytes = await downloadAndCacheModel(MODEL_URL, 'yolo', progress);
+        const yoloBytes = await downloadAndCacheModel(modelUrl, 'yolo', progress, headers);
         yoloSession = await ort.InferenceSession.create(yoloBytes, {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
-        console.log('[detect] YOLO loaded, inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
+        if (DEV) console.log('[detect] YOLO loaded, inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 
         ready = true;
@@ -51,7 +54,7 @@ self.onmessage = async (e: MessageEvent) => {
         const { imageId, imageData } = e.data.payload;
         const decoded = await decodeImage(imageData);
         imageStore.set(imageId, decoded);
-        console.log(`[detect] image added: ${imageId} (${decoded.width}x${decoded.height}), total: ${imageStore.size}`);
+        if (DEV) console.log(`[detect] image added: ${imageId} (${decoded.width}x${decoded.height}), total: ${imageStore.size}`);
         self.postMessage({ type: 'image_ready' });
         break;
       }
@@ -68,7 +71,7 @@ self.onmessage = async (e: MessageEvent) => {
         cancelledRegions.add(regionId);
         const idx = regionQueue.findIndex(r => r.regionId === regionId);
         if (idx >= 0) regionQueue.splice(idx, 1);
-        console.log(`[detect] cancelled region ${regionId}`);
+        if (DEV) console.log(`[detect] cancelled region ${regionId}`);
         break;
       }
     }
@@ -102,7 +105,7 @@ async function processNextRegion() {
     const cw = Math.max(1, Math.min(Math.round(rw), imgData.width - cx));
     const ch = Math.max(1, Math.min(Math.round(rh), imgData.height - cy));
 
-    console.time(`[detect ${regionId}] YOLO`);
+    if (DEV) console.time(`[detect ${regionId}] YOLO`);
     const cropped = cropImageData(imgData, cx, cy, cw, ch);
     const { tensor: yoloInput, scale, padX, padY } = preprocessYolo(cropped, 640);
     const yoloTensor = new ort.Tensor('float32', yoloInput, [1, 3, 640, 640]);
@@ -130,8 +133,8 @@ async function processNextRegion() {
     }
 
     detections.sort((a, b) => a.y - b.y || a.x - b.x);
-    console.timeEnd(`[detect ${regionId}] YOLO`);
-    console.log(`[detect ${regionId}] ${detections.length} lines found`);
+    if (DEV) console.timeEnd(`[detect ${regionId}] YOLO`);
+    if (DEV) console.log(`[detect ${regionId}] ${detections.length} lines found`);
 
     const prevSent = totalLinesSentPerImage.get(imageId) ?? 0;
     const startIndex = prevSent;

@@ -17,9 +17,10 @@
     groups: LineGroup[];
     selectMode: boolean;
     showTextOverlay: boolean;
+    imageFilter?: string;
   }
 
-  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode, showTextOverlay }: Props = $props();
+  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode, showTextOverlay, imageFilter = '' }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
@@ -292,42 +293,47 @@
               ctx.fillRect(b.x, b.y, b.w, b.h);
               if (line.text) {
                 // Show partial text
-                const fontSize = b.h * 0.75;
+                const pad = b.h * 0.15;
+                let fontSize = b.h * 0.75;
                 ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+                let textW = ctx.measureText(line.text).width;
+                if (textW + pad * 2 > b.w) {
+                  fontSize *= (b.w - pad * 2) / textW;
+                  ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+                  textW = ctx.measureText(line.text).width;
+                }
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
-                const pad = b.h * 0.15;
+                const bgW = Math.max(b.w, textW + pad * 2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.fillRect(b.x, b.y, bgW, b.h);
                 ctx.fillStyle = 'rgba(147, 197, 253, 0.9)';
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(b.x, b.y, b.w, b.h);
-                ctx.clip();
                 ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
-                ctx.restore();
                 // Progress bar
                 const progress = Math.min(1, line.text.length / 40);
                 ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
-                ctx.fillRect(b.x, b.y + b.h - 2 / transform.scale, b.w * progress, 2 / transform.scale);
+                ctx.fillRect(b.x, b.y + b.h - 2 / transform.scale, bgW * progress, 2 / transform.scale);
               }
             } else if (line.text) {
               // Completed line — dim unless hovered
               const dimmed = hoveredLine >= 0 && !isHoveredLine;
-              const fontSize = b.h * 0.75;
+              const pad = b.h * 0.15;
+              // Start with height-based size, then shrink to fit width if needed
+              let fontSize = b.h * 0.75;
               ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+              let textW = ctx.measureText(line.text).width;
+              if (textW + pad * 2 > b.w) {
+                fontSize *= (b.w - pad * 2) / textW;
+                ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
+                textW = ctx.measureText(line.text).width;
+              }
               ctx.textAlign = 'left';
               ctx.textBaseline = 'middle';
-              const pad = b.h * 0.15;
+              const bgW = Math.max(b.w, textW + pad * 2);
               ctx.fillStyle = dimmed ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.7)';
-              ctx.fillRect(b.x, b.y, b.w, b.h);
+              ctx.fillRect(b.x, b.y, bgW, b.h);
               ctx.fillStyle = dimmed ? 'rgba(255, 255, 255, 0.3)' : '#fff';
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(b.x, b.y, b.w, b.h);
-              ctx.clip();
               ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
-              ctx.restore();
             }
           } else if (!line.complete && !isSelected && !highlight) {
             // Non-overlay mode: subtle shimmer only
@@ -475,7 +481,7 @@
 </script>
 
 <div class="relative h-full w-full">
-  <canvas bind:this={canvasEl} class="block h-full w-full touch-none" class:cursor-crosshair={selectMode}></canvas>
+  <canvas bind:this={canvasEl} class="block h-full w-full touch-none" class:cursor-crosshair={selectMode} style:filter={imageFilter || 'none'}></canvas>
   {#if stage === 'segmenting'}
     <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 pointer-events-none">
       <div class="size-8 animate-spin rounded-full border-3 border-white/20 border-t-white"></div>

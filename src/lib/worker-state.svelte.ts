@@ -1,14 +1,7 @@
 import type { WorkerOutMessage, PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
 import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe, autoDetectGpuServer, gpuServerUrl } from './gpu-client';
-
-const MODEL_URLS = [
-  '/models/yolo-lines.onnx',
-  '/models/encoder.onnx',
-  '/models/decoder.onnx',
-  '/models/tokenizer.json',
-  '/models/rtmdet-regions.onnx',
-];
+import { ALL_MODEL_URLS, MODEL_URLS, getModelFetchHeaders } from './model-config';
 
 export class HTRWorkerState {
   stage = $state<PipelineStage>('idle');
@@ -61,8 +54,13 @@ export class HTRWorkerState {
 
   private async _init() {
     // Always start with WASM — GPU is an optional upgrade
-    console.log('[htr] Starting with WASM inference');
-    const cached = await areAllModelsCached(MODEL_URLS);
+    if (import.meta.env.DEV) console.log('[htr] Starting with WASM inference');
+    let cached = false;
+    try {
+      cached = await areAllModelsCached(ALL_MODEL_URLS);
+    } catch (e) {
+      console.warn('[htr] Cache check failed, continuing:', e);
+    }
     this.cacheChecked = true;
     if (cached) {
       this.loadModels();
@@ -75,7 +73,7 @@ export class HTRWorkerState {
   private async _detectGpuInBackground() {
     // Check if already configured via localStorage
     if (isGpuServerEnabled()) {
-      console.log(`[htr] GPU server already configured: ${gpuServerUrl.get()}`);
+      if (import.meta.env.DEV) console.log(`[htr] GPU server already configured: ${gpuServerUrl.get()}`);
       return;
     }
 
@@ -83,7 +81,7 @@ export class HTRWorkerState {
     const url = await autoDetectGpuServer();
     if (url) {
       gpuServerUrl.set(url);
-      console.log(`[htr] GPU server auto-detected at ${url}`);
+      if (import.meta.env.DEV) console.log(`[htr] GPU server auto-detected at ${url}`);
     }
   }
 
@@ -122,8 +120,9 @@ export class HTRWorkerState {
     this.createTranscribeWorkers(n);
     if (this.detectReady) {
       this.modelsReady = false;
+      const headers = getModelFetchHeaders();
       for (const w of this.transcribeWorkers) {
-        w.postMessage({ type: 'load_models' });
+        w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: MODEL_URLS.encoder, decoder: MODEL_URLS.decoder, tokenizer: MODEL_URLS.tokenizer }, headers } });
       }
     }
   }
@@ -260,10 +259,11 @@ export class HTRWorkerState {
       this.layoutWorker.onmessage = (e: MessageEvent) => this.handleLayoutMessage(e.data);
     }
 
-    this.detectWorker.postMessage({ type: 'load_models' });
-    this.layoutWorker.postMessage({ type: 'load_model' });
+    const headers = getModelFetchHeaders();
+    this.detectWorker.postMessage({ type: 'load_models', payload: { modelUrl: MODEL_URLS.yolo, headers } });
+    this.layoutWorker.postMessage({ type: 'load_model', payload: { modelUrl: MODEL_URLS.layout, headers } });
     for (const w of this.transcribeWorkers) {
-      w.postMessage({ type: 'load_models' });
+      w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: MODEL_URLS.encoder, decoder: MODEL_URLS.decoder, tokenizer: MODEL_URLS.tokenizer }, headers } });
     }
   }
 
