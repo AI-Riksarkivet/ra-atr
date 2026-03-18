@@ -67,8 +67,10 @@ self.onmessage = async (e: MessageEvent) => {
           downloadAndCacheModel(modelUrls.tokenizer, 'tokenizer', progress, headers),
         ]);
 
+        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
+        if (DEV) console.log(`[transcribe-${workerId}] using: ${eps[0]}`);
         const sessionOpts: ort.InferenceSession.SessionOptions = {
-          executionProviders: ['wasm'],
+          executionProviders: eps,
           graphOptimizationLevel: 'all',
         };
 

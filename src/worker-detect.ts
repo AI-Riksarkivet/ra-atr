@@ -40,10 +40,12 @@ self.onmessage = async (e: MessageEvent) => {
         };
 
         const yoloBytes = await downloadAndCacheModel(modelUrl, 'yolo', progress, headers);
+        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
         yoloSession = await ort.InferenceSession.create(yoloBytes, {
-          executionProviders: ['wasm'],
+          executionProviders: eps,
           graphOptimizationLevel: 'all',
         });
+        if (DEV) console.log(`[detect] using: ${eps[0]}`);
         if (DEV) console.log('[detect] YOLO loaded, inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 

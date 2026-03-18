@@ -29,10 +29,12 @@ self.onmessage = async (e: MessageEvent) => {
           self.postMessage({ type: 'model_status', payload: { model: p.model, status: 'downloading', progress: p.percent } });
         };
         const bytes = await downloadAndCacheModel(modelUrl, 'layout', progress, headers);
+        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
         session = await ort.InferenceSession.create(bytes, {
-          executionProviders: ['wasm'],
+          executionProviders: eps,
           graphOptimizationLevel: 'all',
         });
+        if (DEV) console.log(`[layout] using: ${eps[0]}`);
         if (DEV) console.log('[layout] RTMDet loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'layout', status: 'loaded' } });
         self.postMessage({ type: 'ready' });
