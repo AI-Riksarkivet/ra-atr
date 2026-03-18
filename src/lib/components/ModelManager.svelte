@@ -7,11 +7,14 @@
     onLoadModels: () => void;
     modelsReady: boolean;
     autoLoading?: boolean;
+    error?: string | null;
+    onDismissError?: () => void;
   }
 
-  let { modelProgress, onLoadModels, modelsReady, autoLoading = false }: Props = $props();
+  let { modelProgress, onLoadModels, modelsReady, autoLoading = false, error = null, onDismissError }: Props = $props();
 
   const models = [
+    { key: 'layout', label: 'RTMDet Layout', size: '~97 MB' },
     { key: 'yolo', label: 'YOLO Line Detection', size: '~229 MB' },
     { key: 'trocr-encoder', label: 'TrOCR Encoder', size: '~329 MB' },
     { key: 'trocr-decoder', label: 'TrOCR Decoder', size: '~1.2 GB' },
@@ -20,8 +23,20 @@
 
   let loading = $state(false);
 
+  // Reset loading state when an error arrives
+  $effect(() => { if (error) loading = false; });
+
+  const is401 = $derived(error?.includes('401') ?? false);
+
   function handleLoad() {
     loading = true;
+    onDismissError?.();
+    onLoadModels();
+  }
+
+  function handleRetry() {
+    loading = true;
+    onDismissError?.();
     onLoadModels();
   }
 </script>
@@ -46,7 +61,16 @@
     {/each}
   </div>
 
-  {#if !loading && !modelsReady && !autoLoading}
+  {#if error}
+    <div class="rounded-md border border-destructive/50 bg-destructive/10 p-3 space-y-2">
+      <p class="text-sm font-medium text-destructive">Download failed</p>
+      <p class="text-xs text-muted-foreground break-all">{error}</p>
+      {#if is401}
+        <p class="text-xs text-muted-foreground">Set your HuggingFace token: open browser console and run<br><code class="text-xs bg-muted px-1 rounded">sessionStorage.setItem('hf_token', 'hf_...')</code></p>
+      {/if}
+      <Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
+    </div>
+  {:else if !loading && !modelsReady && !autoLoading}
     <Button class="w-full" onclick={handleLoad}>Download Models</Button>
   {/if}
 </div>

@@ -67,6 +67,10 @@ export async function probeGpuServer(url: string): Promise<boolean> {
  * Returns the URL if found, empty string if not.
  */
 export async function autoDetectGpuServer(): Promise<string> {
+  // Skip auto-detect on non-localhost origins (e.g. HF Spaces) — can't reach loopback
+  if (typeof location !== 'undefined' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    return '';
+  }
   // Try proxy path first (avoids COEP/CORS issues)
   if (await probeGpuServer('/gpu')) {
     return '/gpu';

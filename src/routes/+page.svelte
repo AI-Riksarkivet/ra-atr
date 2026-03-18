@@ -23,6 +23,8 @@
         onLoadModels={() => appState.htr.loadModels()}
         modelsReady={appState.htr.modelsReady}
         autoLoading={appState.htr.stage === 'loading_models'}
+        error={appState.htr.error}
+        onDismissError={() => appState.htr.error = null}
       />
     {/if}
   </div>

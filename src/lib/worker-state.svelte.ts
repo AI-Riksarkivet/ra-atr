@@ -100,11 +100,13 @@ export class HTRWorkerState {
     this.transcribeReadyCount = 0;
 
     for (let i = 0; i < count; i++) {
-      const url = new URL('../worker-transcribe.ts', import.meta.url);
-      url.searchParams.set('id', String(i));
-      url.searchParams.set('pool', String(count));
-      const worker = new Worker(url, { type: 'module' });
+      const worker = new Worker(
+        new URL('../worker-transcribe.ts', import.meta.url),
+        { type: 'module' }
+      );
       worker.onmessage = (e: MessageEvent) => this.handleTranscribeMessage(e.data);
+      // Send worker config (id/pool) — used to be URL params but that broke Vite's worker detection
+      worker.postMessage({ type: 'config', payload: { id: String(i), pool: String(count) } });
       this.transcribeWorkers.push(worker);
     }
   }

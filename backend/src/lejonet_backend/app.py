@@ -701,11 +701,11 @@ def _catalog_fts_search(q: str, limit: int, where: str | None = None) -> pa.Tabl
 
 def _catalog_vector_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
-        from lejonet_backend.ingest_catalog import create_embedder, embed_batch
+        from lejonet_backend.ingest_catalog import create_embedder, embed_query
 
         if not hasattr(_catalog_vector_search, "_embedder"):
             _catalog_vector_search._embedder = create_embedder()
-        vec = embed_batch(_catalog_vector_search._embedder, [q])[0]
+        vec = embed_query(_catalog_vector_search._embedder, q)
         s = catalog_table.search(vec)
         if where:
             s = s.where(where)

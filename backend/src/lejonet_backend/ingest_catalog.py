@@ -8,8 +8,8 @@ import lancedb
 import pyarrow as pa
 
 CATALOG_TABLE = "archive_catalog"
-EMBED_MODEL = "intfloat/multilingual-e5-small"
-EMBED_DIM = 384
+EMBED_MODEL = "Snowflake/snowflake-arctic-embed-l-v2.0"
+EMBED_DIM = 256  # Matryoshka truncation: 1024 → 256 (smaller than e5-small, better quality)
 
 CATALOG_SCHEMA = pa.schema(
     [
@@ -191,14 +191,19 @@ def walk_archive_dir(directory: str, limit: int | None = None):
 def create_embedder():
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(EMBED_MODEL)
+    return SentenceTransformer(EMBED_MODEL, truncate_dim=EMBED_DIM)
 
 
-def embed_batch(embedder, texts: list[str]) -> list[list[float]]:
-    # e5 models expect "query: " or "passage: " prefix
-    prefixed = [f"passage: {t}" for t in texts]
-    vecs = embedder.encode(prefixed, normalize_embeddings=True)
+def embed_documents(embedder, texts: list[str]) -> list[list[float]]:
+    """Embed documents (no prefix for Arctic)."""
+    vecs = embedder.encode(texts, normalize_embeddings=True)
     return [v.tolist() for v in vecs]
+
+
+def embed_query(embedder, query: str) -> list[float]:
+    """Embed a search query (Arctic requires 'query: ' prefix)."""
+    vec = embedder.encode(f"query: {query}", normalize_embeddings=True)
+    return vec.tolist()
 
 
 def ingest_rows(
@@ -216,7 +221,7 @@ def ingest_rows(
         batch = rows[i : i + batch_size]
 
         if embedder:
-            vectors = embed_batch(embedder, [r["search_text"] for r in batch])
+            vectors = embed_documents(embedder, [r["search_text"] for r in batch])
             for row, vec in zip(batch, vectors):
                 row["vector"] = vec
         else:
@@ -275,7 +280,7 @@ def ingest_streaming(
     def flush(batch: list[dict], first: bool) -> None:
         nonlocal written
         if embedder:
-            vectors = embed_batch(embedder, [r["search_text"] for r in batch])
+            vectors = embed_documents(embedder, [r["search_text"] for r in batch])
             for row, vec in zip(batch, vectors):
                 row["vector"] = vec
         else:

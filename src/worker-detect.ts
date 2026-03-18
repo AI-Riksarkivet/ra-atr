@@ -6,7 +6,9 @@ import { parseYoloOutput } from './lib/yolo';
 // Detection worker: YOLO only, lightweight thread usage
 const DEV = self.location?.hostname === 'localhost';
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
-ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4)) : 1;
+const cores = navigator.hardwareConcurrency || 4;
+// Budget 2 threads for detect (lightweight, runs infrequently)
+ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(2, Math.max(1, Math.floor(cores / 4))) : 1;
 if (DEV) console.log(`[detect] threads: ${ort.env.wasm.numThreads}`);
 
 let modelUrl = '/models/yolo-lines.onnx';

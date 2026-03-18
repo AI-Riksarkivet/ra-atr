@@ -112,13 +112,17 @@ def test_walk_directory():
 
 
 def test_embed_texts():
-    from lejonet_backend.ingest_catalog import create_embedder, embed_batch
+    from lejonet_backend.ingest_catalog import create_embedder, embed_documents, embed_query, EMBED_DIM
 
     embedder = create_embedder()
     texts = ["Swedish council protocols", "Krigsarkivet military records"]
-    vectors = embed_batch(embedder, texts)
+    vectors = embed_documents(embedder, texts)
     assert len(vectors) == 2
-    assert len(vectors[0]) == 384  # e5-small output dim
+    assert len(vectors[0]) == EMBED_DIM
+
+    # Query embedding
+    qvec = embed_query(embedder, "military records")
+    assert len(qvec) == EMBED_DIM
 
 
 def test_ingest_to_lancedb(tmp_path):

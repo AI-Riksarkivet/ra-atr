@@ -6,14 +6,15 @@ import { BpeTokenizer } from './lib/tokenizer';
 // Transcription worker: encoder + decoder, share CPU with siblings
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 const cores = navigator.hardwareConcurrency || 4;
-// Thread count passed via URL search param, fallback to reasonable default
-const params = new URL(import.meta.url).searchParams;
-const poolSize = parseInt(params.get('pool') ?? '2', 10);
-ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor(cores / (poolSize + 1))) : 1;
-
 const DEV = self.location?.hostname === 'localhost';
-const workerId = params.get('id') ?? '0';
-if (DEV) console.log(`[transcribe-${workerId}] threads: ${ort.env.wasm.numThreads}, pool: ${poolSize}`);
+
+// ORT recommends: min(cores/2, 4). Budget 4 threads for transcribe (the heavy worker).
+// Must be set before any InferenceSession.create() — cannot be changed after.
+ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(4, Math.max(1, Math.floor(cores / 2))) : 1;
+if (DEV) console.log(`[transcribe] threads: ${ort.env.wasm.numThreads}, cores: ${cores}, SAB: ${hasSharedBuffer}`);
+
+let workerId = '0';
+let poolSize = 1;
 
 let modelUrls = {
   encoder: '/models/encoder.onnx',
@@ -42,6 +43,14 @@ const cancelledRegions = new Set<string>();
 self.onmessage = async (e: MessageEvent) => {
   try {
     switch (e.data.type) {
+      case 'config': {
+        workerId = e.data.payload?.id ?? '0';
+        poolSize = parseInt(e.data.payload?.pool ?? '1', 10);
+        // Note: numThreads cannot be changed after session creation, so we don't update it here
+        if (DEV) console.log(`[transcribe-${workerId}] pool: ${poolSize}`);
+        break;
+      }
+
       case 'load_models': {
         if (e.data.payload?.modelUrls) modelUrls = { ...modelUrls, ...e.data.payload.modelUrls };
         const headers: Record<string, string> = e.data.payload?.headers ?? {};

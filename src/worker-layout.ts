@@ -6,7 +6,9 @@ import { parseRTMDetOutput } from './lib/rtmdet';
 // Layout detection worker: Riksarkivet RTMDet regions
 const DEV = self.location?.hostname === 'localhost';
 const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
-ort.env.wasm.numThreads = hasSharedBuffer ? Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) / 4)) : 1;
+const cores = navigator.hardwareConcurrency || 4;
+// Budget 2 threads for layout (lightweight, runs once per image)
+ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(2, Math.max(1, Math.floor(cores / 4))) : 1;
 
 let modelUrl = '/models/rtmdet-regions.onnx';
 const INPUT_SIZE = 640;
