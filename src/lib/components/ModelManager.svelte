@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Progress } from '$lib/components/ui/progress';
+  import { Scan, PenLine, SplitSquareHorizontal, Type, FileKey } from 'lucide-svelte';
 
   interface Props {
     modelProgress: Record<string, number>;
@@ -14,19 +15,26 @@
   let { modelProgress, onLoadModels, modelsReady, autoLoading = false, error = null, onDismissError }: Props = $props();
 
   const models = [
-    { key: 'layout', label: 'RTMDet Layout', size: '~97 MB' },
-    { key: 'yolo', label: 'YOLO Line Detection', size: '~229 MB' },
-    { key: 'trocr-encoder', label: 'TrOCR Encoder', size: '~329 MB' },
-    { key: 'trocr-decoder', label: 'TrOCR Decoder', size: '~1.2 GB' },
-    { key: 'tokenizer', label: 'Tokenizer', size: '~2 MB' },
+    { key: 'layout', label: 'Layout Detection', desc: 'RTMDet regions', size: '97 MB', icon: Scan },
+    { key: 'yolo', label: 'Line Detection', desc: 'YOLO segments', size: '229 MB', icon: SplitSquareHorizontal },
+    { key: 'trocr-encoder', label: 'Text Encoder', desc: 'TrOCR vision', size: '329 MB', icon: FileKey },
+    { key: 'trocr-decoder', label: 'Text Decoder', desc: 'TrOCR language', size: '1.2 GB', icon: PenLine },
+    { key: 'tokenizer', label: 'Tokenizer', desc: 'BPE vocab', size: '2 MB', icon: Type },
   ];
 
   let loading = $state(false);
 
-  // Reset loading state when an error arrives
   $effect(() => { if (error) loading = false; });
 
   const is401 = $derived(error?.includes('401') ?? false);
+  const isActive = $derived(loading || autoLoading);
+
+  const overallProgress = $derived(() => {
+    if (modelsReady) return 100;
+    if (!isActive) return 0;
+    const values = models.map(m => modelProgress[m.key] ?? 0);
+    return Math.round(values.reduce((a, b) => a + b, 0) / models.length);
+  });
 
   function handleLoad() {
     loading = true;
@@ -42,42 +50,82 @@
 </script>
 
 <div class="mx-auto max-w-md space-y-6 p-8">
-  <div class="space-y-2">
-    <h2 class="text-2xl font-bold tracking-tight">Lejonet HTR</h2>
-    <p class="text-sm text-muted-foreground">
+  <!-- Title and description -->
+  <div class="space-y-3 text-center">
+    <h1 class="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Lejonet HTR</h1>
+    <p class="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
       Transcribe handwritten Swedish historical documents directly in your browser. All inference runs locally — no data leaves your device.
     </p>
   </div>
 
-  <div class="space-y-2">
-    <h3 class="text-sm font-semibold">{autoLoading ? 'Loading Models' : 'Download Models'}</h3>
-    <p class="text-xs text-muted-foreground">
-      {autoLoading ? 'Loading cached models...' : 'HTR models run entirely in your browser using ONNX Runtime. Total download: ~1.8 GB (cached after first load).'}
-    </p>
-  </div>
-
-  <div class="space-y-3">
-    {#each models as model}
-      <div class="flex items-center gap-3">
-        <span class="flex-1 text-sm">{model.label}</span>
-        <span class="min-w-[5rem] text-right font-mono text-xs text-muted-foreground">{model.size}</span>
-        {#if loading || modelsReady || autoLoading}
-          <Progress value={modelsReady ? 100 : (modelProgress[model.key] ?? 0)} class="w-24 {!modelsReady && (modelProgress[model.key] ?? 0) > 0 && (modelProgress[model.key] ?? 0) < 100 ? 'progress-shimmer' : ''}" />
+  <!-- Model card -->
+  <div class="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {#if modelsReady}
+          Models Ready
+        {:else if isActive}
+          Downloading — {overallProgress()}%
+        {:else}
+          HTR Pipeline
         {/if}
+      </h3>
+      {#if isActive && !modelsReady}
+        <span class="text-xs text-muted-foreground/60 font-mono">~1.8 GB</span>
+      {/if}
+    </div>
+
+    <!-- Overall progress bar (only during loading) -->
+    {#if isActive && !modelsReady}
+      <div class="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          class="h-full rounded-full bg-primary transition-all duration-500 progress-shimmer"
+          style="width: {overallProgress()}%"
+        ></div>
       </div>
-    {/each}
+    {/if}
+
+    <!-- Model list -->
+    <div class="space-y-2">
+      {#each models as model}
+        {@const pct = modelProgress[model.key] ?? 0}
+        {@const done = modelsReady || pct >= 100}
+        <div class="flex items-center gap-3 py-1.5 {done ? 'opacity-60' : ''}">
+          <div class="size-7 rounded-lg {done ? 'bg-success/10 text-success' : isActive && pct > 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} flex items-center justify-center transition-colors">
+            <model.icon class="size-3.5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium {done ? 'text-muted-foreground' : ''}">{model.label}</span>
+              <span class="text-[0.65rem] text-muted-foreground/60 font-mono">{model.size}</span>
+            </div>
+            {#if isActive && !done}
+              <div class="mt-1 h-1 rounded-full bg-muted overflow-hidden">
+                <div class="h-full rounded-full bg-primary transition-all duration-300" style="width: {pct}%"></div>
+              </div>
+            {:else if !isActive && !done}
+              <p class="text-[0.65rem] text-muted-foreground/50">{model.desc}</p>
+            {:else}
+              <p class="text-[0.65rem] text-success/70">Ready</p>
+            {/if}
+          </div>
+        </div>
+      {/each}
+    </div>
   </div>
 
+  <!-- Actions -->
   {#if error}
-    <div class="rounded-md border border-destructive/50 bg-destructive/10 p-3 space-y-2">
+    <div class="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-2">
       <p class="text-sm font-medium text-destructive">Download failed</p>
       <p class="text-xs text-muted-foreground break-all">{error}</p>
       {#if is401}
-        <p class="text-xs text-muted-foreground">Set your HuggingFace token: open browser console and run<br><code class="text-xs bg-muted px-1 rounded">sessionStorage.setItem('hf_token', 'hf_...')</code></p>
+        <p class="text-xs text-muted-foreground">Set your HuggingFace token in the browser console:<br><code class="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">sessionStorage.setItem('hf_token', 'hf_...')</code></p>
       {/if}
       <Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
     </div>
   {:else if !loading && !modelsReady && !autoLoading}
-    <Button class="w-full" onclick={handleLoad}>Download Models</Button>
+    <Button class="w-full h-11 text-sm font-medium btn-glow rounded-xl" onclick={handleLoad}>Download Models</Button>
+    <p class="text-center text-[0.65rem] text-muted-foreground/50">Cached after first download — loads instantly next time</p>
   {/if}
 </div>
