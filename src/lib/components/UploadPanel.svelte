@@ -61,7 +61,8 @@
       onchange={(e) => handleFiles(e.currentTarget.files)}
       {disabled}
     />
-    <p class="text-sm text-muted-foreground">Drop images here or click to upload</p>
+    <p class="text-base font-medium text-foreground/80">Drop images here or click to upload</p>
+    <p class="text-xs text-muted-foreground text-center max-w-xs">Upload scanned pages of handwritten documents, then press <span class="inline-flex items-center align-middle"><svg class="size-3.5 inline" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></span> to run layout detection, line segmentation, and transcription.</p>
     <Button
       variant="outline"
       size="sm"

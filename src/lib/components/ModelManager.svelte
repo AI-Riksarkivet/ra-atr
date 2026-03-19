@@ -43,9 +43,16 @@
 
 <div class="mx-auto max-w-md space-y-6 p-8">
   <div class="space-y-2">
-    <h2 class="text-lg font-semibold">{autoLoading ? 'Loading Models' : 'Download Models'}</h2>
+    <h2 class="text-2xl font-bold tracking-tight">Lejonet HTR</h2>
     <p class="text-sm text-muted-foreground">
-      {autoLoading ? 'Loading cached models...' : 'Models run entirely in your browser. Total download: ~1.8 GB (cached after first load).'}
+      Transcribe handwritten Swedish historical documents directly in your browser. All inference runs locally — no data leaves your device.
+    </p>
+  </div>
+
+  <div class="space-y-2">
+    <h3 class="text-sm font-semibold">{autoLoading ? 'Loading Models' : 'Download Models'}</h3>
+    <p class="text-xs text-muted-foreground">
+      {autoLoading ? 'Loading cached models...' : 'HTR models run entirely in your browser using ONNX Runtime. Total download: ~1.8 GB (cached after first load).'}
     </p>
   </div>
 
