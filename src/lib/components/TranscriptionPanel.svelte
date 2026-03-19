@@ -413,7 +413,7 @@
   {@const line = doc.lines.find(l => l.id === lineId)}
   {#if line && lineMatches(doc, lineId)}
     <div
-      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-colors {lineId === hoveredLine ? 'bg-orange-500/[0.08]' : ''} {selectedLines.has(lineId) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''}"
+      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-all relative {lineId === hoveredLine ? 'bg-orange-500/[0.08] pl-3' : ''} {selectedLines.has(lineId) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''} before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-orange-400 before:opacity-0 before:transition-opacity {lineId === hoveredLine ? 'before:opacity-100' : ''}"
       data-line={lineId}
       onmouseenter={() => onHoverLine(lineId)}
       onmouseleave={() => onHoverLine(-1)}
@@ -432,10 +432,10 @@
         />
       {:else}
         <span class="flex-1">
-          {#each highlightText(line.text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !line.complete && line.text}<span class="animate-pulse text-orange-500">|</span>{/if}
+          {#each highlightText(line.text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !line.complete && line.text}<span class="streaming-cursor"></span>{/if}
         </span>
         {#if line.complete}
-          <span class="text-xs text-muted-foreground font-mono">{(line.confidence * 100).toFixed(0)}%</span>
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: oklch(0.65 0.18 {line.confidence > 0.7 ? 145 : line.confidence > 0.4 ? 75 : 25} / {line.confidence * 0.15}); color: oklch({0.45 + line.confidence * 0.25} 0.12 {line.confidence > 0.7 ? 145 : line.confidence > 0.4 ? 75 : 25})">{(line.confidence * 100).toFixed(0)}%</span>
           <button
             class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
             onclick={(e) => { e.stopPropagation(); copyLineText(doc, lineId); }}

@@ -62,7 +62,7 @@
         <span class="flex-1 text-sm">{model.label}</span>
         <span class="min-w-[5rem] text-right font-mono text-xs text-muted-foreground">{model.size}</span>
         {#if loading || modelsReady || autoLoading}
-          <Progress value={modelsReady ? 100 : (modelProgress[model.key] ?? 0)} class="w-24" />
+          <Progress value={modelsReady ? 100 : (modelProgress[model.key] ?? 0)} class="w-24 {!modelsReady && (modelProgress[model.key] ?? 0) > 0 && (modelProgress[model.key] ?? 0) < 100 ? 'progress-shimmer' : ''}" />
         {/if}
       </div>
     {/each}

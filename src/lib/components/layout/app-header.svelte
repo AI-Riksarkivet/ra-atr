@@ -82,7 +82,7 @@
           type="text"
           bind:value={headerSearch}
           placeholder="Search catalog..."
-          class="w-40 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:w-56 transition-all"
+          class="w-48 rounded-lg border border-white/[0.06] bg-white/[0.04] px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/40 focus:bg-white/[0.06] focus:w-64 focus:shadow-[0_0_0_1px_oklch(0.68_0.16_250_/_0.1)] transition-all duration-300"
           onkeydown={(e) => {
             if (e.key === 'Enter' && headerSearch.trim()) {
               onSearch?.(headerSearch.trim());
