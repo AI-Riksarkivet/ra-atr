@@ -250,10 +250,10 @@
     };
 
     // Route token updates to the right document
-    appState.htr.onToken = (imageId, lineId, token) => {
+    appState.htr.onToken = (imageId, lineId, text) => {
       appState.updateDocumentLines(imageId, (doc) => {
         const line = doc.lines.find(l => l.id === lineId);
-        if (line) line.text += token;
+        if (line) line.text = text;
       });
     };
 

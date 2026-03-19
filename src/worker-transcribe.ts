@@ -211,13 +211,13 @@ async function processNext() {
       if (bestToken === tokenizer.eosTokenId) break;
       tokenIds.push(bestToken);
 
-      const tokenText = tokenizer.decodeToken(bestToken);
-      if (tokenText !== null) {
-        self.postMessage({
-          type: 'token',
-          payload: { imageId, regionId, lineIndex, token: tokenText },
-        });
-      }
+      // Decode full sequence so far to handle multi-byte UTF-8 chars (å, ä, ö)
+      // that may span token boundaries
+      const fullText = tokenizer.decode(tokenIds.slice(1));
+      self.postMessage({
+        type: 'token',
+        payload: { imageId, regionId, lineIndex, token: fullText },
+      });
     }
 
     if (!cancelledRegions.has(regionId)) {
