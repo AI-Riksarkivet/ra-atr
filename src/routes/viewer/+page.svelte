@@ -369,7 +369,7 @@
       <CatalogPanel bind:this={catalogPanel} onLoadVolume={(ref, meta) => handleCatalogLoad(ref, meta)} />
     </div>
     <div
-      class="w-[5px] shrink-0 cursor-col-resize touch-none transition-colors hover:bg-primary group relative"
+      class="w-px shrink-0 cursor-col-resize touch-none transition-all hover:w-1 hover:bg-primary/50 active:bg-primary group relative"
       class:bg-primary={draggingDivider === 'left'}
       onpointerdown={(e) => onDividerPointerDown('left', e)}
       onpointermove={onDividerPointerMove}
@@ -437,7 +437,7 @@
       {#if metadataOpen && activeDoc?.manifestId}
         {@const meta = appState.volumeMetadata.get(activeDoc.manifestId)}
         {#if meta}
-          <div class="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-lg bg-black/60 backdrop-blur-md px-4 py-3 text-[0.7rem] text-white/80 leading-relaxed space-y-1 min-w-[280px] max-w-[400px] shadow-lg">
+          <div class="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-lg bg-black/50 backdrop-blur-xl border border-white/[0.06] shadow-xl px-4 py-3 text-[0.7rem] text-white/80 leading-relaxed space-y-1 min-w-[280px] max-w-[400px] shadow-lg">
             <div class="font-semibold text-white">{meta.fonds_title}</div>
             {#if meta.creator}<div class="text-white/60">{meta.creator}</div>{/if}
             {#if meta.series_title}<div>{meta.series_title}{meta.volume_id ? `, vol. ${meta.volume_id}` : ''}</div>{/if}
@@ -453,7 +453,7 @@
       {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
       {@const totalLines = activeDoc?.lines.length ?? 0}
       {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
-      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/50 backdrop-blur-md px-4 py-2 text-[0.7rem] text-white/70">
+      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/40 backdrop-blur-xl border border-white/[0.06] shadow-2xl shadow-black/40 px-4 py-2 text-[0.7rem] text-white/70">
         {#if activeDoc?.manifestId}
           {@const siblings = appState.documents.filter(d => d.manifestId === activeDoc.manifestId)}
           {@const meta = appState.volumeMetadata.get(activeDoc.manifestId)}
@@ -508,7 +508,7 @@
             title="Image adjustments"
           ><SunMedium class="size-4" /></button>
           {#if showFilters}
-            <div class="absolute bottom-full right-0 mb-2 rounded-lg bg-black/70 backdrop-blur-md p-3 space-y-2 min-w-[180px] shadow-lg">
+            <div class="absolute bottom-full right-0 mb-2 rounded-lg bg-black/50 backdrop-blur-xl border border-white/[0.06] shadow-xl p-3 space-y-2 min-w-[180px] shadow-lg">
               <div class="flex items-center justify-between text-[0.65rem] text-white/70">
                 <span>Brightness</span>
                 <span class="font-mono text-white/40">{imageFilters.brightness}%</span>

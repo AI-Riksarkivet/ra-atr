@@ -30,24 +30,24 @@
 }
 
 .dark {
-  --background: oklch(0.145 0.004 285.823);
+  --background: oklch(0.13 0.006 270);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0.006 285.885);
+  --card: oklch(0.17 0.008 270);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0.006 285.885);
+  --popover: oklch(0.19 0.01 270);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.66 0.15 250);
+  --primary: oklch(0.68 0.16 250);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0.006 285.885);
+  --secondary: oklch(0.22 0.008 270);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0.006 285.885);
-  --muted-foreground: oklch(0.711 0.007 285.938);
-  --accent: oklch(0.371 0.006 285.885);
+  --muted: oklch(0.22 0.008 270);
+  --muted-foreground: oklch(0.55 0.01 270);
+  --accent: oklch(0.26 0.01 270);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.66 0.15 250);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.16 250);
   --success: oklch(0.65 0.2 145);
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.75 0.18 75);
@@ -91,5 +91,35 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Smooth streaming cursor for transcription */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: oklch(0.75 0.18 55);
+  margin-left: 1px;
+  animation: cursor-blink 0.8s ease-in-out infinite;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+}
+
+/* Shimmer effect for loading progress */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.progress-shimmer {
+  background: linear-gradient(90deg, oklch(0.68 0.16 250 / 0.1) 0%, oklch(0.68 0.16 250 / 0.35) 50%, oklch(0.68 0.16 250 / 0.1) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
 }
