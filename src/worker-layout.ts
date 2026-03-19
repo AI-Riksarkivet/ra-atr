@@ -9,6 +9,8 @@ const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 const cores = navigator.hardwareConcurrency || 4;
 // Budget 2 threads for layout (lightweight, runs once per image)
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(2, Math.max(1, Math.floor(cores / 4))) : 1;
+// Use CDN for WASM files to avoid HF LFS CORS issues
+if (!DEV) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
 
 let modelUrl = '/models/rtmdet-regions.onnx';
 const INPUT_SIZE = 640;
@@ -29,12 +31,10 @@ self.onmessage = async (e: MessageEvent) => {
           self.postMessage({ type: 'model_status', payload: { model: p.model, status: 'downloading', progress: p.percent } });
         };
         const bytes = await downloadAndCacheModel(modelUrl, 'layout', progress, headers);
-        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
         session = await ort.InferenceSession.create(bytes, {
-          executionProviders: eps,
+          executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
-        if (DEV) console.log(`[layout] using: ${eps[0]}`);
         if (DEV) console.log('[layout] RTMDet loaded, inputs:', session.inputNames, 'outputs:', session.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'layout', status: 'loaded' } });
         self.postMessage({ type: 'ready' });

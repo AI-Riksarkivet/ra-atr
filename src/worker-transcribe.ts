@@ -11,6 +11,8 @@ const DEV = self.location?.hostname === 'localhost';
 // ORT recommends: min(cores/2, 4). Budget 4 threads for transcribe (the heavy worker).
 // Must be set before any InferenceSession.create() — cannot be changed after.
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(4, Math.max(1, Math.floor(cores / 2))) : 1;
+// Use CDN for WASM files to avoid HF LFS CORS issues
+if (!DEV) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
 if (DEV) console.log(`[transcribe] threads: ${ort.env.wasm.numThreads}, cores: ${cores}, SAB: ${hasSharedBuffer}`);
 
 let workerId = '0';
@@ -67,10 +69,8 @@ self.onmessage = async (e: MessageEvent) => {
           downloadAndCacheModel(modelUrls.tokenizer, 'tokenizer', progress, headers),
         ]);
 
-        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
-        if (DEV) console.log(`[transcribe-${workerId}] using: ${eps[0]}`);
         const sessionOpts: ort.InferenceSession.SessionOptions = {
-          executionProviders: eps,
+          executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         };
 

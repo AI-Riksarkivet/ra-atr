@@ -1,4 +1,5 @@
 export const MODEL_BASE = import.meta.env.VITE_MODEL_BASE || '/models';
+export const DEFAULT_GPU_SERVER = import.meta.env.VITE_GPU_SERVER || '';
 const USE_INT8 = import.meta.env.VITE_MODEL_QUANTIZED === 'true';
 const USE_FP16 = import.meta.env.VITE_MODEL_FP16 === 'true';
 

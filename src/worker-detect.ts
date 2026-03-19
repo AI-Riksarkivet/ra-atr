@@ -9,6 +9,8 @@ const hasSharedBuffer = typeof SharedArrayBuffer !== 'undefined';
 const cores = navigator.hardwareConcurrency || 4;
 // Budget 2 threads for detect (lightweight, runs infrequently)
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(2, Math.max(1, Math.floor(cores / 4))) : 1;
+// Use CDN for WASM files to avoid HF LFS CORS issues
+if (!DEV) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
 if (DEV) console.log(`[detect] threads: ${ort.env.wasm.numThreads}`);
 
 let modelUrl = '/models/yolo-lines.onnx';
@@ -40,12 +42,10 @@ self.onmessage = async (e: MessageEvent) => {
         };
 
         const yoloBytes = await downloadAndCacheModel(modelUrl, 'yolo', progress, headers);
-        const eps = (navigator as any).gpu ? ['webgpu', 'wasm'] : ['wasm'];
         yoloSession = await ort.InferenceSession.create(yoloBytes, {
-          executionProviders: eps,
+          executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
-        if (DEV) console.log(`[detect] using: ${eps[0]}`);
         if (DEV) console.log('[detect] YOLO loaded, inputs:', yoloSession.inputNames, 'outputs:', yoloSession.outputNames);
         self.postMessage({ type: 'model_status', payload: { model: 'yolo', status: 'loaded' } });
 

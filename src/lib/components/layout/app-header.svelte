@@ -5,6 +5,7 @@
   import { appState } from '$lib/stores/app-state.svelte';
   import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
+  import { DEFAULT_GPU_SERVER } from '$lib/model-config';
   import { page } from '$app/state';
 
   interface Props {
@@ -66,8 +67,6 @@
 </script>
 
 <header class="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
-  <img src="/head-logo-lion.svg" alt="RA-HTR" class="h-8 dark:invert-0 invert" />
-
   {#if isViewer}
     <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
       <Home class="size-4" />
@@ -144,6 +143,12 @@
             <div class="text-[0.65rem] text-green-500 mt-1.5">Connected{gpuName ? ` — ${gpuName}` : ''}</div>
           {:else if gpuStatus === 'error'}
             <div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
+          {/if}
+          {#if DEFAULT_GPU_SERVER && !gpuServerUrl.get()}
+            <button
+              class="w-full mt-1.5 rounded bg-green-600 px-2 py-1.5 text-[0.65rem] text-white font-medium hover:bg-green-700 transition-colors"
+              onclick={() => { gpuUrl = DEFAULT_GPU_SERVER; checkGpu(); }}
+            >Connect to GPU server</button>
           {/if}
           {#if gpuServerUrl.get()}
             <!-- Deployment status -->
