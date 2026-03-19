@@ -1,11 +1,12 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Server } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Server, Download } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { DEFAULT_GPU_SERVER } from '$lib/model-config';
+  import { exportDocument, type ExportFormat } from '$lib/export';
   import { page } from '$app/state';
 
   interface Props {
@@ -22,6 +23,7 @@
 
   const isViewer = $derived(page.url.pathname === '/viewer');
   let showGpuSettings = $state(false);
+  let showExportMenu = $state(false);
   let gpuUrl = $state(gpuServerUrl.get());
   let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 
@@ -177,6 +179,31 @@
       <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
         <FileText class="size-4" />
       </Button>
+
+      <div class="relative">
+        <Button variant="ghost" size="icon-sm" onclick={() => showExportMenu = !showExportMenu} title="Export transcriptions">
+          <Download class="size-4" />
+        </Button>
+        {#if showExportMenu}
+          <div class="absolute right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg p-1 w-40">
+            {#each [
+              { format: 'alto' as ExportFormat, label: 'ALTO XML' },
+              { format: 'page' as ExportFormat, label: 'PAGE XML' },
+              { format: 'txt' as ExportFormat, label: 'Plain text' },
+              { format: 'json' as ExportFormat, label: 'JSON' },
+            ] as item}
+              <button
+                class="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                onclick={() => {
+                  const doc = appState.activeDocument;
+                  if (doc) exportDocument(doc, item.format);
+                  showExportMenu = false;
+                }}
+              >{item.label}</button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
 
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>
