@@ -452,8 +452,10 @@ export class HTRWorkerState {
         break;
       case 'layout_result': {
         const { imageId, regions } = msg.payload;
-        this.running = false;
+        // Call onLayoutDetected first (triggers transcribeRegion → sets pendingRegions)
+        // then set running=false. The viewer's isRunning also checks pendingRegions/stage.
         this.onLayoutDetected?.(imageId, regions);
+        this.running = false;
         break;
       }
       case 'error':

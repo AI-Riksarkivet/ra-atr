@@ -450,7 +450,7 @@
 
       <!-- Floating toolbar -->
       {@const pageTranscribed = activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every(l => l.complete)}
-      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0}
+      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0 || appState.htr.stage === 'transcribing' || appState.htr.stage === 'loading_models'}
       {@const totalLines = activeDoc?.lines.length ?? 0}
       {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
       <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/40 backdrop-blur-xl border border-white/[0.06] shadow-2xl shadow-black/40 px-4 py-2 text-[0.7rem] text-white/70">
@@ -480,7 +480,7 @@
         {/if}
         <span class="text-white/20">|</span>
         <button
-          class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed {!pageTranscribed && !isRunning ? 'btn-glow' : ''}"
           disabled={isRunning}
           onclick={() => { if (activeDoc) transcribePage(activeDoc); }}
           title={pageTranscribed ? 'Re-transcribe page' : 'Transcribe page'}
@@ -492,12 +492,12 @@
           {/if}
         </button>
         <button
-          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {appState.selectMode ? 'bg-white/30 text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {appState.selectMode ? 'bg-primary text-white ring-2 ring-primary/40' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
           onclick={() => appState.selectMode = !appState.selectMode}
           title={appState.selectMode ? 'Switch to pan mode' : 'Draw region to transcribe'}
         ><PenTool class="size-4" /></button>
         <button
-          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showTextOverlay ? 'bg-white/30 text-white' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showTextOverlay ? 'bg-primary text-white ring-2 ring-primary/40' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
           onclick={() => showTextOverlay = !showTextOverlay}
           title={showTextOverlay ? 'Hide text overlay' : 'Show transcriptions on image'}
         ><Type class="size-4" /></button>

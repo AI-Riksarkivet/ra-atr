@@ -113,6 +113,40 @@
   border-radius: 1px;
 }
 
+/* Animated glow border for CTA buttons */
+@property --glow-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes glow-spin {
+  to { --glow-angle: 360deg; }
+}
+.btn-glow {
+  position: relative;
+  isolation: isolate;
+}
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--glow-angle),
+    transparent 55%,
+    oklch(0.68 0.16 250) 75%,
+    oklch(0.75 0.18 200) 85%,
+    oklch(0.68 0.16 250) 95%,
+    transparent
+  );
+  animation: glow-spin 3s linear infinite;
+  z-index: -1;
+  opacity: 0.7;
+}
+.btn-glow:disabled::before {
+  display: none;
+}
+
 /* Shimmer effect for loading progress */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
