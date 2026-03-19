@@ -10,7 +10,7 @@
   import CatalogPanel from '$lib/components/CatalogPanel.svelte';
   import UploadPanel from '$lib/components/UploadPanel.svelte';
   import type { Line, BBox } from '$lib/types';
-  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw, PenTool, Info, Type, SunMedium } from 'lucide-svelte';
+  import { Maximize2, Plus, Minus, ChevronLeft, ChevronRight, Maximize, Printer, Play, RotateCcw, PenTool, Info, Type, SunMedium, BoxSelect } from 'lucide-svelte';
 
   let leftWidth = $state(20);
   let rightWidth = $state(25);
@@ -20,7 +20,8 @@
   let docViewer: DocumentViewer;
   let isFullscreen = $state(false);
   let metadataOpen = $state(false);
-  let showTextOverlay = $state(false);
+  let showTextOverlay = $state(true);
+  let showBoxes = $state(false);
   let imageFilters = $state({ brightness: 100, contrast: 100, saturate: 100 });
   let showFilters = $state(false);
 
@@ -412,6 +413,7 @@
         groups={groups}
         selectMode={appState.selectMode}
         showTextOverlay={showTextOverlay}
+        showBoxes={showBoxes}
         imageFilter={`brightness(${imageFilters.brightness}%) contrast(${imageFilters.contrast}%) saturate(${imageFilters.saturate}%)`}
       />
 
@@ -496,6 +498,11 @@
           onclick={() => appState.selectMode = !appState.selectMode}
           title={appState.selectMode ? 'Switch to pan mode' : 'Draw region to transcribe'}
         ><PenTool class="size-4" /></button>
+        <button
+          class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showBoxes ? 'bg-primary text-white ring-2 ring-primary/40' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
+          onclick={() => showBoxes = !showBoxes}
+          title={showBoxes ? 'Hide line boxes' : 'Show line boxes'}
+        ><BoxSelect class="size-4" /></button>
         <button
           class="size-8 rounded-full flex items-center justify-center transition-all cursor-pointer {showTextOverlay ? 'bg-primary text-white ring-2 ring-primary/40' : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'}"
           onclick={() => showTextOverlay = !showTextOverlay}

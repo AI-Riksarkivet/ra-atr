@@ -17,10 +17,11 @@
     groups: LineGroup[];
     selectMode: boolean;
     showTextOverlay: boolean;
+    showBoxes?: boolean;
     imageFilter?: string;
   }
 
-  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode, showTextOverlay, imageFilter = '' }: Props = $props();
+  let { imageUrl, lines, currentLine, hoveredLine, onHoverLine, stage, selectedLines, onSelectLine, onMarqueeSelect, onRedetectRegion, groups, selectMode, showTextOverlay, showBoxes = true, imageFilter = '' }: Props = $props();
   let canvasEl: HTMLCanvasElement;
   let controller: CanvasController;
   let img: HTMLImageElement | null = null;
@@ -231,53 +232,56 @@
       onAfterDraw: (ctx, transform) => {
         if (!img) return;
         for (const line of lines) {
+          if (!showBoxes && !showTextOverlay) continue;
           const isCurrent = line.id === currentLine;
           const isHovered = line.id === hoveredLine;
           const isSelected = selectedLines.has(line.id);
           const groupColor = getGroupColor(line.id);
           const highlight = isCurrent || isHovered;
 
-          if (isSelected) {
-            ctx.strokeStyle = '#facc15';
-            ctx.lineWidth = 3 / transform.scale;
-            ctx.fillStyle = 'rgba(250, 204, 21, 0.08)';
-          } else if (highlight) {
-            ctx.strokeStyle = '#ff6b00';
-            ctx.lineWidth = 3 / transform.scale;
-            ctx.fillStyle = 'rgba(255, 107, 0, 0.05)';
-          } else if (groupColor) {
-            ctx.strokeStyle = groupColor;
-            ctx.lineWidth = 2 / transform.scale;
-            ctx.fillStyle = 'transparent';
-          } else {
-            ctx.strokeStyle = line.complete ? '#22c55e' : '#3b82f6';
-            ctx.lineWidth = 1.5 / transform.scale;
-            ctx.fillStyle = 'transparent';
-          }
-
-          ctx.beginPath();
-          const poly = line.bbox.polygon;
-          if (poly && poly.length >= 3) {
-            ctx.moveTo(poly[0].x, poly[0].y);
-            for (let j = 1; j < poly.length; j++) {
-              ctx.lineTo(poly[j].x, poly[j].y);
+          if (showBoxes) {
+            if (isSelected) {
+              ctx.strokeStyle = '#facc15';
+              ctx.lineWidth = 3 / transform.scale;
+              ctx.fillStyle = 'rgba(250, 204, 21, 0.08)';
+            } else if (highlight) {
+              ctx.strokeStyle = '#ff6b00';
+              ctx.lineWidth = 3 / transform.scale;
+              ctx.fillStyle = 'rgba(255, 107, 0, 0.05)';
+            } else if (groupColor) {
+              ctx.strokeStyle = groupColor;
+              ctx.lineWidth = 2 / transform.scale;
+              ctx.fillStyle = 'transparent';
+            } else {
+              ctx.strokeStyle = line.complete ? '#22c55e' : '#3b82f6';
+              ctx.lineWidth = 1.5 / transform.scale;
+              ctx.fillStyle = 'transparent';
             }
-            ctx.closePath();
-          } else {
-            ctx.rect(line.bbox.x, line.bbox.y, line.bbox.w, line.bbox.h);
-          }
-          ctx.fill();
-          ctx.stroke();
 
-          // Draw group color dot next to line
-          if (groupColor && !isSelected && !highlight) {
-            const b = line.bbox;
-            const dotX = b.x - 6 / transform.scale;
-            const dotY = b.y + b.h / 2;
-            ctx.fillStyle = groupColor;
             ctx.beginPath();
-            ctx.arc(dotX, dotY, 3 / transform.scale, 0, Math.PI * 2);
+            const poly = line.bbox.polygon;
+            if (poly && poly.length >= 3) {
+              ctx.moveTo(poly[0].x, poly[0].y);
+              for (let j = 1; j < poly.length; j++) {
+                ctx.lineTo(poly[j].x, poly[j].y);
+              }
+              ctx.closePath();
+            } else {
+              ctx.rect(line.bbox.x, line.bbox.y, line.bbox.w, line.bbox.h);
+            }
             ctx.fill();
+            ctx.stroke();
+
+            // Draw group color dot next to line
+            if (groupColor && !isSelected && !highlight) {
+              const b = line.bbox;
+              const dotX = b.x - 6 / transform.scale;
+              const dotY = b.y + b.h / 2;
+              ctx.fillStyle = groupColor;
+              ctx.beginPath();
+              ctx.arc(dotX, dotY, 3 / transform.scale, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           // Text overlay mode
@@ -286,14 +290,20 @@
             const isHoveredLine = line.id === hoveredLine;
 
             if (!line.complete) {
-              // Animated shimmer for lines being transcribed
               const t = performance.now() / 1000;
-              const shimmerAlpha = 0.08 + 0.06 * Math.sin(t * 3 + line.id);
-              ctx.fillStyle = `rgba(59, 130, 246, ${shimmerAlpha})`;
-              ctx.fillRect(b.x, b.y, b.w, b.h);
+              const pad = b.h * 0.15;
+
+              // Parse group color for tinting (fallback to blue)
+              const gc = groupColor || '#3b82f6';
+              const lr = parseInt(gc.slice(1, 3), 16);
+              const lg = parseInt(gc.slice(3, 5), 16);
+              const lb = parseInt(gc.slice(5, 7), 16);
+              const lrLight = Math.min(lr + 90, 255);
+              const lgLight = Math.min(lg + 90, 255);
+              const lbLight = Math.min(lb + 90, 255);
+
               if (line.text) {
-                // Show partial text
-                const pad = b.h * 0.15;
+                // Measure text
                 let fontSize = b.h * 0.75;
                 ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
                 let textW = ctx.measureText(line.text).width;
@@ -302,17 +312,47 @@
                   ctx.font = `500 ${fontSize}px system-ui, sans-serif`;
                   textW = ctx.measureText(line.text).width;
                 }
+                const bgW = Math.max(b.w, textW + pad * 2);
+
+                // Dark backdrop with soft edges
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.beginPath();
+                const r = Math.min(b.h * 0.15, 4 / transform.scale);
+                ctx.roundRect(b.x, b.y, bgW, b.h, r);
+                ctx.fill();
+
+                // Sweeping gradient highlight in group color
+                const sweepX = b.x + ((t * 80 + line.id * 50) % (bgW + 60)) - 30;
+                const grad = ctx.createLinearGradient(sweepX - 30, 0, sweepX + 30, 0);
+                grad.addColorStop(0, `rgba(${lr}, ${lg}, ${lb}, 0)`);
+                grad.addColorStop(0.5, `rgba(${lrLight}, ${lgLight}, ${lbLight}, 0.12)`);
+                grad.addColorStop(1, `rgba(${lr}, ${lg}, ${lb}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.fillRect(b.x, b.y, bgW, b.h);
+
+                // Text tinted with group color
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
-                const bgW = Math.max(b.w, textW + pad * 2);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.fillRect(b.x, b.y, bgW, b.h);
-                ctx.fillStyle = 'rgba(147, 197, 253, 0.9)';
+                ctx.fillStyle = `rgba(${lrLight}, ${lgLight}, ${lbLight}, 0.95)`;
                 ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
-                // Progress bar
+
+                // Glowing progress edge
                 const progress = Math.min(1, line.text.length / 40);
-                ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
-                ctx.fillRect(b.x, b.y + b.h - 2 / transform.scale, bgW * progress, 2 / transform.scale);
+                const pw = bgW * progress;
+                const edgeGrad = ctx.createLinearGradient(b.x + pw - 8 / transform.scale, 0, b.x + pw, 0);
+                edgeGrad.addColorStop(0, `rgba(${lrLight}, ${lgLight}, ${lbLight}, 0)`);
+                edgeGrad.addColorStop(1, `rgba(${lrLight}, ${lgLight}, ${lbLight}, 0.8)`);
+                ctx.fillStyle = edgeGrad;
+                ctx.fillRect(b.x, b.y + b.h - 2 / transform.scale, pw, 2 / transform.scale);
+
+                // Thin progress line
+                ctx.fillStyle = `rgba(${lr}, ${lg}, ${lb}, 0.3)`;
+                ctx.fillRect(b.x, b.y + b.h - 1.5 / transform.scale, pw, 1.5 / transform.scale);
+              } else {
+                // No text yet — subtle pulsing placeholder in group color
+                const shimmerAlpha = 0.04 + 0.03 * Math.sin(t * 3 + line.id);
+                ctx.fillStyle = `rgba(${lr}, ${lg}, ${lb}, ${shimmerAlpha})`;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
               }
             } else if (line.text) {
               // Completed line — dim unless hovered
@@ -399,29 +439,77 @@
           ctx.setLineDash([]);
         }
 
-        // Draw pending region spinners (waiting for YOLO)
-        for (const [, region] of pendingRegions) {
+        // Draw pending region spinners (waiting for detection)
+        const now = performance.now();
+        let pendingIdx = 0;
+        for (const [regionId, region] of pendingRegions) {
           const { x, y, w, h } = region;
-          ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 2 / transform.scale;
-          ctx.setLineDash([8 / transform.scale, 4 / transform.scale]);
-          ctx.fillStyle = 'rgba(59, 130, 246, 0.08)';
+          // Find group color for this region
+          const gi = groups.findIndex(g => g.regionId === regionId);
+          const groupCol = gi >= 0 ? GROUP_COLORS[gi % GROUP_COLORS.length] : GROUP_COLORS[pendingIdx % GROUP_COLORS.length];
+          pendingIdx++;
+          // Parse hex to rgb components
+          const cr = parseInt(groupCol.slice(1, 3), 16);
+          const cg = parseInt(groupCol.slice(3, 5), 16);
+          const cb = parseInt(groupCol.slice(5, 7), 16);
+          const s = transform.scale;
+          const rr = Math.min(h * 0.05, 6 / s);
+
+          // Frosted backdrop
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.15)';
           ctx.beginPath();
-          ctx.rect(x, y, w, h);
+          ctx.roundRect(x, y, w, h, rr);
           ctx.fill();
+
+          // Animated marching ants border
+          const dashLen = 10 / s;
+          const offset = (now / 80) % (dashLen * 2);
+          ctx.setLineDash([dashLen, dashLen]);
+          ctx.lineDashOffset = -offset;
+          ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.6)`;
+          ctx.lineWidth = 1.5 / s;
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, rr);
           ctx.stroke();
           ctx.setLineDash([]);
+          ctx.lineDashOffset = 0;
 
-          // Spinner circle in the center of the region
-          const spinCx = x + w / 2;
-          const spinCy = y + h / 2;
-          const r = Math.min(w, h, 60 / transform.scale) * 0.3;
-          const angle = (performance.now() / 600) % (Math.PI * 2);
+          // Glowing spinner ring
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const sr = Math.min(w, h, 50 / s) * 0.2;
+          const angle = (now / 500) % (Math.PI * 2);
+
+          // Outer glow
           ctx.beginPath();
-          ctx.arc(spinCx, spinCy, r, angle, angle + Math.PI * 1.5);
-          ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 3 / transform.scale;
+          ctx.arc(cx, cy, sr + 2 / s, angle, angle + Math.PI * 1.2);
+          ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.15)`;
+          ctx.lineWidth = 5 / s;
           ctx.stroke();
+
+          // Main arc
+          ctx.beginPath();
+          ctx.arc(cx, cy, sr, angle, angle + Math.PI * 1.2);
+          ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.9)`;
+          ctx.lineWidth = 2.5 / s;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          ctx.lineCap = 'butt';
+
+          // Small dot at the leading edge
+          const dotAngle = angle + Math.PI * 1.2;
+          ctx.beginPath();
+          ctx.arc(cx + sr * Math.cos(dotAngle), cy + sr * Math.sin(dotAngle), 2.5 / s, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${Math.min(cr + 80, 255)}, ${Math.min(cg + 80, 255)}, ${Math.min(cb + 80, 255)}, 0.95)`;
+          ctx.fill();
+
+          // "Analyzing..." label
+          const labelSize = Math.min(14 / s, h * 0.06);
+          ctx.font = `500 ${labelSize}px system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, 0.7)`;
+          ctx.fillText('Analyzing...', cx, cy + sr + 8 / s);
         }
       },
     });
@@ -463,6 +551,7 @@
     void selectedLines;
     void groups;
     void showTextOverlay;
+    void showBoxes;
     controller?.render();
   });
 
