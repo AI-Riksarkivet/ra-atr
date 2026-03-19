@@ -97,12 +97,6 @@
   {/if}
 
   <div class="ml-auto flex items-center gap-1">
-    {#if isViewer}
-      <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
-        <FileText class="size-4" />
-      </Button>
-    {/if}
-
     <div class="relative">
       {#if appState.htr.modelsReady && gpuServerUrl.get()}
         <button class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
@@ -178,6 +172,12 @@
         </div>
       {/if}
     </div>
+
+    {#if isViewer}
+      <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
+        <FileText class="size-4" />
+      </Button>
+    {/if}
 
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>
       <Sun class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

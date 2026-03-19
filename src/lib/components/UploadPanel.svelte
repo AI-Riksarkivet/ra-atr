@@ -42,7 +42,7 @@
   <div
     class={cn(
       'flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer',
-      dragOver ? 'border-primary bg-primary/5' : 'border-border',
+      dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/30',
       disabled && 'opacity-50 pointer-events-none'
     )}
     ondrop={(e) => { e.preventDefault(); dragOver = false; handleFiles(e.dataTransfer?.files ?? null); }}
