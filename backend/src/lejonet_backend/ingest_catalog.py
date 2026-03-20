@@ -194,16 +194,49 @@ def create_embedder():
     return SentenceTransformer(EMBED_MODEL, truncate_dim=EMBED_DIM)
 
 
-def embed_documents(embedder, texts: list[str]) -> list[list[float]]:
-    """Embed documents (no prefix for Arctic)."""
-    vecs = embedder.encode(texts, normalize_embeddings=True)
-    return [v.tolist() for v in vecs]
+def embed_documents(embedder, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    """Embed documents (no prefix for Arctic). Sub-batches to limit memory."""
+    all_vecs = []
+    for i in range(0, len(texts), batch_size):
+        sub = texts[i : i + batch_size]
+        vecs = embedder.encode(sub, normalize_embeddings=True, show_progress_bar=False)
+        all_vecs.extend(v.tolist() for v in vecs)
+    return all_vecs
 
 
 def embed_query(embedder, query: str) -> list[float]:
     """Embed a search query (Arctic requires 'query: ' prefix)."""
     vec = embedder.encode(f"query: {query}", normalize_embeddings=True)
     return vec.tolist()
+
+
+def embed_documents_remote(texts: list[str], gpu_server: str, batch_size: int = 1024) -> list[list[float]]:
+    """Embed documents via GPU server /embed endpoint with retries."""
+    import time
+
+    import httpx
+
+    all_vecs = []
+    for i in range(0, len(texts), batch_size):
+        sub = texts[i : i + batch_size]
+        # Truncate — model max is ~512 tokens, ~4 chars/token
+        sub = [t[:500] for t in sub]
+        for attempt in range(10):
+            try:
+                resp = httpx.post(f"{gpu_server}/embed", json={"texts": sub, "mode": "document"}, timeout=300)
+                resp.raise_for_status()
+                all_vecs.extend(resp.json()["vectors"])
+                break
+            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.ReadTimeout) as e:
+                if isinstance(e, httpx.HTTPStatusError):
+                    print(f"  Response body: {e.response.text[:500]}")
+                if attempt < 9:
+                    wait = min(2 ** attempt, 60)
+                    print(f"  Embed request failed ({e}), retrying in {wait}s... (attempt {attempt + 1}/10)")
+                    time.sleep(wait)
+                else:
+                    raise
+    return all_vecs
 
 
 def ingest_rows(
@@ -270,16 +303,21 @@ def ingest_streaming(
     db_path: str,
     batch_size: int = 10_000,
     embed: bool = True,
+    gpu_server: str | None = None,
 ) -> int:
     """Stream rows into LanceDB in fixed-size batches. Memory-efficient."""
     db = lancedb.connect(db_path)
-    embedder = create_embedder() if embed else None
+    embedder = create_embedder() if embed and not gpu_server else None
     written = 0
     batch: list[dict] = []
 
     def flush(batch: list[dict], first: bool) -> None:
         nonlocal written
-        if embedder:
+        if gpu_server:
+            vectors = embed_documents_remote([r["search_text"] for r in batch], gpu_server)
+            for row, vec in zip(batch, vectors):
+                row["vector"] = vec
+        elif embedder:
             vectors = embed_documents(embedder, [r["search_text"] for r in batch])
             for row, vec in zip(batch, vectors):
                 row["vector"] = vec
@@ -317,6 +355,7 @@ def main():
     parser.add_argument("--sample", type=int, default=0, help="Only process N files per archive (0=all)")
     parser.add_argument("--batch-size", type=int, default=10_000)
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding (for testing)")
+    parser.add_argument("--gpu-server", type=str, default=None, help="GPU server URL for remote embedding (e.g. http://localhost:8080)")
     args = parser.parse_args()
 
     t0 = time.time()
@@ -329,6 +368,7 @@ def main():
         args.db_path,
         batch_size=args.batch_size,
         embed=not args.no_embed,
+        gpu_server=args.gpu_server,
     )
     print(f"Wrote {written} rows to {args.db_path} in {time.time() - t0:.1f}s")
 

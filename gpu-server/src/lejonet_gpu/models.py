@@ -17,6 +17,10 @@ TOKENIZER_FILE = "tokenizer.json"
 
 ALL_MODELS = [LAYOUT_MODEL, YOLO_MODEL, ENCODER_MODEL, DECODER_MODEL, TOKENIZER_FILE]
 
+# Embedding model (separate HF repo, loaded via sentence-transformers)
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "Snowflake/snowflake-arctic-embed-l-v2.0")
+EMBED_DIM = int(os.environ.get("EMBED_DIM", "256"))
+
 
 def _resolve_model(name: str, models_dir: Path = MODELS_DIR, repo: str = HF_REPO) -> Path:
     """Find a model file — local first, then download from HuggingFace."""
@@ -109,3 +113,33 @@ class ModelStore:
 
     def providers(self) -> list[str]:
         return _providers()
+
+
+class EmbedStore:
+    """Lazy-loading sentence-transformers embedding model."""
+
+    def __init__(self):
+        self._model = None
+
+    @property
+    def model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+
+            self._model = SentenceTransformer(EMBED_MODEL, truncate_dim=EMBED_DIM)
+            print(f"Loaded embedding model: {EMBED_MODEL} (dim={EMBED_DIM})")
+        return self._model
+
+    def encode_documents(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+        """Encode documents (no prefix for Arctic)."""
+        all_vecs = []
+        for i in range(0, len(texts), batch_size):
+            sub = texts[i : i + batch_size]
+            vecs = self.model.encode(sub, normalize_embeddings=True, show_progress_bar=False)
+            all_vecs.extend(v.tolist() for v in vecs)
+        return all_vecs
+
+    def encode_query(self, query: str) -> list[float]:
+        """Encode a search query (Arctic requires 'query: ' prefix)."""
+        vec = self.model.encode(f"query: {query}", normalize_embeddings=True)
+        return vec.tolist()

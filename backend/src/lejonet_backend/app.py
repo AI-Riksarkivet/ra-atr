@@ -699,13 +699,33 @@ def _catalog_fts_search(q: str, limit: int, where: str | None = None) -> pa.Tabl
         return catalog_table.to_arrow().slice(0, 0)  # empty with correct schema
 
 
+GPU_SERVER = os.environ.get("GPU_SERVER", "http://localhost:8080")
+
+
+def _embed_query_via_gpu(q: str) -> list[float] | None:
+    """Call GPU server /embed endpoint for query embedding."""
+    import httpx
+
+    try:
+        resp = httpx.post(f"{GPU_SERVER}/embed", json={"texts": [q], "mode": "query"}, timeout=30)
+        resp.raise_for_status()
+        return resp.json()["vectors"][0]
+    except Exception as e:
+        print(f"GPU embed failed: {e}")
+        return None
+
+
 def _catalog_vector_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
-        from lejonet_backend.ingest_catalog import create_embedder, embed_query
+        # Try GPU server first
+        vec = _embed_query_via_gpu(q)
+        if vec is None:
+            # Fall back to local model
+            from lejonet_backend.ingest_catalog import create_embedder, embed_query
 
-        if not hasattr(_catalog_vector_search, "_embedder"):
-            _catalog_vector_search._embedder = create_embedder()
-        vec = embed_query(_catalog_vector_search._embedder, q)
+            if not hasattr(_catalog_vector_search, "_embedder"):
+                _catalog_vector_search._embedder = create_embedder()
+            vec = embed_query(_catalog_vector_search._embedder, q)
         s = catalog_table.search(vec)
         if where:
             s = s.where(where)

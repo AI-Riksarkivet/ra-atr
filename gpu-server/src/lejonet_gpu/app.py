@@ -6,10 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
+from pydantic import BaseModel
 
 from .detect import decode_yolo
 from .layout import decode_rtmdet
-from .models import TOKENIZER_FILE, ModelStore
+from .models import TOKENIZER_FILE, EmbedStore, ModelStore
 from .preprocessing import (
     crop_region,
     preprocess_rtmdet,
@@ -19,6 +20,7 @@ from .preprocessing import (
 from .transcribe import Tokenizer, transcribe_line
 
 store = ModelStore()
+embed_store = EmbedStore()
 tokenizer: Tokenizer | None = None
 
 
@@ -107,11 +109,14 @@ def _gpu_info() -> dict:
 
 @app.get("/health")
 def health():
+    from .models import EMBED_MODEL
+
     return {
         "status": "ok",
         "models": store.available_models(),
         "providers": store.providers(),
         "gpu": _gpu_info(),
+        "embed_model": EMBED_MODEL,
     }
 
 
@@ -259,3 +264,34 @@ async def process_page(image: UploadFile = File(...)):
         "groups": all_groups,
         "image_size": [img.width, img.height],
     }
+
+
+# --- Embedding endpoints ---
+
+
+class EmbedRequest(BaseModel):
+    texts: list[str]
+    mode: str = "document"  # "document" or "query"
+
+
+class EmbedResponse(BaseModel):
+    vectors: list[list[float]]
+    dim: int
+    model: str
+
+
+@app.post("/embed", response_model=EmbedResponse)
+async def embed_text(body: EmbedRequest):
+    """Generate text embeddings using Snowflake Arctic Embed."""
+    from .models import EMBED_MODEL
+    if body.mode == "query":
+        if len(body.texts) != 1:
+            raise HTTPException(400, "Query mode accepts exactly one text")
+        vectors = [embed_store.encode_query(body.texts[0])]
+    else:
+        vectors = embed_store.encode_documents(body.texts)
+    return EmbedResponse(
+        vectors=vectors,
+        dim=len(vectors[0]) if vectors else 0,
+        model=EMBED_MODEL,
+    )

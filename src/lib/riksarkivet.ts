@@ -61,8 +61,11 @@ export async function fetchPageImage(
   const url = pageImageUrl(manifestId, page);
   const res = await fetch(url);
   if (!res.ok) return null;
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.startsWith('image/')) return null;
   const buf = await res.arrayBuffer();
-  const blob = new Blob([buf], { type: 'image/jpeg' });
+  if (buf.byteLength < 100) return null; // too small to be a valid image
+  const blob = new Blob([buf], { type: contentType });
   const previewUrl = URL.createObjectURL(blob);
   return { imageData: buf, previewUrl };
 }
