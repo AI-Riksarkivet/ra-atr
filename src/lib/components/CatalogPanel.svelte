@@ -36,8 +36,8 @@
     try {
       const data = await searchCatalog({
         q: q || undefined,
-        mode: 'fts',
-        limit: 50,
+        mode: 'vector',
+        limit: 200,
         offset: append ? catalogResults.length : 0,
         digitized: digitizedOnly ? true : undefined,
       });

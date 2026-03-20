@@ -371,9 +371,9 @@
               ctx.textAlign = 'left';
               ctx.textBaseline = 'middle';
               const bgW = Math.max(b.w, textW + pad * 2);
-              ctx.fillStyle = dimmed ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.7)';
+              ctx.fillStyle = dimmed ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.7)';
               ctx.fillRect(b.x, b.y, bgW, b.h);
-              ctx.fillStyle = dimmed ? 'rgba(255, 255, 255, 0.3)' : '#fff';
+              ctx.fillStyle = dimmed ? 'rgba(255, 255, 255, 0.12)' : '#fff';
               ctx.fillText(line.text, b.x + pad, b.y + b.h * 0.55);
             }
           } else if (!line.complete && !isSelected && !highlight) {

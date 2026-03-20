@@ -31,8 +31,8 @@
       const data = await searchCatalog({
         q: query.trim(),
         digitized: digitizedOnly ? true : undefined,
-        mode: 'fts',
-        limit: 50,
+        mode: 'vector',
+        limit: 200,
       });
       results = data.results;
       total = data.total;

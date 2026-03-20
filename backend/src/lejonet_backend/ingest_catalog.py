@@ -210,7 +210,7 @@ def embed_query(embedder, query: str) -> list[float]:
     return vec.tolist()
 
 
-def embed_documents_remote(texts: list[str], gpu_server: str, batch_size: int = 1024) -> list[list[float]]:
+def embed_documents_remote(texts: list[str], gpu_server: str, batch_size: int = 64) -> list[list[float]]:
     """Embed documents via GPU server /embed endpoint with retries."""
     import time
 
@@ -218,9 +218,7 @@ def embed_documents_remote(texts: list[str], gpu_server: str, batch_size: int = 
 
     all_vecs = []
     for i in range(0, len(texts), batch_size):
-        sub = texts[i : i + batch_size]
-        # Truncate — model max is ~512 tokens, ~4 chars/token
-        sub = [t[:500] for t in sub]
+        sub = [t[:500] for t in texts[i : i + batch_size]]
         for attempt in range(10):
             try:
                 resp = httpx.post(f"{gpu_server}/embed", json={"texts": sub, "mode": "document"}, timeout=300)
@@ -304,6 +302,7 @@ def ingest_streaming(
     batch_size: int = 10_000,
     embed: bool = True,
     gpu_server: str | None = None,
+    digitized_only: bool = False,
 ) -> int:
     """Stream rows into LanceDB in fixed-size batches. Memory-efficient."""
     db = lancedb.connect(db_path)
@@ -333,6 +332,8 @@ def ingest_streaming(
         print(f"  Written {written} rows...")
 
     for row in rows_iter:
+        if digitized_only and not row.get("digitized"):
+            continue
         batch.append(row)
         if len(batch) >= batch_size:
             flush(batch, first=(written == 0))
@@ -356,6 +357,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=10_000)
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding (for testing)")
     parser.add_argument("--gpu-server", type=str, default=None, help="GPU server URL for remote embedding (e.g. http://localhost:8080)")
+    parser.add_argument("--digitized-only", action="store_true", help="Only ingest digitized volumes")
     args = parser.parse_args()
 
     t0 = time.time()
@@ -369,6 +371,7 @@ def main():
         batch_size=args.batch_size,
         embed=not args.no_embed,
         gpu_server=args.gpu_server,
+        digitized_only=args.digitized_only,
     )
     print(f"Wrote {written} rows to {args.db_path} in {time.time() - t0:.1f}s")
 

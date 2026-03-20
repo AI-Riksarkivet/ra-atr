@@ -37,14 +37,14 @@ export function getGpuName(): string {
 export async function probeGpuServer(url: string): Promise<boolean> {
   const base = url.replace(/\/$/, '');
   try {
-    const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return false;
     const data = await res.json();
     _gpuName = data.gpu?.name ?? '';
 
     // Check if all deployments are healthy via /status
     try {
-      const statusRes = await fetch(`${base}/status`, { signal: AbortSignal.timeout(3000) });
+      const statusRes = await fetch(`${base}/status`, { signal: AbortSignal.timeout(5000) });
       if (statusRes.ok) {
         const status = await statusRes.json();
         const allHealthy = Object.values(status.deployments as Record<string, { status: string }>)

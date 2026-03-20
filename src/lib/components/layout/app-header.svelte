@@ -118,7 +118,7 @@
         </button>
       {:else}
         <button class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
-          <Server class="size-3" />
+          <Server class="size-3" />{gpuConnected ? 'GPU' : 'Connect GPU'}
         </button>
       {/if}
       {#if showGpuSettings}
