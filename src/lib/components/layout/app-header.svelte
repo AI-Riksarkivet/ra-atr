@@ -26,6 +26,7 @@
   let showGpuSettings = $state(false);
   let showExportMenu = $state(false);
   let gpuUrl = $state(gpuServerUrl.get());
+  let gpuConnected = $state(!!gpuServerUrl.get());
   let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 
   let gpuName = $state('');
@@ -34,7 +35,7 @@
 
   // Poll GPU status when settings panel is open
   $effect(() => {
-    if (showGpuSettings && gpuServerUrl.get()) {
+    if (showGpuSettings && gpuConnected) {
       fetchGpuStatus().then(s => { gpuDetails = s; });
       statusInterval = setInterval(async () => {
         gpuDetails = await fetchGpuStatus();
@@ -48,6 +49,7 @@
     const url = gpuUrl.trim();
     if (!url) {
       gpuServerUrl.set('');
+      gpuConnected = false;
       gpuStatus = 'idle';
       gpuName = '';
       return;
@@ -57,6 +59,7 @@
       const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         gpuServerUrl.set(url);
+        gpuConnected = true;
         gpuStatus = 'ok';
         const data = await res.json();
         gpuName = data.gpu?.name ?? '';
@@ -101,7 +104,7 @@
 
   <div class="ml-auto flex items-center gap-1">
     <div class="relative">
-      {#if appState.htr.modelsReady && gpuServerUrl.get()}
+      {#if appState.htr.modelsReady && gpuConnected}
         <button class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors" onclick={() => showGpuSettings = !showGpuSettings} title="GPU server settings">
           <Server class="size-3" />GPU{gpuName || getGpuName() ? ` (${gpuName || getGpuName()})` : ''}
         </button>
@@ -141,13 +144,13 @@
           {:else if gpuStatus === 'error'}
             <div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
           {/if}
-          {#if DEFAULT_GPU_SERVER && !gpuServerUrl.get()}
+          {#if DEFAULT_GPU_SERVER && !gpuConnected}
             <button
               class="w-full mt-1.5 rounded bg-green-600 px-2 py-1.5 text-[0.65rem] text-white font-medium hover:bg-green-700 transition-colors"
               onclick={() => { gpuUrl = DEFAULT_GPU_SERVER; checkGpu(); }}
             >Connect to GPU server</button>
           {/if}
-          {#if gpuServerUrl.get()}
+          {#if gpuConnected}
             <!-- Deployment status -->
             {#if gpuDetails}
               <div class="mt-2 pt-2 border-t border-border space-y-1">
@@ -167,7 +170,7 @@
             {/if}
             <button
               class="text-[0.65rem] text-muted-foreground hover:text-foreground mt-2 cursor-pointer"
-              onclick={() => { gpuUrl = ''; gpuServerUrl.set(''); gpuStatus = 'idle'; gpuDetails = null; }}
+              onclick={() => { gpuUrl = ''; gpuServerUrl.set(''); gpuConnected = false; gpuStatus = 'idle'; gpuDetails = null; }}
             >Disconnect (use WASM)</button>
           {:else}
             <div class="text-[0.65rem] text-muted-foreground mt-1.5">Using local WASM inference</div>

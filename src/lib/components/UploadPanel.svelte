@@ -42,8 +42,8 @@
 <div class="flex flex-col gap-4">
   <div
     class={cn(
-      'flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer',
-      dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/30',
+      'flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer backdrop-blur-md bg-card/30',
+      dragOver ? 'border-primary bg-primary/10' : 'border-muted-foreground/20',
       disabled && 'opacity-50 pointer-events-none'
     )}
     ondrop={(e) => { e.preventDefault(); dragOver = false; handleFiles(e.dataTransfer?.files ?? null); }}

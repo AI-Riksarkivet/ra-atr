@@ -60,7 +60,7 @@
   </div>
 
   <!-- Model card -->
-  <div class="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 space-y-4">
+  <div class="relative rounded-xl bg-card/50 backdrop-blur-sm p-5 space-y-4 {isActive && !modelsReady ? 'border-glow' : 'border border-border/50'}">
     <div class="flex items-center justify-between">
       <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {#if modelsReady}
@@ -130,3 +130,58 @@
     <p class="text-center text-[0.65rem] text-muted-foreground/50">{t('models.cached')}</p>
   {/if}
 </div>
+
+<style>
+  .border-glow {
+    --border-width: 1px;
+    --glow-size: 80px;
+    border: var(--border-width) solid transparent;
+    background-clip: padding-box;
+    position: relative;
+  }
+  .border-glow::before {
+    content: '';
+    position: absolute;
+    inset: calc(var(--border-width) * -1);
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--glow-angle, 0deg),
+      transparent 0%,
+      transparent 25%,
+      hsl(var(--primary)) 35%,
+      hsl(var(--primary) / 0.6) 45%,
+      transparent 55%,
+      transparent 100%
+    );
+    z-index: -1;
+    animation: border-spin 3s linear infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    padding: var(--border-width);
+  }
+  .border-glow::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--glow-angle, 0deg),
+      transparent 0%,
+      transparent 30%,
+      hsl(var(--primary) / 0.15) 38%,
+      transparent 46%,
+      transparent 100%
+    );
+    z-index: -2;
+    animation: border-spin 3s linear infinite;
+    filter: blur(8px);
+  }
+  @property --glow-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+  @keyframes border-spin {
+    to { --glow-angle: 360deg; }
+  }
+</style>
