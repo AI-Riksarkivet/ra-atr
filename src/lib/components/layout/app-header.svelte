@@ -7,6 +7,7 @@
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { DEFAULT_GPU_SERVER } from '$lib/model-config';
   import { exportDocument, type ExportFormat } from '$lib/export';
+  import { t, locale, setLocale, type Locale } from '$lib/i18n.svelte';
   import { page } from '$app/state';
 
   interface Props {
@@ -70,18 +71,18 @@
 
 <header class="flex items-center gap-3 border-b border-border bg-gradient-to-r from-card to-card/80 px-4 py-2 shrink-0 backdrop-blur-sm">
   {#if isViewer}
-    <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title="Home">
+    <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title={t('toolbar.home')}>
       <Home class="size-4" />
     </Button>
     {#if BACKEND_ENABLED}
-      <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title="Toggle catalog">
+      <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title={t('toolbar.catalog')}>
         <Search class="size-4" />
       </Button>
       {#if !catalogOpen}
         <input
           type="text"
           bind:value={headerSearch}
-          placeholder="Search catalog..."
+          placeholder={t('toolbar.search')}
           class="w-48 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/40 focus:bg-background/80 focus:w-64 focus:shadow-[0_0_0_1px_oklch(0.68_0.16_250_/_0.1)] transition-all duration-300"
           onkeydown={(e) => {
             if (e.key === 'Enter' && headerSearch.trim()) {
@@ -176,12 +177,12 @@
     </div>
 
     {#if isViewer}
-      <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title="Toggle transcriptions">
+      <Button variant={transcriptionOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleTranscription} title={t('toolbar.transcriptions')}>
         <FileText class="size-4" />
       </Button>
 
       <div class="relative">
-        <Button variant="ghost" size="icon-sm" onclick={() => showExportMenu = !showExportMenu} title="Export transcriptions">
+        <Button variant="ghost" size="icon-sm" onclick={() => showExportMenu = !showExportMenu} title={t('export.title')}>
           <Download class="size-4" />
         </Button>
         {#if showExportMenu}
@@ -209,7 +210,13 @@
     <Button variant="ghost" size="icon-sm" onclick={toggleMode}>
       <Sun class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
       <Moon class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span class="sr-only">Toggle theme</span>
+      <span class="sr-only">{t('theme.toggle')}</span>
     </Button>
+
+    <button
+      class="px-1.5 py-0.5 rounded text-[0.65rem] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer uppercase"
+      onclick={() => setLocale(locale() === 'en' ? 'sv' : 'en')}
+      title={locale() === 'en' ? 'Byt till svenska' : 'Switch to English'}
+    >{locale()}</button>
   </div>
 </header>

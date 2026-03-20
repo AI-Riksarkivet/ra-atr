@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ImageDocument } from '$lib/types';
   import { Play } from 'lucide-svelte';
+  import { t } from '$lib/i18n.svelte';
 
   interface Props {
     documents: ImageDocument[];
@@ -243,7 +244,7 @@
       <input
         type="text"
         bind:value={searchQuery}
-        placeholder="Filter transcriptions..."
+        placeholder={t('transcription.filter')}
         class="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-sans text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
       />
       {#if filter && !documents.some(d => docHasMatches(d))}
@@ -344,13 +345,13 @@
               {/each}
 
               {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
-                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">Press <kbd class="not-italic rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono">&#9654;</kbd> to transcribe this page</p>
+                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">{t('transcription.pressPlay')} <kbd class="not-italic rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono">&#9654;</kbd> {t('transcription.toTranscribe')}</p>
               {/if}
             </div>
           {:else if !isCollapsed}
             <div class="pl-6 pb-1">
               {#if doc.lines.length === 0 && doc.groups.length === 0}
-                <p class="text-muted-foreground italic text-xs">No regions detected</p>
+                <p class="text-muted-foreground italic text-xs">{t('transcription.noRegions')}</p>
               {:else}
                 <p class="text-muted-foreground text-xs">{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}</p>
               {/if}

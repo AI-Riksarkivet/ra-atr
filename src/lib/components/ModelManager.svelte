@@ -2,6 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Progress } from '$lib/components/ui/progress';
   import { Scan, PenLine, SplitSquareHorizontal, Type, FileKey } from 'lucide-svelte';
+  import { t } from '$lib/i18n.svelte';
 
   interface Props {
     modelProgress: Record<string, number>;
@@ -15,11 +16,11 @@
   let { modelProgress, onLoadModels, modelsReady, autoLoading = false, error = null, onDismissError }: Props = $props();
 
   const models = [
-    { key: 'layout', label: 'Layout Detection', desc: 'RTMDet regions', size: '97 MB', icon: Scan },
-    { key: 'yolo', label: 'Line Detection', desc: 'YOLO segments', size: '229 MB', icon: SplitSquareHorizontal },
-    { key: 'trocr-encoder', label: 'Text Encoder', desc: 'TrOCR vision', size: '329 MB', icon: FileKey },
-    { key: 'trocr-decoder', label: 'Text Decoder', desc: 'TrOCR language', size: '1.2 GB', icon: PenLine },
-    { key: 'tokenizer', label: 'Tokenizer', desc: 'BPE vocab', size: '2 MB', icon: Type },
+    { key: 'layout', labelKey: 'model.layout', descKey: 'model.layout.desc', size: '97 MB', icon: Scan },
+    { key: 'yolo', labelKey: 'model.yolo', descKey: 'model.yolo.desc', size: '229 MB', icon: SplitSquareHorizontal },
+    { key: 'trocr-encoder', labelKey: 'model.encoder', descKey: 'model.encoder.desc', size: '329 MB', icon: FileKey },
+    { key: 'trocr-decoder', labelKey: 'model.decoder', descKey: 'model.decoder.desc', size: '1.2 GB', icon: PenLine },
+    { key: 'tokenizer', labelKey: 'model.tokenizer', descKey: 'model.tokenizer.desc', size: '2 MB', icon: Type },
   ];
 
   let loading = $state(false);
@@ -52,9 +53,9 @@
 <div class="mx-auto max-w-md space-y-6 p-8">
   <!-- Title and description -->
   <div class="space-y-3 text-center">
-    <h1 class="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Lejonet HTR</h1>
+    <h1 class="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">{t('app.title')}</h1>
     <p class="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
-      Transcribe handwritten Swedish historical documents directly in your browser. All inference runs locally — no data leaves your device.
+      {t('app.description')}
     </p>
   </div>
 
@@ -63,11 +64,11 @@
     <div class="flex items-center justify-between">
       <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {#if modelsReady}
-          Models Ready
+          {t('models.ready')}
         {:else if isActive}
-          Downloading — {overallProgress()}%
+          {t('models.downloading')} — {overallProgress()}%
         {:else}
-          HTR Pipeline
+          {t('models.pipeline')}
         {/if}
       </h3>
       {#if isActive && !modelsReady}
@@ -96,7 +97,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium {done ? 'text-muted-foreground' : ''}">{model.label}</span>
+              <span class="text-sm font-medium {done ? 'text-muted-foreground' : ''}">{t(model.labelKey)}</span>
               <span class="text-[0.65rem] text-muted-foreground/60 font-mono">{model.size}</span>
             </div>
             {#if isActive && !done}
@@ -104,9 +105,9 @@
                 <div class="h-full rounded-full bg-primary transition-all duration-300" style="width: {pct}%"></div>
               </div>
             {:else if !isActive && !done}
-              <p class="text-[0.65rem] text-muted-foreground/50">{model.desc}</p>
+              <p class="text-[0.65rem] text-muted-foreground/50">{t(model.descKey)}</p>
             {:else}
-              <p class="text-[0.65rem] text-success/70">Ready</p>
+              <p class="text-[0.65rem] text-success/70">{t('transcription.ready')}</p>
             {/if}
           </div>
         </div>
@@ -117,15 +118,15 @@
   <!-- Actions -->
   {#if error}
     <div class="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-2">
-      <p class="text-sm font-medium text-destructive">Download failed</p>
+      <p class="text-sm font-medium text-destructive">{t('models.failed')}</p>
       <p class="text-xs text-muted-foreground break-all">{error}</p>
       {#if is401}
         <p class="text-xs text-muted-foreground">Set your HuggingFace token in the browser console:<br><code class="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">sessionStorage.setItem('hf_token', 'hf_...')</code></p>
       {/if}
-      <Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
+      <Button variant="outline" size="sm" onclick={handleRetry}>{t('models.retry')}</Button>
     </div>
   {:else if !loading && !modelsReady && !autoLoading}
-    <Button class="w-full h-11 text-sm font-medium btn-glow rounded-xl" onclick={handleLoad}>Download Models</Button>
-    <p class="text-center text-[0.65rem] text-muted-foreground/50">Cached after first download — loads instantly next time</p>
+    <Button class="w-full h-11 text-sm font-medium btn-glow rounded-xl" onclick={handleLoad}>{t('models.download')}</Button>
+    <p class="text-center text-[0.65rem] text-muted-foreground/50">{t('models.cached')}</p>
   {/if}
 </div>

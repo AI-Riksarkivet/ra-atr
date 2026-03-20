@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { cn } from '$lib/utils';
+  import { t } from '$lib/i18n.svelte';
 
   interface Props {
     onUpload: (files: { name: string; imageData: ArrayBuffer; previewUrl: string }[]) => void;
@@ -41,7 +42,7 @@
 <div class="flex flex-col gap-4">
   <div
     class={cn(
-      'flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer',
+      'flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer',
       dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/30',
       disabled && 'opacity-50 pointer-events-none'
     )}
@@ -61,15 +62,18 @@
       onchange={(e) => handleFiles(e.currentTarget.files)}
       {disabled}
     />
-    <p class="text-base font-medium text-foreground/80">Drop images here or click to upload</p>
-    <p class="text-xs text-muted-foreground text-center max-w-xs">Upload scanned pages of handwritten documents, then press <span class="inline-flex items-center align-middle"><svg class="size-3.5 inline" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></span> to run layout detection, line segmentation, and transcription.</p>
+    <div class="text-center space-y-1">
+      <p class="text-base font-medium text-foreground/80">{t('upload.drop')}</p>
+      <p class="text-xs text-muted-foreground">{t('upload.hint1')}</p>
+      <p class="text-xs text-muted-foreground">{t('upload.hint2')} <span class="inline-flex items-center align-middle"><svg class="size-3.5 inline" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></span> {t('upload.hint3')}</p>
+    </div>
     <Button
       variant="outline"
       size="sm"
       onclick={(e) => { e.stopPropagation(); loadDemoImage(); }}
       disabled={disabled || loadingDemo}
     >
-      {loadingDemo ? 'Loading...' : 'Try demo image'}
+      {loadingDemo ? t('upload.loading') : t('upload.demo')}
     </Button>
   </div>
 
