@@ -2,6 +2,7 @@
   import type { Line, LineGroup, PipelineStage } from '$lib/types';
   import { CanvasController } from '$lib/canvas';
   import { onMount } from 'svelte';
+  import { t } from '$lib/i18n.svelte';
 
   interface Props {
     imageUrl: string | null;
@@ -534,10 +535,18 @@
     if (imageUrl) {
       // Clear pending regions from previous image
       pendingRegions = new Map();
+      // Fade transition
+      canvasEl.style.opacity = '0';
       const newImg = new Image();
       newImg.onload = () => {
         img = newImg;
         controller.setImage(newImg);
+        // Animate in
+        requestAnimationFrame(() => {
+          canvasEl.style.transition = 'opacity 0.2s ease-out';
+          canvasEl.style.opacity = '1';
+          setTimeout(() => { canvasEl.style.transition = ''; }, 250);
+        });
       };
       newImg.src = imageUrl;
     }
@@ -572,15 +581,16 @@
 <div class="relative h-full w-full">
   <canvas bind:this={canvasEl} class="block h-full w-full touch-none" class:cursor-crosshair={selectMode} style:filter={imageFilter || 'none'}></canvas>
   {#if stage === 'segmenting'}
-    <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 pointer-events-none">
-      <div class="size-8 animate-spin rounded-full border-3 border-white/20 border-t-white"></div>
-      <p class="text-sm text-white">Detecting text lines...</p>
+    <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/60 backdrop-blur-md pointer-events-none">
+      <div class="loader-premium"><div class="ring ring-lg ring-light"></div></div>
+      <p class="text-sm text-white font-medium">{t('region.analyzing')}</p>
     </div>
   {/if}
   {#if !imageUrl}
-    <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
-      <div class="size-6 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground"></div>
-      <p class="text-xs text-muted-foreground">Loading page...</p>
+    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div class="rounded-xl bg-card/90 backdrop-blur-lg border border-border/50 shadow-xl p-5">
+        <div class="loader-premium"><div class="ring"></div></div>
+      </div>
     </div>
   {/if}
 </div>

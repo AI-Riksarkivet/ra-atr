@@ -281,7 +281,7 @@
         <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
       {/if}
       {#if volWorking}
-        <span class="inline-block size-2 rounded-full border border-primary/40 border-t-primary animate-spin"></span>
+        <span class="inline-block size-2 rounded-full border border-primary/30 border-t-primary animate-spin" style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"></span>
       {:else}
         <button
           class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 opacity-0 group-hover/vol:opacity-50 hover:!opacity-100 hover:text-primary transition-opacity"
@@ -327,7 +327,7 @@
             {#if isWorking}
               <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
             {:else if doc.placeholder}
-              <span class="inline-block size-2 rounded-full border border-muted-foreground/40 border-t-muted-foreground animate-spin"></span>
+              <span class="inline-block size-2 rounded-full border border-muted-foreground/30 border-t-muted-foreground animate-spin" style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"></span>
             {/if}
             <span class="truncate flex-1">p. {doc.pageNumber ?? '?'}</span>
             {#if totalLines > 0}
