@@ -13,6 +13,25 @@ npm install
 make dev       # Start dev server at http://localhost:5173
 ```
 
+### Full stack (frontend + search + GPU)
+
+```bash
+# 1. Frontend (this repo)
+npm install && make dev
+
+# 2. Search backend (separate repo)
+cd ../lejonet-search
+uv sync
+LANCEDB_PATH=./data/lancedb uv run uvicorn lejonet_backend.app:app --port 8000
+
+# 3. GPU inference (separate repo, requires NVIDIA/AMD GPU)
+cd ../lejonet-inference
+docker build -f Dockerfile.nvidia -t lejonet-inference:nvidia .
+docker run --gpus all --shm-size=4g -p 8080:8080 lejonet-inference:nvidia
+```
+
+The frontend auto-detects the search backend at localhost:8000 (via Vite proxy) and GPU server at localhost:8080.
+
 ## Features
 
 - **In-browser HTR** — ONNX Runtime Web (WASM) with multi-threaded inference
