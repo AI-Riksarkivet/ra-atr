@@ -5,7 +5,7 @@
   import { appState } from '$lib/stores/app-state.svelte';
   import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
-  import { DEFAULT_GPU_SERVER } from '$lib/model-config';
+  import { DEFAULT_GPU_SERVER, getQuantization, setQuantization, type ModelQuantization } from '$lib/model-config';
   import { exportDocument, type ExportFormat } from '$lib/export';
   import { t, locale, setLocale, type Locale } from '$lib/i18n.svelte';
   import { page } from '$app/state';
@@ -178,6 +178,21 @@
             >Disconnect (use WASM)</button>
           {:else}
             <div class="text-[0.65rem] text-muted-foreground mt-1.5">Using local WASM inference</div>
+          {/if}
+          {#if appState.htr.modelsReady}
+            <div class="mt-2 pt-2 border-t border-border">
+              <div class="text-[0.6rem] text-muted-foreground mb-1">Model quality</div>
+              <div class="flex gap-1">
+                <button
+                  class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'fp32' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                  onclick={() => { setQuantization('fp32'); location.reload(); }}
+                >Full</button>
+                <button
+                  class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'int8' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                  onclick={() => { setQuantization('int8'); location.reload(); }}
+                >Lite</button>
+              </div>
+            </div>
           {/if}
         </div>
       {/if}
