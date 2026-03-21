@@ -4,15 +4,15 @@
 
 1. Fork the repository
 2. Clone your fork
-3. Install dependencies: `make install`
+3. Install dependencies: `make setup`
 4. Create a feature branch: `git checkout -b feat/my-feature`
 
 ## Development Workflow
 
 ```bash
-make check   # Format + lint + typecheck
-make test    # Run tests
-make serve   # Start dev servers
+make quality   # Format + typecheck
+make test      # Run tests
+make dev       # Start dev server
 ```
 
 ## Commit Messages
@@ -30,13 +30,11 @@ chore: maintenance
 
 ## Pull Requests
 
-1. Ensure `make check` passes
+1. Ensure `make quality` passes
 2. Ensure `make test` passes
 3. Update documentation if needed
 4. Submit PR against `main` branch
 
 ## Code Style
 
-- **Python**: ruff (line length 160), Google-style docstrings
 - **TypeScript/Svelte**: prettier, Svelte 5 runes
-- **No pandas** in backend — use pyarrow compute

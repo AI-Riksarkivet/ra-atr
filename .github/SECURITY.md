@@ -1,12 +1,20 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Reporting Security Vulnerabilities
 
-Please report security vulnerabilities through [GitHub Security Advisories](https://github.com/AI-Riksarkivet/lejonet/security/advisories/new).
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-Do **not** open public issues for security vulnerabilities.
+Report them via:
+- **GitHub Security Advisories** (preferred)
 
 Include:
 - Description of the vulnerability
 - Steps to reproduce
-- Impact assessment
+- Potential impact
+
+## Security Features
+
+- Automated dependency updates via Dependabot
+- Secret scanning via TruffleHog
+- CodeQL static analysis
+- OpenSSF Scorecard monitoring

@@ -1,59 +1,55 @@
 # Lejonet HTR
 
+[![CI](https://github.com/carpelan/lejonet/actions/workflows/ci.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/ci.yml)
+[![Docs](https://github.com/carpelan/lejonet/actions/workflows/docs.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/docs.yml)
+[![CodeQL](https://github.com/carpelan/lejonet/actions/workflows/codeql.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/codeql.yml)
+[![Scorecard](https://github.com/carpelan/lejonet/actions/workflows/scorecard.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/scorecard.yml)
+
 Collaborative handwritten text recognition for historical documents from Sweden's National Archives (Riksarkivet).
 
-Browse archive volumes, load digitized pages, and transcribe with AI — in-browser or on GPU.
-
 **Live demo**: https://huggingface.co/spaces/carpelan/lejonet
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Svelte 5, Tailwind CSS 4, ONNX Runtime Web |
+| Inference | Ray Serve, ONNX Runtime GPU ([lejonet-inference](https://github.com/carpelan/lejonet-inference)) |
+| Search | FastAPI, LanceDB ([lejonet-search](https://github.com/carpelan/lejonet-search)) |
+| Docs | Zensical |
+| CI/CD | Dagger, Docker, GitHub Actions |
 
 ## Quick Start
 
 ```bash
-npm install
-make dev       # Start dev server at http://localhost:5173
+make setup   # Install dependencies
+make dev     # Start frontend dev server at http://localhost:5173
 ```
 
-### Full stack (frontend + search + GPU)
+## Full Stack
 
 ```bash
 # 1. Frontend (this repo)
-npm install && make dev
+make dev
 
 # 2. Search backend (separate repo)
-cd ../lejonet-search
-uv sync
-LANCEDB_PATH=./data/lancedb uv run uvicorn lejonet_backend.app:app --port 8000
+cd ../lejonet-search && make dev
 
-# 3. GPU inference (separate repo, requires NVIDIA/AMD GPU)
-cd ../lejonet-inference
-docker build -f Dockerfile.nvidia -t lejonet-inference:nvidia .
-docker run --gpus all --shm-size=4g -p 8080:8080 lejonet-inference:nvidia
+# 3. GPU inference (separate repo, requires GPU)
+cd ../lejonet-inference && make dev
 ```
 
-The frontend auto-detects the search backend at localhost:8000 (via Vite proxy) and GPU server at localhost:8080.
+The frontend auto-detects the search backend at localhost:8000 and GPU server at localhost:8080.
+
+## Documentation
+
+- [Docs site](https://carpelan.github.io/lejonet/) — architecture, configuration, getting started
 
 ## Features
 
 - **In-browser HTR** — ONNX Runtime Web (WASM) with multi-threaded inference
 - **GPU acceleration** — Optional GPU server for faster inference
-- **Archive catalog** — Search 3.7M Riksarkivet volumes (requires backend)
+- **Archive catalog** — Search 3.7M Riksarkivet volumes (requires search backend)
 - **Export** — ALTO XML, PAGE XML, JSON, plain text
 - **i18n** — Swedish and English
-- **Model selection** — Full (1.8GB) or Lite mode
-
-## Architecture
-
-```
-Lejonet (this repo)          lejonet-inference           lejonet-search
-  Svelte 5 frontend    ←→    GPU inference server    ←→   Catalog + transcriptions
-  ONNX Runtime WASM          Ray Serve + ONNX GPU        FastAPI + LanceDB
-```
-
-| Repo | Purpose |
-|------|---------|
-| **lejonet** (this) | Svelte frontend, WASM HTR |
-| [lejonet-inference](https://github.com/carpelan/lejonet-inference) | GPU inference server (Docker) |
-| [lejonet-search](https://github.com/carpelan/lejonet-search) | Search backend + catalog |
 
 ## HTR Pipeline
 
@@ -61,34 +57,9 @@ Lejonet (this repo)          lejonet-inference           lejonet-search
 Layout Detection (RTMDet) → Line Detection (YOLO) → Transcription (TrOCR)
 ```
 
-Runs in-browser via WASM or on GPU server. Frontend auto-detects GPU server at localhost:8080.
+## Requirements
 
-## Models
-
-| Model | Size | Source |
-|-------|------|--------|
-| `rtmdet-regions.onnx` | 97 MB | Riksarkivet/rtmdet_regions |
-| `yolo-lines.onnx` | 229 MB | Riksarkivet/yolov9-lines-within-regions-1 |
-| `encoder.onnx` | 329 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
-| `decoder.onnx` | 1.2 GB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
-| `tokenizer.json` | 2 MB | Riksarkivet/trocr-base-handwritten-hist-swe-2 |
-
-Stored on [HuggingFace](https://huggingface.co/carpelan/htr-onnx-models). Auto-downloaded on first use.
-
-## Deploy to HuggingFace Space
-
-```bash
-make deploy
-```
-
-## Development
-
-```bash
-make check   # Format + typecheck
-make help    # Show all targets
-```
-
-See [CLAUDE.md](CLAUDE.md) for the full development guide.
+- [Node.js](https://nodejs.org/) 22+ — frontend runtime
 
 ## License
 

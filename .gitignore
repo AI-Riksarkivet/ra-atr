@@ -2,10 +2,13 @@
 logs
 *.log
 
+# Node
 node_modules
 dist
-.svelte-kit
 *.local
+
+# Svelte
+.svelte-kit
 
 # Editor
 .vscode/*
@@ -27,6 +30,16 @@ space/*.jpg
 space/*.svg
 space/*.mp4
 !space/README.md
+
+# Docs
+site/
+
+# Environment
+.env
+
+# Dagger
+.dagger/internal/
+.dagger/dagger.gen.go
 
 # Worktrees
 .worktrees

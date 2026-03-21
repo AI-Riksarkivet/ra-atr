@@ -1,49 +1,47 @@
 version: 2
 updates:
+  # Node.js dependencies (npm)
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"
-    commit-message:
-      prefix: "chore(deps)"
     open-pull-requests-limit: 10
     groups:
-      all:
-        patterns: ["*"]
-
-  - package-ecosystem: "pip"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
+      npm-packages:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "npm"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 5
+      include: "scope"
 
-  - package-ecosystem: "pip"
-    directory: "/gpu-server"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "chore(deps)"
-    open-pull-requests-limit: 5
-
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 5
+      include: "scope"
 
+  # Docker dependencies
   - package-ecosystem: "docker"
-    directory: "/gpu-server"
+    directory: "/.docker"
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 5
+      include: "scope"

@@ -15,7 +15,7 @@ jobs:
       security-events: write
     strategy:
       matrix:
-        language: [python, javascript-typescript]
+        language: [javascript-typescript]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
