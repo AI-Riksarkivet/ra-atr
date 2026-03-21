@@ -1,60 +1,32 @@
 # Logs
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
 node_modules
 dist
-dist-ssr
 .svelte-kit
 *.local
 
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.sw?
 
-# Rust / WASM
-crates/htr-wasm/target
-crates/htr-wasm/pkg
-Cargo.lock
-
-# Models
+# Models (loaded from HuggingFace)
 models/
-static/models
 *.onnx
-static/*.wasm
-static/ort-*.mjs
-
-# Worktrees
-.worktrees
-
-# Data
-backend/data/
-
-# Documentation build
-site/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-*.egg-info/
-
-# Docker
-.export-venv/
-backend/src/lejonet_backend/data/
 
 # Build & deploy
 build/
-space/
+space/_app/
+space/viewer/
+space/*.html
+space/*.jpg
+space/*.svg
+space/*.mp4
+!space/README.md
+
+# Worktrees
+.worktrees

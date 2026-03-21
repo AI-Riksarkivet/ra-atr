@@ -8,34 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Lint backend
-        run: uvx ruff check backend/
-      - name: Lint gpu-server
-        run: uvx ruff check gpu-server/src/
-      - name: Format check
-        run: uvx ruff format --check backend/ gpu-server/src/
-
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install backend deps
-        run: cd backend && uv sync --extra dev
-      - name: Run tests
-        run: cd backend && uv run pytest -v
-
   check-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -47,3 +19,5 @@ jobs:
         run: npm ci
       - name: Svelte check
         run: npx svelte-check --threshold error
+      - name: Build
+        run: npm run build
