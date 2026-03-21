@@ -31,12 +31,12 @@
     { key: 'layout', labelKey: 'model.layout', descKey: 'model.layout.desc', size: '97 MB', icon: Scan },
     { key: 'yolo', labelKey: 'model.yolo', descKey: 'model.yolo.desc', size: '59 MB', icon: SplitSquareHorizontal },
     { key: 'trocr-encoder', labelKey: 'model.encoder', descKey: 'model.encoder.desc', size: '85 MB', icon: FileKey },
-    { key: 'trocr-decoder', labelKey: 'model.decoder', descKey: 'model.decoder.desc', size: '290 MB', icon: PenLine },
+    { key: 'trocr-decoder', labelKey: 'model.decoder', descKey: 'model.decoder.desc', size: '1.2 GB', icon: PenLine },
     { key: 'tokenizer', labelKey: 'model.tokenizer', descKey: 'model.tokenizer.desc', size: '2 MB', icon: Type },
   ];
 
   const models = $derived(quantization === 'int8' ? int8Models : fp32Models);
-  const totalSize = $derived(quantization === 'int8' ? '~530 MB' : '~1.8 GB');
+  const totalSize = $derived(quantization === 'int8' ? '~1.4 GB' : '~1.8 GB');
 
   $effect(() => { if (error) loading = false; });
 

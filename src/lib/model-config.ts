@@ -31,7 +31,7 @@ export function getModelUrls() {
   return {
     yolo: getModelUrl(modelFile('yolo-lines.onnx')),
     encoder: getModelUrl(modelFile('encoder.onnx')),
-    decoder: getModelUrl(modelFile('decoder.onnx')),
+    decoder: getModelUrl('decoder.onnx'), // always fp32 — int8 hurts text quality
     tokenizer: getModelUrl('tokenizer.json'),
     layout: getModelUrl('rtmdet-regions.onnx'), // no int8 variant
   };
