@@ -1,9 +1,12 @@
 """Entry point for the GPU inference server with Ray Serve."""
 
 import io
+import logging
 import subprocess
 from pathlib import Path
 
+# --- Ray Serve Deployments ---
+import numpy as np
 import ray
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +19,7 @@ from .models import TOKENIZER_FILE, ModelStore, _resolve_model
 from .preprocessing import crop_region, preprocess_rtmdet, preprocess_trocr, preprocess_yolo
 from .transcribe import Tokenizer, transcribe_line
 
-# --- Ray Serve Deployments ---
-
-
-import numpy as np
+logger = logging.getLogger(__name__)
 
 
 @serve.deployment(num_replicas=1, ray_actor_options={"num_gpus": 0.25})
@@ -46,9 +46,9 @@ class LineDetector:
         """Run line detection on preprocessed YOLO tensor [1,3,640,640]."""
         result = self.session.run(None, {self.session.get_inputs()[0].name: tensor})
         lines = decode_yolo(result[0], orig_w, orig_h, scale, pad_x, pad_y)
-        for l in lines:
-            l["x"] += offset_x
-            l["y"] += offset_y
+        for line in lines:
+            line["x"] += offset_x
+            line["y"] += offset_y
         return lines
 
 
@@ -72,30 +72,36 @@ class TranscriberDeployment:
 
 
 def _gpu_info() -> dict:
+    # Try rocm-smi — pass on failure since GPU detection is best-effort
     for cmd in [["rocm-smi", "--showproductname", "--csv"], ["rocm-smi", "--showallinfo", "--csv"]]:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if r.returncode == 0:
-                lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith("device")]
+                lines = [row for row in r.stdout.strip().split("\n") if row and not row.startswith("device")]
                 if lines:
                     return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
         except Exception:
-            pass
+            logger.debug("rocm-smi command %s failed", cmd[0])
     try:
-        r = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True, timeout=5)
+        r = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         if r.returncode == 0 and r.stdout.strip():
             return {"name": r.stdout.strip(), "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("nvidia-smi not available")
     try:
         for card in sorted(Path("/sys/class/drm").glob("card*/device")):
-            v = (card / "vendor").read_text().strip()
-            if v == "0x1002":
+            vendor = (card / "vendor").read_text().strip()
+            if vendor == "0x1002":
                 return {"name": "AMD GPU", "runtime": "ROCm"}
-            if v == "0x10de":
+            if vendor == "0x10de":
                 return {"name": "NVIDIA GPU", "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("sysfs GPU detection failed")
     return {"name": "Unknown", "runtime": "Unknown"}
 
 
@@ -161,6 +167,7 @@ class APIIngress:
 
         # Get cluster resources
         import ray
+
         resources = ray.available_resources()
 
         return {
@@ -174,14 +181,18 @@ class APIIngress:
         }
 
     @app.post("/upload-image")
-    async def upload_image(self, image: UploadFile = File(...)):
+    async def upload_image(self, image: UploadFile = File(...)):  # noqa: B008
         """Upload image once, get an ID to use in subsequent calls."""
         img = _read_image(await image.read())
         image_id = self._store_image(img)
         return {"image_id": image_id, "width": img.width, "height": img.height}
 
     @app.post("/detect-layout")
-    async def detect_layout(self, image: UploadFile = File(None), image_id: str = Form(None)):
+    async def detect_layout(
+        self,
+        image: UploadFile = File(None),  # noqa: B008
+        image_id: str = Form(None),  # noqa: B008
+    ):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
         # Preprocess on CPU side — only send small tensor to GPU actor
         tensor, scale = preprocess_rtmdet(img)
@@ -189,7 +200,15 @@ class APIIngress:
         return {"regions": regions, "image_size": [img.width, img.height]}
 
     @app.post("/detect-lines")
-    async def detect_lines(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(0), y: float = Form(0), w: float = Form(0), h: float = Form(0)):
+    async def detect_lines(
+        self,
+        image: UploadFile = File(None),  # noqa: B008
+        image_id: str = Form(None),  # noqa: B008
+        x: float = Form(0),  # noqa: B008
+        y: float = Form(0),  # noqa: B008
+        w: float = Form(0),  # noqa: B008
+        h: float = Form(0),  # noqa: B008
+    ):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
         if w > 0 and h > 0:
             cropped = crop_region(img, x, y, w, h)
@@ -202,7 +221,15 @@ class APIIngress:
         return {"lines": lines}
 
     @app.post("/transcribe")
-    async def transcribe(self, image: UploadFile = File(None), image_id: str = Form(None), x: float = Form(...), y: float = Form(...), w: float = Form(...), h: float = Form(...)):
+    async def transcribe(
+        self,
+        image: UploadFile = File(None),  # noqa: B008
+        image_id: str = Form(None),  # noqa: B008
+        x: float = Form(...),  # noqa: B008
+        y: float = Form(...),  # noqa: B008
+        w: float = Form(...),  # noqa: B008
+        h: float = Form(...),  # noqa: B008
+    ):
         img = self._get_image(image_id) if image_id else _read_image(await image.read())
         # Crop and preprocess on CPU — send only 384x384 tensor to GPU
         line_img = crop_region(img, x, y, w, h)
@@ -211,7 +238,7 @@ class APIIngress:
         return result
 
     @app.post("/process-page")
-    async def process_page(self, image: UploadFile = File(...)):
+    async def process_page(self, image: UploadFile = File(...)):  # noqa: B008
         img = _read_image(await image.read())
 
         # Preprocess and detect layout
@@ -262,10 +289,10 @@ def start():
     ray.init(
         ignore_reinit_error=True,
         runtime_env={"working_dir": None},
-        dashboard_host="0.0.0.0",
+        dashboard_host="0.0.0.0",  # noqa: S104 — intentional for Docker
     )
 
-    serve.start(http_options={"host": "0.0.0.0", "port": 8080})
+    serve.start(http_options={"host": "0.0.0.0", "port": 8080})  # noqa: S104 — intentional for Docker
 
     layout = LayoutDetector.bind()
     line_det = LineDetector.bind()
@@ -286,10 +313,6 @@ def start():
     def _warmup():
         _time.sleep(8)  # Wait for Ray Serve to fully start
         try:
-            import requests as _req
-        except ImportError:
-            import urllib.request
-
             print("Warming up models...")
             # Create a tiny dummy JPEG
             dummy = Image.new("RGB", (100, 100), (200, 200, 200))
@@ -299,14 +322,13 @@ def start():
 
             # Send to detect-layout to trigger model load
             import http.client
-            import mimetypes
 
             boundary = "warmup_boundary"
             body = (
-                f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="image"; filename="warmup.jpg"\r\n'
-                f"Content-Type: image/jpeg\r\n\r\n"
-            ).encode() + img_bytes + f"\r\n--{boundary}--\r\n".encode()
+                (f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="warmup.jpg"\r\nContent-Type: image/jpeg\r\n\r\n').encode()
+                + img_bytes
+                + f"\r\n--{boundary}--\r\n".encode()
+            )
 
             conn = http.client.HTTPConnection("localhost", 8080)
             conn.request("POST", "/detect-layout", body=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})

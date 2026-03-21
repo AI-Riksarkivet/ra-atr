@@ -1,9 +1,12 @@
 """ONNX model session management with auto-download from HuggingFace."""
 
+import logging
 import os
 from pathlib import Path
 
 import onnxruntime as ort
+
+logger = logging.getLogger(__name__)
 
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/models"))
 HF_REPO = os.environ.get("HF_MODEL_REPO", "carpelan/htr-onnx-models")
@@ -104,11 +107,12 @@ class ModelStore:
                 # Check HF cache
                 try:
                     from huggingface_hub import try_to_load_from_cache
+
                     cached = try_to_load_from_cache(HF_REPO, name)
                     if cached and isinstance(cached, str):
                         result.append(name)
                 except Exception:
-                    pass
+                    logger.debug("Could not check HF cache for model %s", name)
         return result
 
     def providers(self) -> list[str]:

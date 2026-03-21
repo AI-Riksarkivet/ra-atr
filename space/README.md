@@ -9,3 +9,5 @@ custom_headers:
   cross-origin-opener-policy: same-origin
   cross-origin-resource-policy: cross-origin
 ---
+
+Collaborative HTR for Swedish historical documents.

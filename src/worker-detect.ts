@@ -11,7 +11,7 @@ const cores = navigator.hardwareConcurrency || 4;
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(2, Math.max(1, Math.floor(cores / 4))) : 1;
 // Use CDN for WASM files to avoid HF LFS CORS issues
 if (!DEV) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
-if (DEV) console.log(`[detect] threads: ${ort.env.wasm.numThreads}`);
+console.log(`[detect] threads: ${ort.env.wasm.numThreads}, SAB: ${hasSharedBuffer}`);
 
 let modelUrl = '/models/yolo-lines.onnx';
 

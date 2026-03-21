@@ -26,15 +26,15 @@ class Tokenizer:
                 bs.append(b)
                 cs.append(256 + n)
                 n += 1
-        self.byte2unicode = {b: chr(c) for b, c in zip(bs, cs)}
+        self.byte2unicode = {b: chr(c) for b, c in zip(bs, cs, strict=True)}
         self.unicode2byte = {v: k for k, v in self.byte2unicode.items()}
 
     def decode(self, ids: list[int]) -> str:
         tokens = []
-        for id in ids:
-            if id in (self.bos_id, self.eos_id, self.pad_id):
+        for token_id in ids:
+            if token_id in (self.bos_id, self.eos_id, self.pad_id):
                 continue
-            token = self.vocab.get(id, "")
+            token = self.vocab.get(token_id, "")
             tokens.append(token)
         text = "".join(tokens)
         byte_list = [self.unicode2byte.get(c, ord(c)) for c in text]
@@ -90,9 +90,8 @@ def transcribe_line(
         # No-repeat trigram
         if len(generated) >= 2:
             for i in range(len(generated) - 1):
-                if generated[i] == generated[-2] and generated[i + 1] == generated[-1]:
-                    if i + 2 < len(generated):
-                        next_logits[generated[i + 2]] = -float("inf")
+                if generated[i] == generated[-2] and generated[i + 1] == generated[-1] and i + 2 < len(generated):
+                    next_logits[generated[i + 2]] = -float("inf")
 
         # Argmax
         next_id = int(np.argmax(next_logits))

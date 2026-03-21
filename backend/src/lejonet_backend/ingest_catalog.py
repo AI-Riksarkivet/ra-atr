@@ -58,7 +58,7 @@ def parse_date_range(text: str | None) -> tuple[int | None, int | None]:
 
 def parse_ead_file(path: str) -> list[dict]:
     """Parse one EAD XML file, return list of volume dicts."""
-    tree = ET.parse(path)
+    tree = ET.parse(path)  # noqa: S314 — trusted local archive data
     root = tree.getroot()
 
     # Fonds-level metadata
@@ -181,8 +181,7 @@ def walk_archive_dir(directory: str, limit: int | None = None):
             break
         try:
             rows = parse_ead_file(os.path.join(directory, fname))
-            for row in rows:
-                yield row
+            yield from rows
             count += 1
         except ET.ParseError as e:
             print(f"Skipping {fname}: {e}")
@@ -229,7 +228,7 @@ def embed_documents_remote(texts: list[str], gpu_server: str, batch_size: int = 
                 if isinstance(e, httpx.HTTPStatusError):
                     print(f"  Response body: {e.response.text[:500]}")
                 if attempt < 9:
-                    wait = min(2 ** attempt, 60)
+                    wait = min(2**attempt, 60)
                     print(f"  Embed request failed ({e}), retrying in {wait}s... (attempt {attempt + 1}/10)")
                     time.sleep(wait)
                 else:
@@ -253,7 +252,7 @@ def ingest_rows(
 
         if embedder:
             vectors = embed_documents(embedder, [r["search_text"] for r in batch])
-            for row, vec in zip(batch, vectors):
+            for row, vec in zip(batch, vectors, strict=True):
                 row["vector"] = vec
         else:
             for row in batch:
@@ -314,11 +313,11 @@ def ingest_streaming(
         nonlocal written
         if gpu_server:
             vectors = embed_documents_remote([r["search_text"] for r in batch], gpu_server)
-            for row, vec in zip(batch, vectors):
+            for row, vec in zip(batch, vectors, strict=True):
                 row["vector"] = vec
         elif embedder:
             vectors = embed_documents(embedder, [r["search_text"] for r in batch])
-            for row, vec in zip(batch, vectors):
+            for row, vec in zip(batch, vectors, strict=True):
                 row["vector"] = vec
         else:
             for row in batch:

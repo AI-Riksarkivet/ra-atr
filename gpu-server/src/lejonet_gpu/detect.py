@@ -81,5 +81,5 @@ def decode_yolo(
             }
         )
 
-    lines.sort(key=lambda l: (l["y"], l["x"]))
+    lines.sort(key=lambda line: (line["y"], line["x"]))
     return lines

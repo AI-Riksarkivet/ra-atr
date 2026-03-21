@@ -13,7 +13,7 @@ const DEV = self.location?.hostname === 'localhost';
 ort.env.wasm.numThreads = hasSharedBuffer ? Math.min(4, Math.max(1, Math.floor(cores / 2))) : 1;
 // Use CDN for WASM files to avoid HF LFS CORS issues
 if (!DEV) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
-if (DEV) console.log(`[transcribe] threads: ${ort.env.wasm.numThreads}, cores: ${cores}, SAB: ${hasSharedBuffer}`);
+console.log(`[transcribe] threads: ${ort.env.wasm.numThreads}, cores: ${cores}, SAB: ${hasSharedBuffer}, isolated: ${self.crossOriginIsolated}`);
 
 let workerId = '0';
 let poolSize = 1;

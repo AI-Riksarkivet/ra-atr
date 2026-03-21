@@ -289,10 +289,11 @@ def test_catalog_search_filters(client):
     assert "results" in data
 
 
-def test_catalog_search_requires_query(client):
-    """Empty query returns 400."""
+def test_catalog_search_empty_returns_empty(client):
+    """Empty query with no catalog returns empty results."""
     res = client.get("/catalog/search")
-    assert res.status_code == 400
+    assert res.status_code == 200
+    assert res.json()["results"] == []
 
 
 # --- Helpers ---

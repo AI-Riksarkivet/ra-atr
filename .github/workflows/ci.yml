@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install backend deps
-        run: cd backend && uv sync
+        run: cd backend && uv sync --extra dev
       - name: Run tests
         run: cd backend && uv run pytest -v
 

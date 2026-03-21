@@ -1,6 +1,7 @@
 """GPU inference server for Lejonet HTR."""
 
 import io
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -19,6 +20,8 @@ from .preprocessing import (
 )
 from .transcribe import Tokenizer, transcribe_line
 
+logger = logging.getLogger(__name__)
+
 store = ModelStore()
 embed_store = EmbedStore()
 tokenizer: Tokenizer | None = None
@@ -27,7 +30,7 @@ tokenizer: Tokenizer | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global tokenizer
-    from .models import download_models, _resolve_model
+    from .models import _resolve_model, download_models
 
     # Download models if missing
     download_models(store.models_dir)
@@ -59,7 +62,7 @@ def _gpu_info() -> dict:
     """Get GPU device info if available."""
     import subprocess
 
-    # Try rocm-smi
+    # Try rocm-smi — pass on failure since GPU detection is best-effort
     for cmd in [
         ["rocm-smi", "--showproductname", "--csv"],
         ["rocm-smi", "--showallinfo", "--csv"],
@@ -67,11 +70,11 @@ def _gpu_info() -> dict:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
-                lines = [l for l in result.stdout.strip().split("\n") if l and not l.startswith("device")]
+                lines = [row for row in result.stdout.strip().split("\n") if row and not row.startswith("device")]
                 if lines:
                     return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
         except Exception:
-            pass
+            logger.debug("rocm-smi command %s failed", cmd[0])
     # Try nvidia-smi
     try:
         result = subprocess.run(
@@ -83,7 +86,7 @@ def _gpu_info() -> dict:
         if result.returncode == 0 and result.stdout.strip():
             return {"name": result.stdout.strip(), "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("nvidia-smi not available")
     # Try reading from sysfs (works without tools)
     try:
         from pathlib import Path
@@ -97,7 +100,7 @@ def _gpu_info() -> dict:
                 name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "NVIDIA GPU"
                 return {"name": name, "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("sysfs GPU detection failed")
     # Identify from providers
     providers = store.providers()
     if "ROCMExecutionProvider" in providers:
@@ -130,7 +133,7 @@ def status():
 
 
 @app.post("/detect-layout")
-async def detect_layout(image: UploadFile = File(...)):
+async def detect_layout(image: UploadFile = File(...)):  # noqa: B008
     """Detect layout regions in an image using RTMDet."""
     img = _read_image(await image.read())
     tensor, scale = preprocess_rtmdet(img)
@@ -146,11 +149,11 @@ async def detect_layout(image: UploadFile = File(...)):
 
 @app.post("/detect-lines")
 async def detect_lines(
-    image: UploadFile = File(...),
-    x: float = Form(0),
-    y: float = Form(0),
-    w: float = Form(0),
-    h: float = Form(0),
+    image: UploadFile = File(...),  # noqa: B008
+    x: float = Form(0),  # noqa: B008
+    y: float = Form(0),  # noqa: B008
+    w: float = Form(0),  # noqa: B008
+    h: float = Form(0),  # noqa: B008
 ):
     """Detect text lines in a region using YOLO."""
     img = _read_image(await image.read())
@@ -180,11 +183,11 @@ async def detect_lines(
 
 @app.post("/transcribe")
 async def transcribe(
-    image: UploadFile = File(...),
-    x: float = Form(...),
-    y: float = Form(...),
-    w: float = Form(...),
-    h: float = Form(...),
+    image: UploadFile = File(...),  # noqa: B008
+    x: float = Form(...),  # noqa: B008
+    y: float = Form(...),  # noqa: B008
+    w: float = Form(...),  # noqa: B008
+    h: float = Form(...),  # noqa: B008
 ):
     """Transcribe a single text line using TrOCR."""
     if tokenizer is None:
@@ -204,7 +207,7 @@ async def transcribe(
 
 
 @app.post("/process-page")
-async def process_page(image: UploadFile = File(...)):
+async def process_page(image: UploadFile = File(...)):  # noqa: B008
     """Full pipeline: layout → lines → transcription for a page image."""
     if tokenizer is None:
         raise HTTPException(503, "Tokenizer not loaded")
@@ -284,6 +287,7 @@ class EmbedResponse(BaseModel):
 async def embed_text(body: EmbedRequest):
     """Generate text embeddings using Snowflake Arctic Embed."""
     from .models import EMBED_MODEL
+
     if body.mode == "query":
         if len(body.texts) != 1:
             raise HTTPException(400, "Query mode accepts exactly one text")

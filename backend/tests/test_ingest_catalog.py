@@ -3,6 +3,12 @@ import os
 
 import pytest
 
+try:
+    import sentence_transformers  # noqa: F401
+    HAS_SENTENCE_TRANSFORMERS = True
+except ImportError:
+    HAS_SENTENCE_TRANSFORMERS = False
+
 DATA_DIR = os.environ.get("RIKSARKIVET_DATA", "/home/m/Downloads/Riksarkivet-2022-12-16")
 SAMPLE_FILE = os.path.join(DATA_DIR, "SE_RA", "SE_RA_1111.xml")
 
@@ -111,8 +117,9 @@ def test_walk_directory():
     assert "reference_code" in rows[0]
 
 
+@pytest.mark.skipif(not HAS_SENTENCE_TRANSFORMERS, reason="sentence-transformers not installed")
 def test_embed_texts():
-    from lejonet_backend.ingest_catalog import create_embedder, embed_documents, embed_query, EMBED_DIM
+    from lejonet_backend.ingest_catalog import EMBED_DIM, create_embedder, embed_documents, embed_query
 
     embedder = create_embedder()
     texts = ["Swedish council protocols", "Krigsarkivet military records"]
@@ -140,6 +147,7 @@ def test_ingest_to_lancedb(tmp_path):
     assert table.count_rows() == 20
 
 
+@pytest.mark.skipif(not HAS_SENTENCE_TRANSFORMERS, reason="sentence-transformers not installed")
 def test_ingest_with_embeddings(tmp_path):
     from lejonet_backend.ingest_catalog import ingest_rows, parse_ead_file
 

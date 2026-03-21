@@ -476,7 +476,7 @@
 
       <!-- Floating toolbar -->
       {@const pageTranscribed = activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every(l => l.complete)}
-      {@const isRunning = appState.htr.running || appState.htr.pendingRegions.size > 0 || appState.htr.pendingLines > 0 || appState.htr.stage === 'transcribing' || appState.htr.stage === 'loading_models'}
+      {@const isRunning = appState.htr.stage !== 'idle' && appState.htr.stage !== 'done'}
       {@const totalLines = activeDoc?.lines.length ?? 0}
       {@const completedLines = activeDoc?.lines.filter(l => l.complete).length ?? 0}
       <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-black/40 backdrop-blur-xl border border-white/[0.06] shadow-2xl shadow-black/40 px-4 py-2 text-[0.7rem] text-white/70">

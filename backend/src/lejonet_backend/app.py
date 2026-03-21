@@ -1,4 +1,6 @@
+import logging
 import os
+import tempfile
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,10 +14,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from huggingface_hub import CommitScheduler, hf_hub_download
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 DATASET_REPO = os.environ.get("DATASET_REPO", "lejonet/transcriptions")
 TABLE_NAME = "transcriptions"
 DB_PATH = os.environ.get("LANCEDB_PATH", str(Path(__file__).parents[2] / "data" / "lancedb"))
-PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "/tmp/parquet_export"))
+PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", os.path.join(tempfile.gettempdir(), "parquet_export")))
 
 SCHEMA = pa.schema(
     [
@@ -92,7 +96,7 @@ def init_db():
             print(f"Opened local table with {table.count_rows()} rows")
             return
         except Exception:
-            pass
+            logger.debug("No existing local table '%s', will create new", TABLE_NAME)
 
     # In production, cold-start from HF Dataset repo
     try:
@@ -137,7 +141,7 @@ def _search_fts(q: str, contributor: str) -> pa.Table:
         if len(fts_results) > 0:
             fts_ids = set(fts_results.column("id").to_pylist())
     except Exception:
-        pass
+        logger.debug("FTS search failed for query '%s', falling back to metadata search", q)
 
     # Substring match on metadata columns via pyarrow
     q_lower = q.lower()
@@ -210,10 +214,8 @@ def _remove(**filters: str):
         return
     match = _match_mask(all_rows, **filters)
     kept = all_rows.filter(pc.invert(match))
-    if len(kept) > 0:
-        table = db.create_table(TABLE_NAME, kept, mode="overwrite")
-    else:
-        table = db.create_table(TABLE_NAME, schema=SCHEMA, mode="overwrite")
+    data = kept if len(kept) > 0 else pa.Table.from_pylist([], schema=SCHEMA)
+    table = db.create_table(TABLE_NAME, data, mode="overwrite")
 
 
 def _resolve_user(request: Request) -> str | None:
@@ -311,7 +313,7 @@ def debug_browse(
     try:
         t = db.open_table(table_name)
     except Exception:
-        raise HTTPException(404, f"Table '{table_name}' not found")
+        raise HTTPException(404, f"Table '{table_name}' not found") from None
 
     # Select columns
     col_list = [c.strip() for c in columns.split(",")] if columns else None
@@ -321,13 +323,13 @@ def debug_browse(
         try:
             result = t.search(q, query_type="fts").limit(limit + offset).to_arrow()
         except Exception as e:
-            raise HTTPException(400, f"FTS error: {e}")
+            raise HTTPException(400, f"FTS error: {e}") from None
     elif where:
         # SQL where filter
         try:
             result = t.search().where(where).limit(limit + offset).to_arrow()
         except Exception as e:
-            raise HTTPException(400, f"Where error: {e}")
+            raise HTTPException(400, f"Where error: {e}") from None
     else:
         result = t.to_arrow().slice(offset, limit)
         # For browse without query, just return the slice
@@ -441,7 +443,7 @@ def get_transcriptions(manifest_id: str, request: Request, q: str | None = None)
             if len(fts_results) > 0:
                 fts_ids = set(fts_results.column("id").to_pylist())
         except Exception:
-            pass
+            logger.debug("FTS search failed for manifest query '%s'", q)
         # Substring on metadata
         q_lower = q.lower()
         grp_match = pc.match_substring(pc.utf8_lower(all_user.column("group_name")), q_lower)
@@ -556,10 +558,7 @@ def contribute(manifest_id: str, body: ContributeRequest, request: Request):
     if new_rows:
         new_arrow = pa.Table.from_pylist(new_rows, schema=SCHEMA)
         all_rows = table.to_arrow()
-        if len(all_rows) > 0:
-            combined = pa.concat_tables([all_rows, new_arrow])
-        else:
-            combined = new_arrow
+        combined = pa.concat_tables([all_rows, new_arrow]) if len(all_rows) > 0 else new_arrow
         table = db.create_table(TABLE_NAME, combined, mode="overwrite")
 
     final = table.count_rows()
@@ -700,7 +699,7 @@ def catalog_random():
     if total == 0:
         raise HTTPException(404, "No digitized volumes found")
 
-    offset = random.randrange(total)
+    offset = random.randrange(total)  # noqa: S311 — not security-sensitive, just picking a random catalog entry
     results = catalog_table.search().where("digitized = true").limit(1).offset(offset).to_arrow()
     if len(results) == 0:
         raise HTTPException(404, "No digitized volumes found")

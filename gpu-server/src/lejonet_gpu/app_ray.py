@@ -1,6 +1,7 @@
 """GPU inference server for Lejonet HTR — Ray Serve + FastAPI."""
 
 import io
+import logging
 import subprocess
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from PIL import Image
 from ray import serve
 
 from .models import ModelStore
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lejonet GPU Inference")
 app.add_middleware(
@@ -27,6 +30,7 @@ def _read_image(data: bytes) -> Image.Image:
 
 def _gpu_info() -> dict:
     """Get GPU device info."""
+    # Try rocm-smi — pass on failure since GPU detection is best-effort
     for cmd in [
         ["rocm-smi", "--showproductname", "--csv"],
         ["rocm-smi", "--showallinfo", "--csv"],
@@ -34,11 +38,11 @@ def _gpu_info() -> dict:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
-                lines = [l for l in result.stdout.strip().split("\n") if l and not l.startswith("device")]
+                lines = [row for row in result.stdout.strip().split("\n") if row and not row.startswith("device")]
                 if lines:
                     return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
         except Exception:
-            pass
+            logger.debug("rocm-smi command %s failed", cmd[0])
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -49,7 +53,7 @@ def _gpu_info() -> dict:
         if result.returncode == 0 and result.stdout.strip():
             return {"name": result.stdout.strip(), "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("nvidia-smi not available")
     try:
         for card in sorted(Path("/sys/class/drm").glob("card*/device")):
             vendor = (card / "vendor").read_text().strip()
@@ -60,7 +64,7 @@ def _gpu_info() -> dict:
                 name = (card / "product_name").read_text().strip() if (card / "product_name").exists() else "NVIDIA GPU"
                 return {"name": name, "runtime": "CUDA"}
     except Exception:
-        pass
+        logger.debug("sysfs GPU detection failed")
     store = ModelStore()
     providers = store.providers()
     if "ROCMExecutionProvider" in providers:
@@ -83,7 +87,7 @@ def health():
 
 
 @app.post("/detect-layout")
-async def detect_layout(image: UploadFile = File(...)):
+async def detect_layout(image: UploadFile = File(...)):  # noqa: B008
     img = _read_image(await image.read())
     detector = serve.get_deployment_handle("LayoutDetector")
     regions = await detector.detect.remote(img)
@@ -92,11 +96,11 @@ async def detect_layout(image: UploadFile = File(...)):
 
 @app.post("/detect-lines")
 async def detect_lines(
-    image: UploadFile = File(...),
-    x: float = Form(0),
-    y: float = Form(0),
-    w: float = Form(0),
-    h: float = Form(0),
+    image: UploadFile = File(...),  # noqa: B008
+    x: float = Form(0),  # noqa: B008
+    y: float = Form(0),  # noqa: B008
+    w: float = Form(0),  # noqa: B008
+    h: float = Form(0),  # noqa: B008
 ):
     img = _read_image(await image.read())
     region = {"x": x, "y": y, "w": w, "h": h} if w > 0 and h > 0 else None
@@ -107,11 +111,11 @@ async def detect_lines(
 
 @app.post("/transcribe")
 async def transcribe(
-    image: UploadFile = File(...),
-    x: float = Form(...),
-    y: float = Form(...),
-    w: float = Form(...),
-    h: float = Form(...),
+    image: UploadFile = File(...),  # noqa: B008
+    x: float = Form(...),  # noqa: B008
+    y: float = Form(...),  # noqa: B008
+    w: float = Form(...),  # noqa: B008
+    h: float = Form(...),  # noqa: B008
 ):
     img = _read_image(await image.read())
     transcriber = serve.get_deployment_handle("Transcriber")
@@ -120,7 +124,7 @@ async def transcribe(
 
 
 @app.post("/process-page")
-async def process_page(image: UploadFile = File(...)):
+async def process_page(image: UploadFile = File(...)):  # noqa: B008
     """Full pipeline: layout → lines → transcription."""
     img = _read_image(await image.read())
 
