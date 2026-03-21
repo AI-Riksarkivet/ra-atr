@@ -141,6 +141,29 @@ cd backend
 uv run python -m lejonet_backend.ingest_catalog /path/to/Riksarkivet-2022-12-16 --no-embed
 ```
 
+## Deploy to HuggingFace Space
+
+The frontend is deployed as a static HuggingFace Space with custom COEP headers for multi-threaded WASM.
+
+```bash
+# 1. Build
+npm run build
+
+# 2. Copy to space (exclude models — they load from carpelan/htr-onnx-models)
+rm -rf space/build
+mkdir -p space/build/viewer
+rsync -a --exclude='models' --exclude='*.mp4' build/ space/build/
+cp space/build/viewer.html space/build/viewer/index.html
+
+# 3. Upload
+cd space && python3 -c "
+from huggingface_hub import HfApi
+HfApi().upload_folder(folder_path='.', repo_id='carpelan/lejonet', repo_type='space', delete_patterns=['build/*'])
+"
+```
+
+Live at: https://huggingface.co/spaces/carpelan/lejonet
+
 ## Development
 
 ```bash
