@@ -115,13 +115,74 @@ Stored flat in the HF Bucket, served directly via URL.
 | Browse page load (100 thumbnails) | < 200ms |
 | Thumbnail load (single) | < 50ms (CDN cached) |
 
-## Phase 2 (deferred)
+## Phase 2 — Crowdsourced Transcriptions
 
-- User accounts / HF OAuth
-- Submit transcription corrections
-- Review/moderation workflow
+### Architecture
+
+Separate write Space from the read Space:
+
+```
+Read Space (free/cheap)              Write Space (free)
+  FastAPI + LanceDB                    FastAPI + SQLite
+  read-only, fast                      HF OAuth login
+  serves search/browse                 append-only transcription log
+       │                                     │
+       └──────── HF Bucket ─────────────────┘
+                 (rebuilt periodically)
+```
+
+### Data model — append-only
+
+No edits, no overwrites, no consensus. Every transcription is saved separately.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | string | UUID |
+| user_id | string | HF username |
+| manifest_id | string | Volume identifier |
+| page_number | int | |
+| line_index | int | |
+| bbox | json | `{x, y, w, h}` |
+| text | string | Transcribed text |
+| source | string | `htr-trocr`, `htr-gpu`, `human`, `human-corrected` |
+| confidence | float | Model confidence (0-1), null for human |
+| created_at | timestamp | |
+
+Multiple users can transcribe the same page — all rows are kept.
+The read/search index picks the best transcription per page using a simple heuristic (human > human-corrected > high-confidence HTR > low-confidence HTR).
+
+### Source tagging
+
+| Source | Meaning | Training value |
+|--------|---------|---------------|
+| `htr-trocr` | WASM pipeline output | Bronze (pre-training) |
+| `htr-gpu` | GPU server pipeline output | Bronze (pre-training) |
+| `human` | User transcribed from scratch | Gold (fine-tuning) |
+| `human-corrected` | User edited existing transcription | Gold (fine-tuning) |
+
+### Automatic quality signals
+
+No human review needed. Quality inferred from:
+
+- **Confidence score** — TrOCR outputs per-line confidence. Low = likely wrong
+- **Language model perplexity** — small Swedish LM scores gibberish high
+- **Character n-gram frequency** — old Swedish has patterns, random misreads don't
+- **Agreement** — if 2+ transcriptions exist, similarity between them = quality
+- **Length ratio** — transcription length vs image dimensions, outliers are suspicious
+- **Source** — human transcriptions weighted higher than HTR
+
+### For VLM training
+
+- Duplicates don't matter — multiple transcriptions of the same image add robustness
+- Disagreements are useful — ambiguous handwriting has multiple valid readings
+- Quality tiers: gold (human) for fine-tuning, bronze (HTR) for pre-training
+- Each training sample: `(line_image_crop, text, confidence, source)`
+
+### Deferred (phase 3)
+
 - Leaderboard / contribution stats
-- Version history per page
+- Active learning — prioritize pages where model is least confident for human review
+- Gamification — show users pages that need transcription most
 
 ## Tech Stack
 
