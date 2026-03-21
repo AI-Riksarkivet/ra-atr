@@ -3,7 +3,6 @@
   import { Progress } from '$lib/components/ui/progress';
   import { Scan, PenLine, SplitSquareHorizontal, Type, FileKey } from 'lucide-svelte';
   import { t } from '$lib/i18n.svelte';
-  import { getQuantization, setQuantization, type ModelQuantization } from '$lib/model-config';
 
   interface Props {
     modelProgress: Record<string, number>;
@@ -17,9 +16,8 @@
   let { modelProgress, onLoadModels, modelsReady, autoLoading = false, error = null, onDismissError }: Props = $props();
 
   let loading = $state(false);
-  let quantization = $state<ModelQuantization>(getQuantization());
 
-  const fp32Models = [
+  const models = [
     { key: 'layout', labelKey: 'model.layout', descKey: 'model.layout.desc', size: '97 MB', icon: Scan },
     { key: 'yolo', labelKey: 'model.yolo', descKey: 'model.yolo.desc', size: '229 MB', icon: SplitSquareHorizontal },
     { key: 'trocr-encoder', labelKey: 'model.encoder', descKey: 'model.encoder.desc', size: '329 MB', icon: FileKey },
@@ -27,16 +25,7 @@
     { key: 'tokenizer', labelKey: 'model.tokenizer', descKey: 'model.tokenizer.desc', size: '2 MB', icon: Type },
   ];
 
-  const int8Models = [
-    { key: 'layout', labelKey: 'model.layout', descKey: 'model.layout.desc', size: '97 MB', icon: Scan },
-    { key: 'yolo', labelKey: 'model.yolo', descKey: 'model.yolo.desc', size: '59 MB', icon: SplitSquareHorizontal },
-    { key: 'trocr-encoder', labelKey: 'model.encoder', descKey: 'model.encoder.desc', size: '85 MB', icon: FileKey },
-    { key: 'trocr-decoder', labelKey: 'model.decoder', descKey: 'model.decoder.desc', size: '1.2 GB', icon: PenLine },
-    { key: 'tokenizer', labelKey: 'model.tokenizer', descKey: 'model.tokenizer.desc', size: '2 MB', icon: Type },
-  ];
-
-  const models = $derived(quantization === 'int8' ? int8Models : fp32Models);
-  const totalSize = $derived(quantization === 'int8' ? '~1.4 GB' : '~1.8 GB');
+  const totalSize = '~1.8 GB';
 
   $effect(() => { if (error) loading = false; });
 
@@ -139,20 +128,6 @@
       <Button variant="outline" size="sm" onclick={handleRetry}>{t('models.retry')}</Button>
     </div>
   {:else if !loading && !modelsReady && !autoLoading}
-    <div class="flex items-center justify-center gap-1 rounded-lg bg-muted/50 p-1">
-      <button
-        class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors {quantization === 'fp32' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        onclick={() => { quantization = 'fp32'; setQuantization('fp32'); }}
-      >
-        Full (1.8 GB)
-      </button>
-      <button
-        class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors {quantization === 'int8' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        onclick={() => { quantization = 'int8'; setQuantization('int8'); }}
-      >
-        Lite (530 MB)
-      </button>
-    </div>
     <Button class="w-full h-11 text-sm font-medium btn-glow rounded-xl" onclick={handleLoad}>{t('models.download')}</Button>
     <p class="text-center text-[0.65rem] text-muted-foreground/50">{t('models.cached')}</p>
   {/if}
