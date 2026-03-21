@@ -33,7 +33,7 @@ export function getModelUrls() {
     encoder: getModelUrl(modelFile('encoder.onnx')),
     decoder: getModelUrl(modelFile('decoder.onnx')),
     tokenizer: getModelUrl('tokenizer.json'),
-    layout: getModelUrl(modelFile('rtmdet-regions.onnx')),
+    layout: getModelUrl('rtmdet-regions.onnx'), // no int8 variant
   };
 }
 
