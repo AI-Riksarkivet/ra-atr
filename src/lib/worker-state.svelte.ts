@@ -1,7 +1,7 @@
 import type { WorkerOutMessage, PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
 import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe, autoDetectGpuServer, gpuServerUrl } from './gpu-client';
-import { ALL_MODEL_URLS, MODEL_URLS, getModelFetchHeaders } from './model-config';
+import { getModelUrls, getModelFetchHeaders } from './model-config';
 
 export class HTRWorkerState {
   stage = $state<PipelineStage>('idle');
@@ -44,7 +44,7 @@ export class HTRWorkerState {
 
   private regionPending = new Map<string, { imageId: string; total: number; done: number }>();
   /** Stored image buffers for re-sending to new workers */
-  private storedImages = new Map<string, ArrayBuffer>();
+  storedImages = new Map<string, ArrayBuffer>();
 
   constructor() {
     this.createDetectWorker();
@@ -57,7 +57,7 @@ export class HTRWorkerState {
     if (import.meta.env.DEV) console.log('[htr] Starting with WASM inference');
     let cached = false;
     try {
-      cached = await areAllModelsCached(ALL_MODEL_URLS);
+      cached = await areAllModelsCached(Object.values(getModelUrls()));
     } catch (e) {
       console.warn('[htr] Cache check failed, continuing:', e);
     }
@@ -124,7 +124,7 @@ export class HTRWorkerState {
       this.modelsReady = false;
       const headers = getModelFetchHeaders();
       for (const w of this.transcribeWorkers) {
-        w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: MODEL_URLS.encoder, decoder: MODEL_URLS.decoder, tokenizer: MODEL_URLS.tokenizer }, headers } });
+        w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: getModelUrls().encoder, decoder: getModelUrls().decoder, tokenizer: getModelUrls().tokenizer }, headers } });
       }
     }
   }
@@ -262,10 +262,10 @@ export class HTRWorkerState {
     }
 
     const headers = getModelFetchHeaders();
-    this.detectWorker.postMessage({ type: 'load_models', payload: { modelUrl: MODEL_URLS.yolo, headers } });
-    this.layoutWorker.postMessage({ type: 'load_model', payload: { modelUrl: MODEL_URLS.layout, headers } });
+    this.detectWorker.postMessage({ type: 'load_models', payload: { modelUrl: getModelUrls().yolo, headers } });
+    this.layoutWorker.postMessage({ type: 'load_model', payload: { modelUrl: getModelUrls().layout, headers } });
     for (const w of this.transcribeWorkers) {
-      w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: MODEL_URLS.encoder, decoder: MODEL_URLS.decoder, tokenizer: MODEL_URLS.tokenizer }, headers } });
+      w.postMessage({ type: 'load_models', payload: { modelUrls: { encoder: getModelUrls().encoder, decoder: getModelUrls().decoder, tokenizer: getModelUrls().tokenizer }, headers } });
     }
   }
 
