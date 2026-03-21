@@ -179,21 +179,19 @@
           {:else}
             <div class="text-[0.65rem] text-muted-foreground mt-1.5">Using local WASM inference</div>
           {/if}
-          {#if appState.htr.modelsReady}
-            <div class="mt-2 pt-2 border-t border-border">
-              <div class="text-[0.6rem] text-muted-foreground mb-1">Model quality</div>
-              <div class="flex gap-1">
-                <button
-                  class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'fp32' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-                  onclick={() => { setQuantization('fp32'); location.reload(); }}
-                >Full</button>
-                <button
-                  class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'int8' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-                  onclick={() => { setQuantization('int8'); location.reload(); }}
-                >Lite</button>
-              </div>
+          <div class="mt-2 pt-2 border-t border-border">
+            <div class="text-[0.6rem] text-muted-foreground mb-1">Model quality</div>
+            <div class="flex gap-1">
+              <button
+                class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'fp32' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                onclick={() => { setQuantization('fp32'); location.reload(); }}
+              >Full</button>
+              <button
+                class="flex-1 rounded px-2 py-1 text-[0.6rem] font-medium transition-colors {getQuantization() === 'int8' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                onclick={() => { setQuantization('int8'); location.reload(); }}
+              >Lite</button>
             </div>
-          {/if}
+          </div>
         </div>
       {/if}
     </div>
