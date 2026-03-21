@@ -1,7 +1,17 @@
 <script lang="ts">
   import type { ImageDocument } from '$lib/types';
+  import type { Action } from 'svelte/action';
   import { Play } from 'lucide-svelte';
   import { t } from '$lib/i18n.svelte';
+
+  const scrollIfActive: Action<HTMLElement, boolean> = (node, active) => {
+    if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return {
+      update(active: boolean) {
+        if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    };
+  };
 
   interface Props {
     documents: ImageDocument[];
@@ -319,6 +329,8 @@
 
           <div
             class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none font-sans text-xs mb-0.5 {isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'}"
+            class:active-page={isActive}
+            use:scrollIfActive={isActive}
             onclick={() => { onSwitchDocument(doc.id); if (isCollapsed) toggleDoc(doc.id); }}
           >
             <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); toggleDoc(doc.id); }}>

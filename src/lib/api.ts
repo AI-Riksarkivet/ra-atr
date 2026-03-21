@@ -115,3 +115,19 @@ export async function searchCatalog(params: {
   if (!res.ok) return { results: [], total: 0 };
   return res.json();
 }
+
+export interface RandomVolume {
+  reference_code: string;
+  archive_code: string;
+  fonds_title: string;
+  series_title: string;
+  volume_id: string;
+  date_text: string;
+  description: string;
+}
+
+export async function fetchRandomVolume(): Promise<RandomVolume> {
+  const res = await fetch(`${API_BASE}/catalog/random`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch random volume');
+  return res.json();
+}

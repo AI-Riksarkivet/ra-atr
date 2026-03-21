@@ -688,6 +688,34 @@ def catalog_search(
     }
 
 
+@app.get("/catalog/random")
+def catalog_random():
+    """Return a random digitized volume."""
+    import random
+
+    if catalog_table is None:
+        raise HTTPException(503, "Catalog not loaded")
+
+    total = catalog_table.count_rows("digitized = true")
+    if total == 0:
+        raise HTTPException(404, "No digitized volumes found")
+
+    offset = random.randrange(total)
+    results = catalog_table.search().where("digitized = true").limit(1).offset(offset).to_arrow()
+    if len(results) == 0:
+        raise HTTPException(404, "No digitized volumes found")
+
+    return {
+        "reference_code": results.column("reference_code")[0].as_py(),
+        "archive_code": results.column("archive_code")[0].as_py(),
+        "fonds_title": results.column("fonds_title")[0].as_py(),
+        "series_title": results.column("series_title")[0].as_py(),
+        "volume_id": results.column("volume_id")[0].as_py(),
+        "date_text": results.column("date_text")[0].as_py(),
+        "description": results.column("description")[0].as_py(),
+    }
+
+
 def _catalog_fts_search(q: str, limit: int, where: str | None = None) -> pa.Table:
     try:
         s = catalog_table.search(q, query_type="fts")

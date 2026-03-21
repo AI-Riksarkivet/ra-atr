@@ -108,30 +108,36 @@
     if (e.key === 'ArrowRight') { e.preventDefault(); appState.navigatePage(1); }
     if (e.key === 'ArrowUp') { e.preventDefault(); appState.navigateLine(-1); }
     if (e.key === 'ArrowDown') { e.preventDefault(); appState.navigateLine(1); }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); docViewer?.zoomIn(); }
+    if (e.key === '-') { e.preventDefault(); docViewer?.zoomOut(); }
+    if (e.key === '0') { e.preventDefault(); docViewer?.resetView(); }
   }
 
   let catalogLoading = $state('');
   let catalogError = $state('');
   let catalogPanel: CatalogPanel;
 
-  function handleRiksarkivetResolved(manifestId: string, pages: number[]) {
+  function handleRiksarkivetResolved(manifestId: string, pages: number[], startPage?: number) {
     const existingPages = new Set(
       appState.documents.filter(d => d.manifestId === manifestId).map(d => d.pageNumber)
     );
     const newPages = pages.filter(p => !existingPages.has(p));
 
     let firstDocId = '';
+    let targetDocId = '';
     for (const page of newPages) {
       const padded = String(page).padStart(5, '0');
       const docId = appState.addPlaceholderDocument(
         `${manifestId}_${padded}.jpg`, manifestId, page
       );
       if (!firstDocId) firstDocId = docId;
+      if (startPage !== undefined && page === startPage) targetDocId = docId;
     }
 
-    // Switch to first page of new volume and show transcription panel
-    if (firstDocId) {
-      appState.switchDocument(firstDocId);
+    // Switch to target page (or first) and show transcription panel
+    const switchTo = targetDocId || firstDocId;
+    if (switchTo) {
+      appState.switchDocument(switchTo);
       rightCollapsed = false;
     }
 
@@ -143,7 +149,7 @@
     }
   }
 
-  async function handleCatalogLoad(referenceCode: string, metadata?: import('$lib/api').CatalogResult) {
+  async function handleCatalogLoad(referenceCode: string, metadata?: import('$lib/api').CatalogResult, randomPage = false) {
     if (catalogLoading) return;
     catalogLoading = 'Resolving...';
     catalogError = '';
@@ -157,7 +163,8 @@
         appState.volumeMetadata.set(manifestId, metadata);
         appState.volumeMetadata = new Map(appState.volumeMetadata);
       }
-      handleRiksarkivetResolved(manifestId, pages);
+      const startPage = randomPage && pages.length > 0 ? pages[Math.floor(Math.random() * pages.length)] : undefined;
+      handleRiksarkivetResolved(manifestId, pages, startPage);
     } catch (e) {
       catalogError = e instanceof Error ? e.message : 'Failed to load volume';
     } finally {
@@ -166,9 +173,14 @@
   }
 
   /** Run the HTR pipeline on a single page: layout → lines → transcription */
-  function transcribePage(doc: import('$lib/types').ImageDocument) {
+  async function transcribePage(doc: import('$lib/types').ImageDocument) {
     // Don't re-run if already working on this page
     if (appState.htr.pendingImageIds.has(doc.id) || appState.htr.running) return;
+
+    // Ensure image is loaded (placeholder pages from catalog)
+    if (!appState.htr.storedImages.has(doc.id)) {
+      await appState.loadDocumentImage(doc.id);
+    }
 
     if (doc.groups.length > 0) {
       // Re-run on existing regions
@@ -188,17 +200,21 @@
     }
   }
 
-  /** Wait until all in-flight transcriptions finish */
-  function waitForIdle(): Promise<void> {
+  /** Wait until the HTR pipeline finishes all stages for the current page */
+  function waitForPipelineDone(): Promise<void> {
     return new Promise((resolve) => {
+      let sawActivity = false;
       const check = () => {
-        if (appState.htr.pendingLines === 0 && appState.htr.pendingRegions.size === 0) {
+        const stage = appState.htr.stage;
+        if (stage !== 'idle' && stage !== 'done') sawActivity = true;
+        // Resolve when pipeline reaches 'done' or returns to 'idle' (no regions found)
+        if (sawActivity && (stage === 'done' || stage === 'idle')) {
           resolve();
           return;
         }
-        setTimeout(check, 500);
+        setTimeout(check, 300);
       };
-      setTimeout(check, 1000);
+      setTimeout(check, 500);
     });
   }
 
@@ -207,19 +223,18 @@
       .filter(d => d.manifestId === manifestId)
       .sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
 
-    const toProcess = pages.filter(d => d.groups.length === 0 || d.lines.some(l => !l.complete));
+    const toProcess = pages.filter(d => d.groups.length === 0 || d.lines.length === 0);
     if (toProcess.length === 0) return;
 
     appState.htr.batchProgress = { current: 0, total: toProcess.length };
 
     for (let pi = 0; pi < toProcess.length; pi++) {
-      if (appState.htr.stage === 'idle' && pi > 0) break;
       appState.htr.batchProgress = { current: pi, total: toProcess.length };
 
       await appState.loadDocumentImage(toProcess[pi].id);
       appState.activeDocumentId = toProcess[pi].id;
       transcribePage(toProcess[pi]);
-      await waitForIdle();
+      await waitForPipelineDone();
       if (toProcess[pi].manifestId) appState.scheduleAutoSave();
     }
 
@@ -342,6 +357,15 @@
     leftCollapsed = false;
     await tick();
     catalogPanel?.setSearch(q);
+  }}
+  onRandomVolume={async () => {
+    const { fetchRandomVolume } = await import('$lib/api');
+    try {
+      const vol = await fetchRandomVolume();
+      await handleCatalogLoad(vol.reference_code, vol as any, true);
+    } catch (e) {
+      catalogError = e instanceof Error ? e.message : 'Failed to load random volume';
+    }
   }}
 />
 
@@ -484,8 +508,8 @@
         <button
           class="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed {!pageTranscribed && !isRunning ? 'btn-glow' : ''}"
           disabled={isRunning}
-          onclick={() => { if (activeDoc) transcribePage(activeDoc); }}
-          title={pageTranscribed ? 'Re-transcribe page' : 'Transcribe page'}
+          onclick={(e: MouseEvent) => { if (activeDoc) { if (e.shiftKey && activeDoc.manifestId) { transcribeVolume(activeDoc.manifestId); } else { transcribePage(activeDoc); } } }}
+          title={pageTranscribed ? 'Re-transcribe page (Shift+click: whole volume)' : 'Transcribe page (Shift+click: whole volume)'}
         >
           {#if pageTranscribed}
             <RotateCcw class="size-4" />

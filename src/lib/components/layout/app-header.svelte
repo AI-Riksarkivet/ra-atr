@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { toggleMode } from 'mode-watcher';
-  import { Sun, Moon, Home, Search, FileText, Server, Download } from 'lucide-svelte';
+  import { Sun, Moon, Home, Search, FileText, Server, Download, Dices } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
@@ -16,9 +16,10 @@
     onToggleCatalog?: () => void;
     onToggleTranscription?: () => void;
     onSearch?: (query: string) => void;
+    onRandomVolume?: () => void;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onSearch }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onSearch, onRandomVolume }: Props = $props();
 
   let headerSearch = $state('');
 
@@ -80,6 +81,9 @@
     {#if BACKEND_ENABLED}
       <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title={t('toolbar.catalog')}>
         <Search class="size-4" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" onclick={onRandomVolume} title="Random volume">
+        <Dices class="size-4" />
       </Button>
       {#if !catalogOpen}
         <input
