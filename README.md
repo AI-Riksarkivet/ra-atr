@@ -149,11 +149,13 @@ The frontend is deployed as a static HuggingFace Space with custom COEP headers 
 # 1. Build
 npm run build
 
-# 2. Copy to space (exclude models — they load from carpelan/htr-onnx-models)
-rm -rf space/build
-mkdir -p space/build/viewer
-rsync -a --exclude='models' --exclude='*.mp4' build/ space/build/
-cp space/build/viewer.html space/build/viewer/index.html
+# 2. Copy to space root (exclude models — they load from carpelan/htr-onnx-models)
+rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg
+mkdir -p space/viewer
+rsync -a --exclude='models' --exclude='*.mp4' build/ space/
+cp space/viewer.html space/viewer/index.html
+cp space/index.html space/200.html   # SPA fallback for HF static Spaces
+cp space/index.html space/404.html
 
 # 3. Upload
 cd space && python3 -c "

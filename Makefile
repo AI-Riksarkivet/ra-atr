@@ -68,6 +68,19 @@ compose-down: ## Stop all Docker Compose services
 ingest-catalog: ## Ingest Riksarkivet metadata into LanceDB
 	cd backend && .venv/bin/python ingest_catalog.py $(DATA_DIR) --no-embed
 
+# --- HuggingFace Space ---
+
+deploy: ## Build and deploy frontend to HuggingFace Space
+	npm run build
+	rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg
+	mkdir -p space/viewer
+	rsync -a --exclude='models' --exclude='*.mp4' build/ space/
+	cp space/viewer.html space/viewer/index.html
+	cp space/index.html space/200.html
+	cp space/index.html space/404.html
+	cd space && python3 -c "from huggingface_hub import HfApi; HfApi().upload_folder(folder_path='.', repo_id='carpelan/lejonet', repo_type='space')"
+	@echo "Deployed to https://huggingface.co/spaces/carpelan/lejonet"
+
 # --- Documentation ---
 
 docs-serve: ## Serve documentation locally
