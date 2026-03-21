@@ -5,6 +5,7 @@ import pytest
 
 try:
     import sentence_transformers  # noqa: F401
+
     HAS_SENTENCE_TRANSFORMERS = True
 except ImportError:
     HAS_SENTENCE_TRANSFORMERS = False

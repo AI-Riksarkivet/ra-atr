@@ -2,8 +2,6 @@
 
 import io
 import logging
-import subprocess
-from pathlib import Path
 
 # --- Ray Serve Deployments ---
 import numpy as np
@@ -72,37 +70,9 @@ class TranscriberDeployment:
 
 
 def _gpu_info() -> dict:
-    # Try rocm-smi — pass on failure since GPU detection is best-effort
-    for cmd in [["rocm-smi", "--showproductname", "--csv"], ["rocm-smi", "--showallinfo", "--csv"]]:
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if r.returncode == 0:
-                lines = [row for row in r.stdout.strip().split("\n") if row and not row.startswith("device")]
-                if lines:
-                    return {"name": lines[0].split(",")[-1].strip(), "runtime": "ROCm"}
-        except Exception:
-            logger.debug("rocm-smi command %s failed", cmd[0])
-    try:
-        r = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if r.returncode == 0 and r.stdout.strip():
-            return {"name": r.stdout.strip(), "runtime": "CUDA"}
-    except Exception:
-        logger.debug("nvidia-smi not available")
-    try:
-        for card in sorted(Path("/sys/class/drm").glob("card*/device")):
-            vendor = (card / "vendor").read_text().strip()
-            if vendor == "0x1002":
-                return {"name": "AMD GPU", "runtime": "ROCm"}
-            if vendor == "0x10de":
-                return {"name": "NVIDIA GPU", "runtime": "CUDA"}
-    except Exception:
-        logger.debug("sysfs GPU detection failed")
-    return {"name": "Unknown", "runtime": "Unknown"}
+    from .gpu_info import get_gpu_info
+
+    return get_gpu_info()
 
 
 app = FastAPI(title="Lejonet GPU Inference (Ray Serve)")
