@@ -71,10 +71,10 @@ ingest-catalog: ## Ingest Riksarkivet metadata into LanceDB
 # --- HuggingFace Space ---
 
 deploy: ## Build and deploy frontend to HuggingFace Space
-	npm run build
-	rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg
+	VITE_MODEL_BASE=https://huggingface.co/carpelan/htr-onnx-models/resolve/main npm run build
+	rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg space/*.mp4
 	mkdir -p space/viewer
-	rsync -a --exclude='models' --exclude='*.mp4' build/ space/
+	rsync -a --exclude='models' build/ space/
 	cp space/viewer.html space/viewer/index.html
 	cp space/index.html space/200.html
 	cp space/index.html space/404.html

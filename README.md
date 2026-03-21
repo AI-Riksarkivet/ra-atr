@@ -146,13 +146,14 @@ uv run python -m lejonet_backend.ingest_catalog /path/to/Riksarkivet-2022-12-16 
 The frontend is deployed as a static HuggingFace Space with custom COEP headers for multi-threaded WASM.
 
 ```bash
-# 1. Build
-npm run build
+# Option 1: One command
+make deploy
 
-# 2. Copy to space root (exclude models — they load from carpelan/htr-onnx-models)
-rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg
+# Option 2: Manual steps
+VITE_MODEL_BASE=https://huggingface.co/carpelan/htr-onnx-models/resolve/main npm run build
+rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg space/*.mp4
 mkdir -p space/viewer
-rsync -a --exclude='models' --exclude='*.mp4' build/ space/
+rsync -a --exclude='models' build/ space/
 cp space/viewer.html space/viewer/index.html
 cp space/index.html space/200.html   # SPA fallback for HF static Spaces
 cp space/index.html space/404.html
