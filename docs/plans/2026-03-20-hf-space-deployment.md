@@ -33,16 +33,26 @@ custom_headers:
 # 1. Build the frontend
 npm run build
 
-# 2. Copy build output into space/
-cp -r build/* space/build/
+# 2. Copy build output into space/ (exclude models and large assets)
+rm -rf space/build
+mkdir -p space/build/viewer
+rsync -a --exclude='models' --exclude='*.mp4' build/ space/build/
+cp space/build/viewer.html space/build/viewer/index.html
 
 # 3. Push to HF Space
-#    Option A: git subtree
-git subtree push --prefix space hf main
-
-#    Option B: huggingface-cli
-cd space && huggingface-cli upload YOUR_USERNAME/lejonet-htr .
+cd space && python3 -c "
+from huggingface_hub import HfApi
+api = HfApi()
+api.upload_folder(
+    folder_path='.',
+    repo_id='carpelan/lejonet',
+    repo_type='space',
+    delete_patterns=['build/*'],
+)
+"
 ```
+
+**Important:** Do NOT copy `build/models/` into the Space — models are loaded from the separate HF repo `carpelan/htr-onnx-models`. The Space has a 1GB storage limit.
 
 ## Key Implementation Details
 
