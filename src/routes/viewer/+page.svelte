@@ -3,7 +3,7 @@
   import { onMount, tick } from 'svelte';
   import { appState } from '$lib/stores/app-state.svelte';
   import { resolveVolume } from '$lib/riksarkivet';
-  import { fetchTranscriptions, BACKEND_ENABLED } from '$lib/api';
+  import { fetchTranscriptions, probeBackend } from '$lib/api';
   import AppHeader from '$lib/components/layout/app-header.svelte';
   import DocumentViewer from '$lib/components/DocumentViewer.svelte';
   import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
@@ -113,6 +113,7 @@
     if (e.key === '0') { e.preventDefault(); docViewer?.resetView(); }
   }
 
+  let backendAvailable = $state(false);
   let catalogLoading = $state('');
   let catalogError = $state('');
   let catalogPanel: CatalogPanel;
@@ -142,7 +143,7 @@
     }
 
 
-    if (newPages.length > 0 && BACKEND_ENABLED) {
+    if (newPages.length > 0 && backendAvailable) {
       fetchTranscriptions(manifestId).then(groups => {
         if (groups.length > 0) appState.populateFromBackend(manifestId, groups);
       }).catch(() => {});
@@ -242,6 +243,9 @@
   }
 
   onMount(() => {
+    // Check if backend is reachable
+    probeBackend().then(ok => { backendAvailable = ok; });
+
     // Route region detections to the right document
     appState.htr.onRegionDetected = (imageId, regionId, _startIndex, bboxes) => {
       docViewer?.clearRedetecting(regionId);
@@ -349,6 +353,7 @@
 </script>
 
 <AppHeader
+  {backendAvailable}
   catalogOpen={!leftCollapsed}
   transcriptionOpen={!rightCollapsed}
   onToggleCatalog={() => leftCollapsed = !leftCollapsed}
@@ -389,7 +394,7 @@
 
 <div class="flex flex-1 overflow-hidden">
   <!-- Left: Catalog browser -->
-  {#if BACKEND_ENABLED && !leftCollapsed}
+  {#if backendAvailable && !leftCollapsed}
     <div class="overflow-hidden border-r border-border flex flex-col" style="width: {leftWidth}%">
       <CatalogPanel bind:this={catalogPanel} onLoadVolume={(ref, meta) => handleCatalogLoad(ref, meta)} />
     </div>

@@ -1,5 +1,17 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
-export const BACKEND_ENABLED = import.meta.env.VITE_DISABLE_BACKEND !== 'true';
+export let BACKEND_ENABLED = import.meta.env.VITE_DISABLE_BACKEND !== 'true';
+
+/** Probe the backend and disable if unreachable */
+export async function probeBackend(): Promise<boolean> {
+  if (!BACKEND_ENABLED) return false;
+  try {
+    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
+    BACKEND_ENABLED = res.ok;
+  } catch {
+    BACKEND_ENABLED = false;
+  }
+  return BACKEND_ENABLED;
+}
 
 function getToken(): string {
   return sessionStorage.getItem('hf_token') || 'local';

@@ -3,7 +3,6 @@
   import { toggleMode } from 'mode-watcher';
   import { Sun, Moon, Home, Search, FileText, Server, Download, Dices } from 'lucide-svelte';
   import { appState } from '$lib/stores/app-state.svelte';
-  import { BACKEND_ENABLED } from '$lib/api';
   import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
   import { DEFAULT_GPU_SERVER } from '$lib/model-config';
   import { exportDocument, type ExportFormat } from '$lib/export';
@@ -17,9 +16,10 @@
     onToggleTranscription?: () => void;
     onSearch?: (query: string) => void;
     onRandomVolume?: () => void;
+    backendAvailable?: boolean;
   }
 
-  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onSearch, onRandomVolume }: Props = $props();
+  let { catalogOpen, transcriptionOpen, onToggleCatalog, onToggleTranscription, onSearch, onRandomVolume, backendAvailable = false }: Props = $props();
 
   let headerSearch = $state('');
 
@@ -78,7 +78,7 @@
     <Button variant="ghost" size="icon-sm" onclick={() => { appState.activeDocumentId = null; }} title={t('toolbar.home')}>
       <Home class="size-4" />
     </Button>
-    {#if BACKEND_ENABLED}
+    {#if backendAvailable}
       <Button variant={catalogOpen ? 'secondary' : 'ghost'} size="icon-sm" onclick={onToggleCatalog} title={t('toolbar.catalog')}>
         <Search class="size-4" />
       </Button>
