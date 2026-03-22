@@ -21,6 +21,6 @@ jobs:
       - name: Install deps
         run: npm ci
       - name: Svelte check
-        run: npx svelte-check --threshold error
+        run: npx svelte-kit sync && npx svelte-check --threshold error
       - name: Build
         run: npm run build
