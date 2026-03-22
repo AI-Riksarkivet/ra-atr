@@ -17,18 +17,18 @@ The frontend is a Svelte 5 SPA using ONNX Runtime Web for in-browser handwritten
 ## Key Modules
 
 ### State Management
-- `src/lib/stores/app-state.svelte.ts` — Centralized app state with auto-save and LRU cache
-- `src/lib/worker-state.svelte.ts` — HTR worker orchestration and GPU routing
+- `frontend/src/lib/stores/app-state.svelte.ts` — Centralized app state with auto-save and LRU cache
+- `frontend/src/lib/worker-state.svelte.ts` — HTR worker orchestration and GPU routing
 
 ### Workers
-- `src/worker-layout.ts` — RTMDet layout detection
-- `src/worker-detect.ts` — YOLO line detection
-- `src/worker-transcribe.ts` — TrOCR transcription (pooled, 1-8 workers)
+- `frontend/src/worker-layout.ts` — RTMDet layout detection
+- `frontend/src/worker-detect.ts` — YOLO line detection
+- `frontend/src/worker-transcribe.ts` — TrOCR transcription (pooled, 1-8 workers)
 
 ### Components
-- `src/lib/components/TranscriptionPanel.svelte` — Right panel (workspace tree)
-- `src/lib/components/CatalogPanel.svelte` — Left panel (archive search)
-- `src/routes/viewer/+page.svelte` — Main workspace page
+- `frontend/src/lib/components/TranscriptionPanel.svelte` — Right panel (workspace tree)
+- `frontend/src/lib/components/CatalogPanel.svelte` — Left panel (archive search)
+- `frontend/src/routes/viewer/+page.svelte` — Main workspace page
 
 ## Inference Pipeline
 
