@@ -111,7 +111,7 @@
 
 				const proximity = Math.max(0, 1 - dist / INFLUENCE);
 				const glow = proximity * proximity;
-				const r = (RADIUS + (RADIUS_MAX - RADIUS) * glow) * (0.85 + 0.15 * pulse);
+				const _r = (RADIUS + (RADIUS_MAX - RADIUS) * glow) * (0.85 + 0.15 * pulse);
 				const alpha = isDark
 					? 0.03 + 0.02 * pulse + 0.25 * glow
 					: 0.02 + 0.01 * pulse + 0.15 * glow;

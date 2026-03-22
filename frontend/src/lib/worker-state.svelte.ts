@@ -1,4 +1,4 @@
-import type { WorkerOutMessage, PipelineStage, BBox } from './types';
+import type { PipelineStage, BBox } from './types';
 import { areAllModelsCached } from './model-cache';
 import {
 	isGpuServerEnabled,

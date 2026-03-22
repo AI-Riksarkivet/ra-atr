@@ -6,7 +6,7 @@
 	import { gpuServerUrl, getGpuName, fetchGpuStatus, type GpuStatus } from '$lib/gpu-client';
 	import { DEFAULT_GPU_SERVER } from '$lib/model-config';
 	import { exportDocument, type ExportFormat } from '$lib/export';
-	import { t, locale, setLocale, type Locale } from '$lib/i18n.svelte';
+	import { t, locale, setLocale } from '$lib/i18n.svelte';
 	import { page } from '$app/state';
 
 	interface Props {

@@ -147,7 +147,7 @@ async function processNextRegion() {
 		const protoOutput =
 			yoloSession.outputNames.length > 1 ? yoloResult[yoloSession.outputNames[1]] : null;
 
-		let detections = parseYoloOutput(
+		const detections = parseYoloOutput(
 			yoloOutput.data as Float32Array,
 			yoloOutput.dims,
 			protoOutput ? (protoOutput.data as Float32Array) : null,

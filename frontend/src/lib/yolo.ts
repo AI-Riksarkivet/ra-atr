@@ -125,7 +125,9 @@ export function parseYoloOutput(
 	}
 
 	// Clean up internal fields
-	return detections.map(({ maskCoeffs, padX1, padY1, padX2, padY2, ...rest }) => rest);
+	return detections.map(
+		({ maskCoeffs: _mc, padX1: _px1, padY1: _py1, padX2: _px2, padY2: _py2, ...rest }) => rest,
+	);
 }
 
 /**

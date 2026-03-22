@@ -143,7 +143,9 @@ class AppState {
 			if (toRemove.has(doc.id) && doc.imageUrl) {
 				try {
 					URL.revokeObjectURL(doc.imageUrl);
-				} catch {}
+				} catch {
+					/* ignore revoke errors */
+				}
 			}
 		}
 		this.documents = this.documents.filter((d) => !toRemove.has(d.id));

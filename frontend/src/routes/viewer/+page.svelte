@@ -9,7 +9,7 @@
 	import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
 	import CatalogPanel from '$lib/components/CatalogPanel.svelte';
 	import UploadPanel from '$lib/components/UploadPanel.svelte';
-	import type { Line, BBox } from '$lib/types';
+
 	import {
 		Maximize2,
 		Plus,
@@ -33,7 +33,7 @@
 	let rightCollapsed = $state(true);
 	let draggingDivider = $state<'left' | 'right' | null>(null);
 	let docViewer: DocumentViewer;
-	let isFullscreen = $state(false);
+	let _isFullscreen = $state(false);
 	let metadataOpen = $state(false);
 	let showTextOverlay = $state(true);
 	let showBoxes = $state(false);
@@ -361,7 +361,7 @@
 		};
 
 		// Route region completion
-		appState.htr.onRegionComplete = (imageId, regionId) => {
+		appState.htr.onRegionComplete = (imageId, _regionId) => {
 			// Auto-save when a region finishes transcribing
 			const doc = appState.documents.find((d) => d.id === imageId);
 			if (doc?.manifestId) appState.scheduleAutoSave();
@@ -397,7 +397,7 @@
 		};
 
 		function onFullscreenChange() {
-			isFullscreen = !!document.fullscreenElement;
+			_isFullscreen = !!document.fullscreenElement;
 			setTimeout(() => docViewer?.resetView(), 100);
 		}
 		document.addEventListener('fullscreenchange', onFullscreenChange);

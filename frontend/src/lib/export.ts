@@ -2,7 +2,7 @@
  * Export transcriptions in ALTO XML, PAGE XML, plain text, and JSON formats.
  */
 
-import type { ImageDocument, Line, LineGroup } from './types';
+import type { ImageDocument, Line } from './types';
 
 // --- Plain Text ---
 

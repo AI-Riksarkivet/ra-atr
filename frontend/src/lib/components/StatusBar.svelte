@@ -10,8 +10,14 @@
 		batchProgress: { current: number; total: number } | null;
 	}
 
-	let { stage, documents, pendingImageIds, inFlightLines, poolSize, batchProgress }: Props =
-		$props();
+	let {
+		stage,
+		documents,
+		pendingImageIds,
+		inFlightLines,
+		poolSize: _poolSize,
+		batchProgress,
+	}: Props = $props();
 
 	let totalLines = $derived(documents.reduce((sum, d) => sum + d.lines.length, 0));
 	let completedLines = $derived(
