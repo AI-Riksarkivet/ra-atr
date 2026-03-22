@@ -13,6 +13,7 @@
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
     "test:watch": "vitest",
+    "knip": "knip",
     "build-storybook": "storybook build"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.16.0",
     "globals": "^17.4.0",
+    "knip": "^6.0.1",
     "prettier": "^3.8.1",
     "prettier-plugin-svelte": "^3.5.1",
     "storybook": "^10.2.19",
