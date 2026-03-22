@@ -59,6 +59,12 @@
 		onclick={() => {
 			if (!disabled) fileInput?.click();
 		}}
+		onkeydown={(e) => {
+			if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+				e.preventDefault();
+				fileInput?.click();
+			}
+		}}
 		role="button"
 		tabindex="0"
 	>

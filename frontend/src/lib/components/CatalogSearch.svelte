@@ -77,7 +77,7 @@
 	{#if results.length > 0}
 		<div class="text-[0.65rem] text-muted-foreground">{total} result{total !== 1 ? 's' : ''}</div>
 		<div class="flex flex-col gap-1.5 max-h-[40vh] overflow-y-auto">
-			{#each results as r}
+			{#each results as r (r.reference_code)}
 				<div
 					class="rounded border border-border px-3 py-2 text-xs {r.digitized ? '' : 'opacity-50'}"
 				>

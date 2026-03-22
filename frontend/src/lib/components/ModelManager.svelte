@@ -137,7 +137,7 @@
 
 		<!-- Model list -->
 		<div class="space-y-2">
-			{#each models as model}
+			{#each models as model (model.key)}
 				{@const pct = modelProgress[model.key] ?? 0}
 				{@const done = modelsReady || pct >= 100}
 				<div class="flex items-center gap-3 py-1.5 {done ? 'opacity-60' : ''}">

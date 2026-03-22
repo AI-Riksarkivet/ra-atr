@@ -135,10 +135,10 @@ self.onmessage = async (e: MessageEvent) => {
 				break;
 			}
 		}
-	} catch (err: any) {
+	} catch (err: unknown) {
 		self.postMessage({
 			type: 'error',
-			payload: { message: err.message ?? String(err) },
+			payload: { message: err instanceof Error ? err.message : String(err) },
 		});
 	}
 };

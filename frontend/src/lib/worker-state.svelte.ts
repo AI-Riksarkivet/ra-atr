@@ -1,4 +1,73 @@
 import type { PipelineStage, BBox } from './types';
+
+interface WorkerReadyMessage {
+	type: 'ready';
+}
+interface WorkerModelStatusMessage {
+	type: 'model_status';
+	payload: { model: string; status: string; progress?: number };
+}
+interface WorkerImageReadyMessage {
+	type: 'image_ready';
+	payload?: { imageId?: string };
+}
+interface WorkerErrorMessage {
+	type: 'error';
+	payload: { message: string };
+}
+interface WorkerRegionLinesMessage {
+	type: 'region_lines';
+	payload: { imageId: string; regionId: string; startIndex: number; lines: BBox[] };
+}
+interface WorkerTokenMessage {
+	type: 'token';
+	payload: { imageId: string; regionId: string; lineIndex: number; token: string };
+}
+interface WorkerLineDoneMessage {
+	type: 'line_done';
+	payload: {
+		imageId: string;
+		regionId: string;
+		lineIndex: number;
+		text: string;
+		confidence: number;
+	};
+}
+interface WorkerLayoutResultMessage {
+	type: 'layout_result';
+	payload: {
+		imageId: string;
+		regions: {
+			label: string;
+			confidence: number;
+			x: number;
+			y: number;
+			w: number;
+			h: number;
+		}[];
+	};
+}
+
+type DetectWorkerMessage =
+	| WorkerReadyMessage
+	| WorkerModelStatusMessage
+	| WorkerImageReadyMessage
+	| WorkerErrorMessage
+	| WorkerRegionLinesMessage;
+
+type TranscribeWorkerMessage =
+	| WorkerReadyMessage
+	| WorkerModelStatusMessage
+	| WorkerErrorMessage
+	| WorkerTokenMessage
+	| WorkerLineDoneMessage;
+
+type LayoutWorkerMessage =
+	| WorkerReadyMessage
+	| WorkerModelStatusMessage
+	| WorkerImageReadyMessage
+	| WorkerErrorMessage
+	| WorkerLayoutResultMessage;
 import { areAllModelsCached } from './model-cache';
 import {
 	isGpuServerEnabled,
@@ -164,7 +233,7 @@ export class HTRWorkerState {
 		}
 	}
 
-	private handleDetectMessage(msg: any) {
+	private handleDetectMessage(msg: DetectWorkerMessage) {
 		switch (msg.type) {
 			case 'ready':
 				this.detectReady = true;
@@ -221,7 +290,7 @@ export class HTRWorkerState {
 		}
 	}
 
-	private handleTranscribeMessage(msg: any) {
+	private handleTranscribeMessage(msg: TranscribeWorkerMessage) {
 		switch (msg.type) {
 			case 'ready':
 				this.transcribeReadyCount++;
@@ -428,8 +497,8 @@ export class HTRWorkerState {
 				this.stage = 'done';
 				this.pendingImageIds = new Set();
 			}
-		} catch (err: any) {
-			this.error = err.message ?? String(err);
+		} catch (err: unknown) {
+			this.error = err instanceof Error ? err.message : String(err);
 			const nextRegions = new Set(this.pendingRegions);
 			nextRegions.delete(regionId);
 			this.pendingRegions = nextRegions;
@@ -477,10 +546,10 @@ export class HTRWorkerState {
 				this.onLayoutDetected?.(imageId, regions);
 
 				// Steps 2+3 happen via transcribeRegion which is called by onLayoutDetected
-			} catch (err: any) {
-				if (err?.name === 'AbortError') return; // stopped by user
+			} catch (err: unknown) {
+				if (err instanceof Error && err.name === 'AbortError') return; // stopped by user
 				this.running = false;
-				this.error = err.message ?? String(err);
+				this.error = err instanceof Error ? err.message : String(err);
 			}
 			return;
 		}
@@ -516,7 +585,7 @@ export class HTRWorkerState {
 		});
 	}
 
-	private handleLayoutMessage(msg: any) {
+	private handleLayoutMessage(msg: LayoutWorkerMessage) {
 		switch (msg.type) {
 			case 'ready':
 				this.layoutReady = true;

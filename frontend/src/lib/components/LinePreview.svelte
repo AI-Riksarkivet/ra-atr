@@ -9,8 +9,8 @@
 	}
 
 	let { imageUrl, bbox, visible = true }: Props = $props();
-	let canvasEl: HTMLCanvasElement;
-	let containerEl: HTMLDivElement;
+	let canvasEl = $state<HTMLCanvasElement>();
+	let containerEl = $state<HTMLDivElement>();
 	let img: HTMLImageElement | null = $state(null);
 	let height = $state(80);
 	let isDragging = $state(false);

@@ -32,7 +32,7 @@
 	let leftCollapsed = $state(true);
 	let rightCollapsed = $state(true);
 	let draggingDivider = $state<'left' | 'right' | null>(null);
-	let docViewer: DocumentViewer;
+	let docViewer = $state<DocumentViewer>();
 	let _isFullscreen = $state(false);
 	let metadataOpen = $state(false);
 	let showTextOverlay = $state(true);
@@ -167,7 +167,7 @@
 	let backendAvailable = $state(false);
 	let catalogLoading = $state('');
 	let catalogError = $state('');
-	let catalogPanel: CatalogPanel;
+	let catalogPanel = $state<CatalogPanel>();
 
 	function handleRiksarkivetResolved(manifestId: string, pages: number[], startPage?: number) {
 		const existingPages = new Set(
@@ -445,7 +445,7 @@
 		const { fetchRandomVolume } = await import('$lib/api');
 		try {
 			const vol = await fetchRandomVolume();
-			await handleCatalogLoad(vol.reference_code, vol as any, true);
+			await handleCatalogLoad(vol.reference_code, vol as import('$lib/api').CatalogResult, true);
 		} catch (e) {
 			catalogError = e instanceof Error ? e.message : 'Failed to load random volume';
 		}

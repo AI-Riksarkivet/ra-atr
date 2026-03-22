@@ -146,11 +146,11 @@
 	<!-- Scrollable results -->
 	<div class="flex-1 overflow-y-auto p-3 pt-2">
 		{#snippet hl(text: string)}
-			{#each highlight(text) as part}{part.before}{#if part.match}<mark
+			{#each highlight(text) as part, i (i)}{part.before}{#if part.match}<mark
 						class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark
 					>{/if}{part.after}{/each}
 		{/snippet}
-		{#each catalogTree as fonds}
+		{#each catalogTree as fonds (fonds.title)}
 			{@const fCollapsed = collapsedFonds.has(fonds.title)}
 			<div
 				class="flex items-center gap-2 px-2 py-1.5 rounded select-none mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
@@ -160,6 +160,17 @@
 					else next.add(fonds.title);
 					collapsedFonds = next;
 				}}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						const next = new Set(collapsedFonds);
+						if (next.has(fonds.title)) next.delete(fonds.title);
+						else next.add(fonds.title);
+						collapsedFonds = next;
+					}
+				}}
+				role="button"
+				tabindex="0"
 			>
 				<span class="text-[0.65rem] w-4">{fCollapsed ? '\u25B6' : '\u25BC'}</span>
 				<span class="font-semibold truncate flex-1">{@render hl(fonds.title)}</span>
@@ -184,14 +195,14 @@
 				</div>
 
 				<div class="pl-2">
-					{#each fonds.series as series}
+					{#each fonds.series as series (series.title)}
 						{#if series.title}
 							<div class="text-[0.65rem] text-muted-foreground font-medium px-2 py-0.5 mt-1">
 								{@render hl(series.title)}
 							</div>
 						{/if}
 						<div class="pl-2">
-							{#each series.volumes as vol}
+							{#each series.volumes as vol (vol.reference_code)}
 								<div
 									class="flex items-center gap-2 px-2 py-1 rounded mb-0.5 {vol.digitized
 										? 'cursor-pointer hover:bg-muted/50'
@@ -199,6 +210,14 @@
 									onclick={() => {
 										if (vol.digitized) onLoadVolume(vol.reference_code, vol);
 									}}
+									onkeydown={(e) => {
+										if ((e.key === 'Enter' || e.key === ' ') && vol.digitized) {
+											e.preventDefault();
+											onLoadVolume(vol.reference_code, vol);
+										}
+									}}
+									role="button"
+									tabindex={vol.digitized ? 0 : -1}
 								>
 									<span class="truncate flex-1">
 										vol. {vol.volume_id}

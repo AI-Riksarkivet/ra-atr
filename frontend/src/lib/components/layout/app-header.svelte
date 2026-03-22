@@ -209,7 +209,7 @@
 						<!-- Deployment status -->
 						{#if gpuDetails}
 							<div class="mt-2 pt-2 border-t border-border space-y-1">
-								{#each Object.entries(gpuDetails.deployments) as [name, dep]}
+								{#each Object.entries(gpuDetails.deployments) as [name, dep] (name)}
 									<div class="flex items-center gap-2 text-[0.6rem]">
 										<span
 											class="size-1.5 rounded-full {dep.status === 'HEALTHY'
@@ -271,7 +271,7 @@
 					<div
 						class="absolute right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg p-1 w-40"
 					>
-						{#each [{ format: 'alto' as ExportFormat, label: 'ALTO XML' }, { format: 'page' as ExportFormat, label: 'PAGE XML' }, { format: 'txt' as ExportFormat, label: 'Plain text' }, { format: 'json' as ExportFormat, label: 'JSON' }] as item}
+						{#each [{ format: 'alto' as ExportFormat, label: 'ALTO XML' }, { format: 'page' as ExportFormat, label: 'PAGE XML' }, { format: 'txt' as ExportFormat, label: 'Plain text' }, { format: 'json' as ExportFormat, label: 'JSON' }] as item (item.format)}
 							<button
 								class="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted transition-colors"
 								onclick={() => {

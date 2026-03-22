@@ -102,10 +102,10 @@ self.onmessage = async (e: MessageEvent) => {
 				break;
 			}
 		}
-	} catch (err: any) {
+	} catch (err: unknown) {
 		self.postMessage({
 			type: 'error',
-			payload: { message: err.message ?? String(err) },
+			payload: { message: err instanceof Error ? err.message : String(err) },
 		});
 	}
 };
@@ -185,10 +185,10 @@ async function processNextRegion() {
 			type: 'region_lines',
 			payload: { imageId, regionId, startIndex, lines: detections },
 		});
-	} catch (err: any) {
+	} catch (err: unknown) {
 		self.postMessage({
 			type: 'error',
-			payload: { message: (err as Error).message ?? String(err) },
+			payload: { message: err instanceof Error ? err.message : String(err) },
 		});
 	}
 

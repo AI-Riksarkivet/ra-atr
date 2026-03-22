@@ -304,7 +304,7 @@
 	<!-- Scrollable content -->
 	<div class="flex-1 overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed">
 		<!-- Volumes (Riksarkivet) -->
-		{#each volumes as vol}
+		{#each volumes as vol (vol.manifestId)}
 			{@const volHasMatches = !filter || vol.docs.some((d) => docHasMatches(d))}
 			{#if volHasMatches}
 				{@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
@@ -318,6 +318,14 @@
 				<div
 					class="group/vol flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
 					onclick={() => toggleVolume(vol.manifestId)}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							toggleVolume(vol.manifestId);
+						}
+					}}
+					role="button"
+					tabindex="0"
 				>
 					<button
 						class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4"
@@ -381,7 +389,7 @@
 
 				{#if !volCollapsed}
 					<div class="pl-2">
-						{#each vol.docs as doc}
+						{#each vol.docs as doc (doc.id)}
 							{#if !filter || docHasMatches(doc)}
 								{@const isActive = doc.id === activeDocumentId}
 								{@const isCollapsed = collapsedDocs.has(doc.id)}
@@ -399,6 +407,15 @@
 										onSwitchDocument(doc.id);
 										if (isCollapsed) toggleDoc(doc.id);
 									}}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											onSwitchDocument(doc.id);
+											if (isCollapsed) toggleDoc(doc.id);
+										}
+									}}
+									role="button"
+									tabindex="0"
 								>
 									<button
 										class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4"
@@ -426,7 +443,7 @@
 
 								{#if !isCollapsed && isActive}
 									<div class="pl-3">
-										{#each doc.groups as group, gi}
+										{#each doc.groups as group, gi (group.id)}
 											{#if !filter || groupHasMatches(doc, group.lineIds)}
 												{@const groupWorking = group.regionId
 													? pendingRegions.has(group.regionId)
@@ -490,6 +507,14 @@
 		<div
 			class="flex items-center gap-1.5 px-2 py-1.5 bg-muted/30 text-xs font-sans select-none cursor-pointer"
 			onclick={() => onFocusGroup(group.lineIds, group.rect)}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onFocusGroup(group.lineIds, group.rect);
+				}
+			}}
+			role="button"
+			tabindex="0"
 		>
 			<button
 				class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4"
@@ -518,7 +543,9 @@
 				<span
 					class="font-semibold cursor-default"
 					style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
-					ondblclick={() => startRename(group)}>{group.name}</span
+					ondblclick={() => startRename(group)}
+					role="button"
+					tabindex="0">{group.name}</span
 				>
 			{/if}
 			<span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIds.length}</span>
@@ -550,7 +577,7 @@
 		</div>
 		{#if !group.collapsed}
 			<div class="pl-1">
-				{#each group.lineIds as lineId, li}
+				{#each group.lineIds as lineId, li (lineId)}
 					{@render lineRow(doc, lineId, li)}
 				{/each}
 			</div>
@@ -576,6 +603,14 @@
 			onmouseleave={() => onHoverLine(-1)}
 			onclick={(e) => handleLineClick(lineId, e)}
 			ondblclick={() => startEditLine(lineId)}
+			onkeydown={(e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					onFocusLine(lineId);
+				}
+			}}
+			role="button"
+			tabindex="0"
 		>
 			<span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none"
 				>{lineNum + 1}</span
@@ -594,7 +629,7 @@
 				/>
 			{:else}
 				<span class="flex-1">
-					{#each highlightText(line.text) as part}{part.before}{#if part.match}<mark
+					{#each highlightText(line.text) as part, i (i)}{part.before}{#if part.match}<mark
 								class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark
 							>{/if}{part.after}{/each}{#if !line.complete && line.text}<span
 							class="streaming-cursor"

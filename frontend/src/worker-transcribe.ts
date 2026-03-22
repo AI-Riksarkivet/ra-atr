@@ -127,10 +127,10 @@ self.onmessage = async (e: MessageEvent) => {
 				break;
 			}
 		}
-	} catch (err: any) {
+	} catch (err: unknown) {
 		self.postMessage({
 			type: 'error',
-			payload: { message: err.message ?? String(err) },
+			payload: { message: err instanceof Error ? err.message : String(err) },
 		});
 	}
 };
@@ -201,10 +201,10 @@ async function processNext() {
 			let decResult;
 			try {
 				decResult = await decoderSession.run(decFeeds);
-			} catch (decErr: any) {
+			} catch (decErr: unknown) {
 				console.error(
 					`[transcribe-${workerId} line ${lineIndex}] decoder step ${step} failed:`,
-					decErr.message,
+					decErr instanceof Error ? decErr.message : String(decErr),
 				);
 				break;
 			}
@@ -256,10 +256,10 @@ async function processNext() {
 				payload: { imageId, regionId, lineIndex, text: fullText, confidence },
 			});
 		}
-	} catch (err: any) {
+	} catch (err: unknown) {
 		self.postMessage({
 			type: 'error',
-			payload: { message: (err as Error).message ?? String(err) },
+			payload: { message: err instanceof Error ? err.message : String(err) },
 		});
 	}
 
