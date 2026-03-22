@@ -1,466 +1,637 @@
 <script lang="ts">
-  import type { ImageDocument } from '$lib/types';
-  import type { Action } from 'svelte/action';
-  import { Play } from 'lucide-svelte';
-  import { t } from '$lib/i18n.svelte';
+	import type { ImageDocument } from '$lib/types';
+	import type { Action } from 'svelte/action';
+	import { Play } from 'lucide-svelte';
+	import { t } from '$lib/i18n.svelte';
 
-  const scrollIfActive: Action<HTMLElement, boolean> = (node, active) => {
-    if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    return {
-      update(active: boolean) {
-        if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    };
-  };
+	const scrollIfActive: Action<HTMLElement, boolean> = (node, active) => {
+		if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		return {
+			update(active: boolean) {
+				if (active) node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+			},
+		};
+	};
 
-  interface Props {
-    documents: ImageDocument[];
-    activeDocumentId: string | null;
-    onSwitchDocument: (id: string) => void;
-    hoveredLine: number;
-    onHoverLine: (index: number) => void;
-    selectedLines: Set<number>;
-    onSelectLine: (index: number, additive: boolean) => void;
-    onToggleGroup: (groupId: string) => void;
-    onRenameGroup: (groupId: string, name: string) => void;
-    onDeleteGroup: (groupId: string) => void;
-    onFocusGroup: (lineIds: number[], rect?: { x: number; y: number; w: number; h: number }) => void;
-    onFocusLine: (lineId: number) => void;
-    onEditLine: (lineId: number, text: string) => void;
-    onRemoveVolume: (manifestId: string) => void;
-    onTranscribeVolume: (manifestId: string) => void;
-    selectMode: boolean;
-    pendingRegions: Set<string>;
-    pendingImageIds: Set<string>;
-  }
+	interface Props {
+		documents: ImageDocument[];
+		activeDocumentId: string | null;
+		onSwitchDocument: (id: string) => void;
+		hoveredLine: number;
+		onHoverLine: (index: number) => void;
+		selectedLines: Set<number>;
+		onSelectLine: (index: number, additive: boolean) => void;
+		onToggleGroup: (groupId: string) => void;
+		onRenameGroup: (groupId: string, name: string) => void;
+		onDeleteGroup: (groupId: string) => void;
+		onFocusGroup: (
+			lineIds: number[],
+			rect?: { x: number; y: number; w: number; h: number },
+		) => void;
+		onFocusLine: (lineId: number) => void;
+		onEditLine: (lineId: number, text: string) => void;
+		onRemoveVolume: (manifestId: string) => void;
+		onTranscribeVolume: (manifestId: string) => void;
+		selectMode: boolean;
+		pendingRegions: Set<string>;
+		pendingImageIds: Set<string>;
+	}
 
-  let {
-    documents, activeDocumentId, onSwitchDocument,
-    hoveredLine, onHoverLine,
-    selectedLines, onSelectLine,
-    onToggleGroup, onRenameGroup, onDeleteGroup, onFocusGroup, onFocusLine, onEditLine,
-    onRemoveVolume, onTranscribeVolume,
-    selectMode, pendingRegions, pendingImageIds,
-  }: Props = $props();
+	let {
+		documents,
+		activeDocumentId,
+		onSwitchDocument,
+		hoveredLine,
+		onHoverLine,
+		selectedLines,
+		onSelectLine,
+		onToggleGroup,
+		onRenameGroup,
+		onDeleteGroup,
+		onFocusGroup,
+		onFocusLine,
+		onEditLine,
+		onRemoveVolume,
+		onTranscribeVolume,
+		selectMode,
+		pendingRegions,
+		pendingImageIds,
+	}: Props = $props();
 
-  let panelEl: HTMLDivElement;
-  let editingGroupId = $state<string | null>(null);
-  let editName = $state('');
-  let editingLineIdx = $state<number>(-1);
-  let editLineText = $state('');
+	let panelEl: HTMLDivElement;
+	let editingGroupId = $state<string | null>(null);
+	let editName = $state('');
+	let editingLineIdx = $state<number>(-1);
+	let editLineText = $state('');
 
-  function startRename(group: { id: string; name: string }) {
-    editingGroupId = group.id;
-    editName = group.name;
-  }
+	function startRename(group: { id: string; name: string }) {
+		editingGroupId = group.id;
+		editName = group.name;
+	}
 
-  function finishRename(groupId: string) {
-    if (editName.trim()) {
-      onRenameGroup(groupId, editName.trim());
-    }
-    editingGroupId = null;
-  }
+	function finishRename(groupId: string) {
+		if (editName.trim()) {
+			onRenameGroup(groupId, editName.trim());
+		}
+		editingGroupId = null;
+	}
 
-  function startEditLine(lineId: number) {
-    editingLineIdx = lineId;
-    const doc = documents.find(d => d.id === activeDocumentId);
-    editLineText = doc?.lines.find(l => l.id === lineId)?.text ?? '';
-  }
+	function startEditLine(lineId: number) {
+		editingLineIdx = lineId;
+		const doc = documents.find((d) => d.id === activeDocumentId);
+		editLineText = doc?.lines.find((l) => l.id === lineId)?.text ?? '';
+	}
 
-  function finishEditLine() {
-    if (editingLineIdx >= 0) {
-      onEditLine(editingLineIdx, editLineText);
-      editingLineIdx = -1;
-    }
-  }
+	function finishEditLine() {
+		if (editingLineIdx >= 0) {
+			onEditLine(editingLineIdx, editLineText);
+			editingLineIdx = -1;
+		}
+	}
 
-  function handleLineClick(i: number, e: MouseEvent) {
-    if (selectMode) {
-      onSelectLine(i, e.shiftKey || e.ctrlKey || e.metaKey);
-    } else {
-      onFocusLine(i);
-    }
-  }
+	function handleLineClick(i: number, e: MouseEvent) {
+		if (selectMode) {
+			onSelectLine(i, e.shiftKey || e.ctrlKey || e.metaKey);
+		} else {
+			onFocusLine(i);
+		}
+	}
 
-  let copiedGroupId = $state<string | null>(null);
+	let copiedGroupId = $state<string | null>(null);
 
-  async function copyGroupLines(group: { id: string; lineIds: number[]; rect?: { x: number; y: number; w: number; h: number } }) {
-    const doc = documents.find(d => d.id === activeDocumentId);
-    if (!doc) return;
+	async function copyGroupLines(group: {
+		id: string;
+		lineIds: number[];
+		rect?: { x: number; y: number; w: number; h: number };
+	}) {
+		const doc = documents.find((d) => d.id === activeDocumentId);
+		if (!doc) return;
 
-    const text = group.lineIds
-      .map(id => doc.lines.find(l => l.id === id)?.text ?? '')
-      .filter(t => t.trim())
-      .join('\n');
+		const text = group.lineIds
+			.map((id) => doc.lines.find((l) => l.id === id)?.text ?? '')
+			.filter((t) => t.trim())
+			.join('\n');
 
-    const items: Record<string, Blob> = {
-      'text/plain': new Blob([text], { type: 'text/plain' }),
-    };
+		const items: Record<string, Blob> = {
+			'text/plain': new Blob([text], { type: 'text/plain' }),
+		};
 
-    if (doc.imageUrl && group.rect) {
-      try {
-        const img = new Image();
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = reject;
-          img.src = doc.imageUrl!;
-        });
-        const r = group.rect;
-        const canvas = document.createElement('canvas');
-        canvas.width = r.w;
-        canvas.height = r.h;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-        const blob = await new Promise<Blob>((resolve) =>
-          canvas.toBlob(b => resolve(b!), 'image/png')
-        );
-        items['image/png'] = blob;
-      } catch { /* fall back to text-only */ }
-    }
+		if (doc.imageUrl && group.rect) {
+			try {
+				const img = new Image();
+				await new Promise<void>((resolve, reject) => {
+					img.onload = () => resolve();
+					img.onerror = reject;
+					img.src = doc.imageUrl!;
+				});
+				const r = group.rect;
+				const canvas = document.createElement('canvas');
+				canvas.width = r.w;
+				canvas.height = r.h;
+				const ctx = canvas.getContext('2d')!;
+				ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+				const blob = await new Promise<Blob>((resolve) =>
+					canvas.toBlob((b) => resolve(b!), 'image/png'),
+				);
+				items['image/png'] = blob;
+			} catch {
+				/* fall back to text-only */
+			}
+		}
 
-    await navigator.clipboard.write([new ClipboardItem(items)]);
-    copiedGroupId = group.id;
-    setTimeout(() => { if (copiedGroupId === group.id) copiedGroupId = null; }, 1500);
-  }
+		await navigator.clipboard.write([new ClipboardItem(items)]);
+		copiedGroupId = group.id;
+		setTimeout(() => {
+			if (copiedGroupId === group.id) copiedGroupId = null;
+		}, 1500);
+	}
 
-  const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
+	const GROUP_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#f97316'];
 
-  let copiedLineIdx = $state<number>(-1);
-  let confirmRemoveVolume = $state<string | null>(null);
+	let copiedLineIdx = $state<number>(-1);
+	let confirmRemoveVolume = $state<string | null>(null);
 
-  async function copyLineText(doc: ImageDocument, lineId: number) {
-    const text = doc.lines.find(l => l.id === lineId)?.text ?? '';
-    await navigator.clipboard.writeText(text);
-    copiedLineIdx = lineId;
-    setTimeout(() => { if (copiedLineIdx === lineId) copiedLineIdx = -1; }, 1500);
-  }
+	async function copyLineText(doc: ImageDocument, lineId: number) {
+		const text = doc.lines.find((l) => l.id === lineId)?.text ?? '';
+		await navigator.clipboard.writeText(text);
+		copiedLineIdx = lineId;
+		setTimeout(() => {
+			if (copiedLineIdx === lineId) copiedLineIdx = -1;
+		}, 1500);
+	}
 
-  async function copyLineImage(doc: ImageDocument, lineId: number) {
-    const line = doc.lines.find(l => l.id === lineId);
-    if (!doc.imageUrl || !line?.bbox) return;
+	async function copyLineImage(doc: ImageDocument, lineId: number) {
+		const line = doc.lines.find((l) => l.id === lineId);
+		if (!doc.imageUrl || !line?.bbox) return;
 
-    try {
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-        img.src = doc.imageUrl!;
-      });
-      const b = line.bbox;
-      const pad = 8;
-      const sx = Math.max(0, b.x - pad);
-      const sy = Math.max(0, b.y - pad);
-      const sw = Math.min(img.width - sx, b.w + pad * 2);
-      const sh = Math.min(img.height - sy, b.h + pad * 2);
-      const canvas = document.createElement('canvas');
-      canvas.width = sw;
-      canvas.height = sh;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-      const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob(b => resolve(b!), 'image/png')
-      );
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      copiedLineIdx = lineId;
-      setTimeout(() => { if (copiedLineIdx === lineId) copiedLineIdx = -1; }, 1500);
-    } catch { /* ignore */ }
-  }
+		try {
+			const img = new Image();
+			await new Promise<void>((resolve, reject) => {
+				img.onload = () => resolve();
+				img.onerror = reject;
+				img.src = doc.imageUrl!;
+			});
+			const b = line.bbox;
+			const pad = 8;
+			const sx = Math.max(0, b.x - pad);
+			const sy = Math.max(0, b.y - pad);
+			const sw = Math.min(img.width - sx, b.w + pad * 2);
+			const sh = Math.min(img.height - sy, b.h + pad * 2);
+			const canvas = document.createElement('canvas');
+			canvas.width = sw;
+			canvas.height = sh;
+			const ctx = canvas.getContext('2d')!;
+			ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+			const blob = await new Promise<Blob>((resolve) =>
+				canvas.toBlob((b) => resolve(b!), 'image/png'),
+			);
+			await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+			copiedLineIdx = lineId;
+			setTimeout(() => {
+				if (copiedLineIdx === lineId) copiedLineIdx = -1;
+			}, 1500);
+		} catch {
+			/* ignore */
+		}
+	}
 
-  // Filter for transcriptions
-  let searchQuery = $state('');
-  let filter = $derived(searchQuery.trim().toLowerCase());
+	// Filter for transcriptions
+	let searchQuery = $state('');
+	let filter = $derived(searchQuery.trim().toLowerCase());
 
-  function highlightText(text: string): { before: string; match: string; after: string }[] {
-    if (!filter || !text) return [{ before: text, match: '', after: '' }];
-    const idx = text.toLowerCase().indexOf(filter);
-    if (idx === -1) return [{ before: text, match: '', after: '' }];
-    return [{
-      before: text.slice(0, idx),
-      match: text.slice(idx, idx + filter.length),
-      after: text.slice(idx + filter.length),
-    }];
-  }
+	function highlightText(text: string): { before: string; match: string; after: string }[] {
+		if (!filter || !text) return [{ before: text, match: '', after: '' }];
+		const idx = text.toLowerCase().indexOf(filter);
+		if (idx === -1) return [{ before: text, match: '', after: '' }];
+		return [
+			{
+				before: text.slice(0, idx),
+				match: text.slice(idx, idx + filter.length),
+				after: text.slice(idx + filter.length),
+			},
+		];
+	}
 
-  function lineMatches(doc: ImageDocument, lineId: number): boolean {
-    if (!filter) return true;
-    return doc.lines.find(l => l.id === lineId)?.text?.toLowerCase().includes(filter) ?? false;
-  }
+	function lineMatches(doc: ImageDocument, lineId: number): boolean {
+		if (!filter) return true;
+		return (
+			doc.lines
+				.find((l) => l.id === lineId)
+				?.text?.toLowerCase()
+				.includes(filter) ?? false
+		);
+	}
 
-  function groupHasMatches(doc: ImageDocument, lineIds: number[]): boolean {
-    if (!filter) return true;
-    return lineIds.some(id => lineMatches(doc, id));
-  }
+	function groupHasMatches(doc: ImageDocument, lineIds: number[]): boolean {
+		if (!filter) return true;
+		return lineIds.some((id) => lineMatches(doc, id));
+	}
 
-  function docHasMatches(doc: ImageDocument): boolean {
-    if (!filter) return true;
-    return doc.lines.some((l) => l.text?.toLowerCase().includes(filter));
-  }
+	function docHasMatches(doc: ImageDocument): boolean {
+		if (!filter) return true;
+		return doc.lines.some((l) => l.text?.toLowerCase().includes(filter));
+	}
 
-  // Collapsed state
-  let collapsedVolumes = $state(new Set<string>());
-  let collapsedDocs = $state(new Set<string>());
+	// Collapsed state
+	let collapsedVolumes = $state(new Set<string>());
+	let collapsedDocs = $state(new Set<string>());
 
-  // Auto-collapse other volumes when switching to a different one
-  let lastActiveManifest = $state('');
-  $effect(() => {
-    const activeDoc = documents.find(d => d.id === activeDocumentId);
-    const manifest = activeDoc?.manifestId ?? '';
-    if (manifest && manifest !== lastActiveManifest) {
-      // Collapse all volumes except the active one
-      const next = new Set<string>();
-      for (const doc of documents) {
-        if (doc.manifestId && doc.manifestId !== manifest) {
-          next.add(doc.manifestId);
-        }
-      }
-      collapsedVolumes = next;
-      lastActiveManifest = manifest;
-    }
-  });
+	// Auto-collapse other volumes when switching to a different one
+	let lastActiveManifest = $state('');
+	$effect(() => {
+		const activeDoc = documents.find((d) => d.id === activeDocumentId);
+		const manifest = activeDoc?.manifestId ?? '';
+		if (manifest && manifest !== lastActiveManifest) {
+			// Collapse all volumes except the active one
+			const next = new Set<string>();
+			for (const doc of documents) {
+				if (doc.manifestId && doc.manifestId !== manifest) {
+					next.add(doc.manifestId);
+				}
+			}
+			collapsedVolumes = next;
+			lastActiveManifest = manifest;
+		}
+	});
 
-  function toggleVolume(id: string) {
-    const next = new Set(collapsedVolumes);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    collapsedVolumes = next;
-  }
+	function toggleVolume(id: string) {
+		const next = new Set(collapsedVolumes);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		collapsedVolumes = next;
+	}
 
-  function toggleDoc(docId: string) {
-    const next = new Set(collapsedDocs);
-    if (next.has(docId)) next.delete(docId); else next.add(docId);
-    collapsedDocs = next;
-  }
+	function toggleDoc(docId: string) {
+		const next = new Set(collapsedDocs);
+		if (next.has(docId)) next.delete(docId);
+		else next.add(docId);
+		collapsedDocs = next;
+	}
 
-  interface Volume {
-    manifestId: string;
-    docs: ImageDocument[];
-  }
+	interface Volume {
+		manifestId: string;
+		docs: ImageDocument[];
+	}
 
-  let volumes = $derived.by(() => {
-    const vols = new Map<string, ImageDocument[]>();
-    for (const doc of documents) {
-      const key = doc.manifestId || 'unnamed';
-      const list = vols.get(key);
-      if (list) list.push(doc); else vols.set(key, [doc]);
-    }
-    return [...vols.entries()].map(([manifestId, docs]) => ({ manifestId, docs })) as Volume[];
-  });
+	let volumes = $derived.by(() => {
+		const vols = new Map<string, ImageDocument[]>();
+		for (const doc of documents) {
+			const key = doc.manifestId || 'unnamed';
+			const list = vols.get(key);
+			if (list) list.push(doc);
+			else vols.set(key, [doc]);
+		}
+		return [...vols.entries()].map(([manifestId, docs]) => ({ manifestId, docs })) as Volume[];
+	});
 </script>
 
 <div class="flex flex-col flex-1 min-h-0 bg-card text-card-foreground" bind:this={panelEl}>
+	{#if documents.length > 0}
+		<!-- Sticky filter -->
+		<div class="shrink-0 p-3 pb-2 border-b border-border">
+			<input
+				type="text"
+				bind:value={searchQuery}
+				placeholder={t('transcription.filter')}
+				class="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-sans text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+			/>
+			{#if filter && !documents.some((d) => docHasMatches(d))}
+				<div class="mt-2 text-xs text-muted-foreground font-sans italic px-1">No matches</div>
+			{/if}
+		</div>
+	{/if}
 
-  {#if documents.length > 0}
-    <!-- Sticky filter -->
-    <div class="shrink-0 p-3 pb-2 border-b border-border">
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder={t('transcription.filter')}
-        class="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-sans text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-      />
-      {#if filter && !documents.some(d => docHasMatches(d))}
-        <div class="mt-2 text-xs text-muted-foreground font-sans italic px-1">No matches</div>
-      {/if}
-    </div>
-  {/if}
+	<!-- Scrollable content -->
+	<div class="flex-1 overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed">
+		<!-- Volumes (Riksarkivet) -->
+		{#each volumes as vol}
+			{@const volHasMatches = !filter || vol.docs.some((d) => docHasMatches(d))}
+			{#if volHasMatches}
+				{@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
+				{@const volLines = vol.docs.reduce((n, d) => n + d.lines.length, 0)}
+				{@const volCompleted = vol.docs.reduce(
+					(n, d) => n + d.lines.filter((l) => l.complete).length,
+					0,
+				)}
+				{@const volWorking = vol.docs.some((d) => pendingImageIds.has(d.id))}
 
-  <!-- Scrollable content -->
-  <div class="flex-1 overflow-y-auto p-3 font-serif text-[0.95rem] leading-relaxed">
+				<div
+					class="group/vol flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
+					onclick={() => toggleVolume(vol.manifestId)}
+				>
+					<button
+						class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4"
+					>
+						{volCollapsed ? '\u25B6' : '\u25BC'}
+					</button>
+					{#if volWorking}
+						<span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+					{/if}
+					<span class="font-semibold truncate flex-1"
+						>{vol.manifestId.startsWith('upload-')
+							? `Upload ${vol.manifestId.slice(7)}`
+							: vol.manifestId}</span
+					>
+					<span class="text-[0.65rem] text-muted-foreground font-mono">{vol.docs.length} pg</span>
+					{#if volLines > 0}
+						<span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
+					{/if}
+					{#if volWorking}
+						<span
+							class="inline-block size-2 rounded-full border border-primary/30 border-t-primary animate-spin"
+							style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"
+						></span>
+					{:else}
+						<button
+							class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 opacity-0 group-hover/vol:opacity-50 hover:!opacity-100 hover:text-primary transition-opacity"
+							onclick={(e) => {
+								e.stopPropagation();
+								onTranscribeVolume(vol.manifestId);
+							}}
+							title="Transcribe all pages"><Play class="size-3" /></button
+						>
+						{#if confirmRemoveVolume === vol.manifestId}
+							<button
+								class="bg-destructive text-destructive-foreground rounded px-1.5 py-0.5 text-[0.6rem] font-medium cursor-pointer hover:bg-destructive/90"
+								onclick={(e) => {
+									e.stopPropagation();
+									onRemoveVolume(vol.manifestId);
+									confirmRemoveVolume = null;
+								}}>Remove</button
+							>
+							<button
+								class="bg-transparent border-none text-muted-foreground cursor-pointer text-[0.6rem] hover:text-foreground"
+								onclick={(e) => {
+									e.stopPropagation();
+									confirmRemoveVolume = null;
+								}}>Cancel</button
+							>
+						{:else}
+							<button
+								class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/vol:opacity-30 hover:!opacity-100 hover:text-destructive transition-opacity"
+								onclick={(e) => {
+									e.stopPropagation();
+									confirmRemoveVolume = vol.manifestId;
+								}}
+								title="Remove volume">x</button
+							>
+						{/if}
+					{/if}
+				</div>
 
-  <!-- Volumes (Riksarkivet) -->
-  {#each volumes as vol}
-    {@const volHasMatches = !filter || vol.docs.some(d => docHasMatches(d))}
-    {#if volHasMatches}
-    {@const volCollapsed = collapsedVolumes.has(vol.manifestId)}
-    {@const volLines = vol.docs.reduce((n, d) => n + d.lines.length, 0)}
-    {@const volCompleted = vol.docs.reduce((n, d) => n + d.lines.filter(l => l.complete).length, 0)}
-    {@const volWorking = vol.docs.some(d => pendingImageIds.has(d.id))}
+				{#if !volCollapsed}
+					<div class="pl-2">
+						{#each vol.docs as doc}
+							{#if !filter || docHasMatches(doc)}
+								{@const isActive = doc.id === activeDocumentId}
+								{@const isCollapsed = collapsedDocs.has(doc.id)}
+								{@const isWorking = pendingImageIds.has(doc.id)}
+								{@const totalLines = doc.lines.length}
+								{@const completedLines = doc.lines.filter((l) => l.complete).length}
 
-    <div
-      class="group/vol flex items-center gap-2 px-2 py-1.5 rounded select-none font-sans text-xs mb-0.5 bg-muted/30 cursor-pointer hover:bg-muted/50"
-      onclick={() => toggleVolume(vol.manifestId)}
-    >
-      <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4">
-        {volCollapsed ? '\u25B6' : '\u25BC'}
-      </button>
-      {#if volWorking}
-        <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
-      {/if}
-      <span class="font-semibold truncate flex-1">{vol.manifestId.startsWith('upload-') ? `Upload ${vol.manifestId.slice(7)}` : vol.manifestId}</span>
-      <span class="text-[0.65rem] text-muted-foreground font-mono">{vol.docs.length} pg</span>
-      {#if volLines > 0}
-        <span class="text-[0.7rem] font-mono">{volCompleted}/{volLines}</span>
-      {/if}
-      {#if volWorking}
-        <span class="inline-block size-2 rounded-full border border-primary/30 border-t-primary animate-spin" style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"></span>
-      {:else}
-        <button
-          class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 opacity-0 group-hover/vol:opacity-50 hover:!opacity-100 hover:text-primary transition-opacity"
-          onclick={(e) => { e.stopPropagation(); onTranscribeVolume(vol.manifestId); }}
-          title="Transcribe all pages"
-        ><Play class="size-3" /></button>
-        {#if confirmRemoveVolume === vol.manifestId}
-          <button
-            class="bg-destructive text-destructive-foreground rounded px-1.5 py-0.5 text-[0.6rem] font-medium cursor-pointer hover:bg-destructive/90"
-            onclick={(e) => { e.stopPropagation(); onRemoveVolume(vol.manifestId); confirmRemoveVolume = null; }}
-          >Remove</button>
-          <button
-            class="bg-transparent border-none text-muted-foreground cursor-pointer text-[0.6rem] hover:text-foreground"
-            onclick={(e) => { e.stopPropagation(); confirmRemoveVolume = null; }}
-          >Cancel</button>
-        {:else}
-          <button
-            class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/vol:opacity-30 hover:!opacity-100 hover:text-destructive transition-opacity"
-            onclick={(e) => { e.stopPropagation(); confirmRemoveVolume = vol.manifestId; }}
-            title="Remove volume"
-          >x</button>
-        {/if}
-      {/if}
-    </div>
+								<div
+									class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none font-sans text-xs mb-0.5 {isActive
+										? 'bg-primary/10 text-primary'
+										: 'text-muted-foreground hover:bg-muted/50'}"
+									class:active-page={isActive}
+									use:scrollIfActive={isActive}
+									onclick={() => {
+										onSwitchDocument(doc.id);
+										if (isCollapsed) toggleDoc(doc.id);
+									}}
+								>
+									<button
+										class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4"
+										onclick={(e) => {
+											e.stopPropagation();
+											toggleDoc(doc.id);
+										}}
+									>
+										{isCollapsed ? '\u25B6' : '\u25BC'}
+									</button>
+									{#if isWorking}
+										<span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"
+										></span>
+									{:else if doc.placeholder}
+										<span
+											class="inline-block size-2 rounded-full border border-muted-foreground/30 border-t-muted-foreground animate-spin"
+											style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"
+										></span>
+									{/if}
+									<span class="truncate flex-1">p. {doc.pageNumber ?? '?'}</span>
+									{#if totalLines > 0}
+										<span class="text-[0.7rem] font-mono">{completedLines}/{totalLines}</span>
+									{/if}
+								</div>
 
-    {#if !volCollapsed}
-      <div class="pl-2">
-        {#each vol.docs as doc}
-          {#if !filter || docHasMatches(doc)}
-          {@const isActive = doc.id === activeDocumentId}
-          {@const isCollapsed = collapsedDocs.has(doc.id)}
-          {@const isWorking = pendingImageIds.has(doc.id)}
-          {@const totalLines = doc.lines.length}
-          {@const completedLines = doc.lines.filter(l => l.complete).length}
+								{#if !isCollapsed && isActive}
+									<div class="pl-3">
+										{#each doc.groups as group, gi}
+											{#if !filter || groupHasMatches(doc, group.lineIds)}
+												{@const groupWorking = group.regionId
+													? pendingRegions.has(group.regionId)
+													: false}
+												{@render groupBlock(doc, group, gi, groupWorking)}
+											{/if}
+										{/each}
 
-          <div
-            class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none font-sans text-xs mb-0.5 {isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50'}"
-            class:active-page={isActive}
-            use:scrollIfActive={isActive}
-            onclick={() => { onSwitchDocument(doc.id); if (isCollapsed) toggleDoc(doc.id); }}
-          >
-            <button class="bg-transparent border-none text-current cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); toggleDoc(doc.id); }}>
-              {isCollapsed ? '\u25B6' : '\u25BC'}
-            </button>
-            {#if isWorking}
-              <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
-            {:else if doc.placeholder}
-              <span class="inline-block size-2 rounded-full border border-muted-foreground/30 border-t-muted-foreground animate-spin" style="animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.5, 0.1, 0.5, 0.9)"></span>
-            {/if}
-            <span class="truncate flex-1">p. {doc.pageNumber ?? '?'}</span>
-            {#if totalLines > 0}
-              <span class="text-[0.7rem] font-mono">{completedLines}/{totalLines}</span>
-            {/if}
-          </div>
+										{#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
+											<p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">
+												{t('transcription.pressPlay')}
+												<kbd
+													class="not-italic rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono"
+													>&#9654;</kbd
+												>
+												{t('transcription.toTranscribe')}
+											</p>
+										{/if}
+									</div>
+								{:else if !isCollapsed}
+									<div class="pl-6 pb-1">
+										{#if doc.lines.length === 0 && doc.groups.length === 0}
+											<p class="text-muted-foreground italic text-xs">
+												{t('transcription.noRegions')}
+											</p>
+										{:else}
+											<p class="text-muted-foreground text-xs">
+												{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines
+													.length} line{doc.lines.length !== 1 ? 's' : ''}
+											</p>
+										{/if}
+									</div>
+								{/if}
+							{/if}
+						{/each}
+					</div>
+				{/if}
+			{/if}
+		{/each}
 
-          {#if !isCollapsed && isActive}
-            <div class="pl-3">
-              {#each doc.groups as group, gi}
-                {#if !filter || groupHasMatches(doc, group.lineIds)}
-                  {@const groupWorking = group.regionId ? pendingRegions.has(group.regionId) : false}
-                  {@render groupBlock(doc, group, gi, groupWorking)}
-                {/if}
-              {/each}
-
-              {#if !filter && doc.lines.length === 0 && doc.groups.length === 0}
-                <p class="text-muted-foreground italic text-center text-sm mt-2 mb-2">{t('transcription.pressPlay')} <kbd class="not-italic rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono">&#9654;</kbd> {t('transcription.toTranscribe')}</p>
-              {/if}
-            </div>
-          {:else if !isCollapsed}
-            <div class="pl-6 pb-1">
-              {#if doc.lines.length === 0 && doc.groups.length === 0}
-                <p class="text-muted-foreground italic text-xs">{t('transcription.noRegions')}</p>
-              {:else}
-                <p class="text-muted-foreground text-xs">{doc.groups.length} group{doc.groups.length !== 1 ? 's' : ''}, {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}</p>
-              {/if}
-            </div>
-          {/if}
-          {/if}
-        {/each}
-      </div>
-    {/if}
-    {/if}
-  {/each}
-
-  {#if documents.length === 0}
-    <p class="text-muted-foreground italic text-center mt-8 text-xs font-sans">No volumes loaded</p>
-  {/if}
-  </div>
+		{#if documents.length === 0}
+			<p class="text-muted-foreground italic text-center mt-8 text-xs font-sans">
+				No volumes loaded
+			</p>
+		{/if}
+	</div>
 </div>
 
 <!-- Shared snippets -->
 
-{#snippet groupBlock(doc: ImageDocument, group: import('$lib/types').LineGroup, gi: number, groupWorking: boolean)}
-  <div class="mb-2 border-l-3 rounded" style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}">
-    <div
-      class="flex items-center gap-1.5 px-2 py-1.5 bg-muted/30 text-xs font-sans select-none cursor-pointer"
-      onclick={() => onFocusGroup(group.lineIds, group.rect)}
-    >
-      <button class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4" onclick={(e) => { e.stopPropagation(); onToggleGroup(group.id); }}>
-        {group.collapsed ? '\u25B6' : '\u25BC'}
-      </button>
-      {#if groupWorking}
-        <span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
-      {/if}
-      {#if editingGroupId === group.id}
-        <input
-          class="bg-card border border-current text-foreground rounded px-1 py-0.5 text-xs w-32 outline-none"
-          style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
-          bind:value={editName}
-          onkeydown={(e) => { if (e.key === 'Enter') finishRename(group.id); if (e.key === 'Escape') editingGroupId = null; }}
-          onblur={() => finishRename(group.id)}
-        />
-      {:else}
-        <span class="font-semibold cursor-default" style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}" ondblclick={() => startRename(group)}>{group.name}</span>
-      {/if}
-      <span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIds.length}</span>
-      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); copyGroupLines(group); }} title="Copy all lines">{copiedGroupId === group.id ? '\u2713' : '\u2398'}</button>
-      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100" onclick={(e) => { e.stopPropagation(); onFocusGroup(group.lineIds, group.rect); }} title="Zoom to group">&#x2316;</button>
-      <button class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" onclick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'} disabled={groupWorking}>x</button>
-    </div>
-    {#if !group.collapsed}
-      <div class="pl-1">
-        {#each group.lineIds as lineId, li}
-          {@render lineRow(doc, lineId, li)}
-        {/each}
-      </div>
-    {/if}
-  </div>
+{#snippet groupBlock(
+	doc: ImageDocument,
+	group: import('$lib/types').LineGroup,
+	gi: number,
+	groupWorking: boolean,
+)}
+	<div
+		class="mb-2 border-l-3 rounded"
+		style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
+	>
+		<div
+			class="flex items-center gap-1.5 px-2 py-1.5 bg-muted/30 text-xs font-sans select-none cursor-pointer"
+			onclick={() => onFocusGroup(group.lineIds, group.rect)}
+		>
+			<button
+				class="bg-transparent border-none text-muted-foreground cursor-pointer p-0 text-[0.65rem] w-4"
+				onclick={(e) => {
+					e.stopPropagation();
+					onToggleGroup(group.id);
+				}}
+			>
+				{group.collapsed ? '\u25B6' : '\u25BC'}
+			</button>
+			{#if groupWorking}
+				<span class="inline-block size-2 rounded-full bg-orange-500 animate-pulse"></span>
+			{/if}
+			{#if editingGroupId === group.id}
+				<input
+					class="bg-card border border-current text-foreground rounded px-1 py-0.5 text-xs w-32 outline-none"
+					style="border-color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
+					bind:value={editName}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') finishRename(group.id);
+						if (e.key === 'Escape') editingGroupId = null;
+					}}
+					onblur={() => finishRename(group.id)}
+				/>
+			{:else}
+				<span
+					class="font-semibold cursor-default"
+					style="color: {GROUP_COLORS[gi % GROUP_COLORS.length]}"
+					ondblclick={() => startRename(group)}>{group.name}</span
+				>
+			{/if}
+			<span class="text-[0.7rem] text-muted-foreground ml-auto">{group.lineIds.length}</span>
+			<button
+				class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100"
+				onclick={(e) => {
+					e.stopPropagation();
+					copyGroupLines(group);
+				}}
+				title="Copy all lines">{copiedGroupId === group.id ? '\u2713' : '\u2398'}</button
+			>
+			<button
+				class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100"
+				onclick={(e) => {
+					e.stopPropagation();
+					onFocusGroup(group.lineIds, group.rect);
+				}}
+				title="Zoom to group">&#x2316;</button
+			>
+			<button
+				class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-50 hover:opacity-100 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed"
+				onclick={(e) => {
+					e.stopPropagation();
+					onDeleteGroup(group.id);
+				}}
+				title={groupWorking ? 'Cannot delete while transcribing' : 'Delete group'}
+				disabled={groupWorking}>x</button
+			>
+		</div>
+		{#if !group.collapsed}
+			<div class="pl-1">
+				{#each group.lineIds as lineId, li}
+					{@render lineRow(doc, lineId, li)}
+				{/each}
+			</div>
+		{/if}
+	</div>
 {/snippet}
 
 {#snippet lineRow(doc: ImageDocument, lineId: number, lineNum: number)}
-  {@const line = doc.lines.find(l => l.id === lineId)}
-  {#if line && lineMatches(doc, lineId)}
-    <div
-      class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-all relative {lineId === hoveredLine ? 'bg-orange-500/[0.08] pl-3' : ''} {selectedLines.has(lineId) ? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30' : ''} before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-orange-400 before:opacity-0 before:transition-opacity {lineId === hoveredLine ? 'before:opacity-100' : ''}"
-      data-line={lineId}
-      onmouseenter={() => onHoverLine(lineId)}
-      onmouseleave={() => onHoverLine(-1)}
-      onclick={(e) => handleLineClick(lineId, e)}
-      ondblclick={() => startEditLine(lineId)}
-    >
-      <span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none">{lineNum + 1}</span>
-      {#if editingLineIdx === lineId}
-        <input
-          class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
-          bind:value={editLineText}
-          onkeydown={(e) => { if (e.key === 'Enter') finishEditLine(); if (e.key === 'Escape') editingLineIdx = -1; }}
-          onblur={finishEditLine}
-          onclick={(e) => e.stopPropagation()}
-          ondblclick={(e) => e.stopPropagation()}
-        />
-      {:else}
-        <span class="flex-1">
-          {#each highlightText(line.text) as part}{part.before}{#if part.match}<mark class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark>{/if}{part.after}{/each}{#if !line.complete && line.text}<span class="streaming-cursor"></span>{/if}
-        </span>
-        {#if line.complete}
-          <span class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: oklch(0.65 0.18 {line.confidence > 0.7 ? 145 : line.confidence > 0.4 ? 75 : 25} / {line.confidence * 0.15}); color: oklch({0.45 + line.confidence * 0.25} 0.12 {line.confidence > 0.7 ? 145 : line.confidence > 0.4 ? 75 : 25})">{(line.confidence * 100).toFixed(0)}%</span>
-          <button
-            class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
-            onclick={(e) => { e.stopPropagation(); copyLineText(doc, lineId); }}
-            title="Copy line text"
-          >{copiedLineIdx === lineId ? '\u2713' : 'T'}</button>
-          <button
-            class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
-            onclick={(e) => { e.stopPropagation(); copyLineImage(doc, lineId); }}
-            title="Copy line image"
-          >{copiedLineIdx === lineId ? '\u2713' : '\u{1F5BC}'}</button>
-        {/if}
-      {/if}
-    </div>
-  {/if}
+	{@const line = doc.lines.find((l) => l.id === lineId)}
+	{#if line && lineMatches(doc, lineId)}
+		<div
+			class="group/line flex items-baseline gap-2 px-2 py-1 rounded cursor-pointer transition-all relative {lineId ===
+			hoveredLine
+				? 'bg-orange-500/[0.08] pl-3'
+				: ''} {selectedLines.has(lineId)
+				? 'bg-yellow-400/[0.12] outline outline-1 outline-yellow-400/30'
+				: ''} before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-orange-400 before:opacity-0 before:transition-opacity {lineId ===
+			hoveredLine
+				? 'before:opacity-100'
+				: ''}"
+			data-line={lineId}
+			onmouseenter={() => onHoverLine(lineId)}
+			onmouseleave={() => onHoverLine(-1)}
+			onclick={(e) => handleLineClick(lineId, e)}
+			ondblclick={() => startEditLine(lineId)}
+		>
+			<span class="text-muted-foreground text-xs min-w-[1.5rem] text-right font-mono select-none"
+				>{lineNum + 1}</span
+			>
+			{#if editingLineIdx === lineId}
+				<input
+					class="flex-1 bg-card border border-border text-foreground font-inherit text-inherit px-1 py-0.5 rounded outline-none focus:border-primary"
+					bind:value={editLineText}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') finishEditLine();
+						if (e.key === 'Escape') editingLineIdx = -1;
+					}}
+					onblur={finishEditLine}
+					onclick={(e) => e.stopPropagation()}
+					ondblclick={(e) => e.stopPropagation()}
+				/>
+			{:else}
+				<span class="flex-1">
+					{#each highlightText(line.text) as part}{part.before}{#if part.match}<mark
+								class="bg-yellow-400/40 text-inherit rounded-sm px-px">{part.match}</mark
+							>{/if}{part.after}{/each}{#if !line.complete && line.text}<span
+							class="streaming-cursor"
+						></span>{/if}
+				</span>
+				{#if line.complete}
+					<span
+						class="text-xs font-mono px-1.5 py-0.5 rounded"
+						style="background: oklch(0.65 0.18 {line.confidence > 0.7
+							? 145
+							: line.confidence > 0.4
+								? 75
+								: 25} / {line.confidence * 0.15}); color: oklch({0.45 +
+							line.confidence * 0.25} 0.12 {line.confidence > 0.7
+							? 145
+							: line.confidence > 0.4
+								? 75
+								: 25})">{(line.confidence * 100).toFixed(0)}%</span
+					>
+					<button
+						class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
+						onclick={(e) => {
+							e.stopPropagation();
+							copyLineText(doc, lineId);
+						}}
+						title="Copy line text">{copiedLineIdx === lineId ? '\u2713' : 'T'}</button
+					>
+					<button
+						class="bg-transparent border-none text-muted-foreground cursor-pointer px-0.5 text-xs opacity-0 group-hover/line:opacity-50 hover:!opacity-100 transition-opacity"
+						onclick={(e) => {
+							e.stopPropagation();
+							copyLineImage(doc, lineId);
+						}}
+						title="Copy line image">{copiedLineIdx === lineId ? '\u2713' : '\u{1F5BC}'}</button
+					>
+				{/if}
+			{/if}
+		</div>
+	{/if}
 {/snippet}
