@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────────────
 #  Lejonet HTR — Development commands
 # ──────────────────────────────────────────────────────────────────────
-.PHONY: setup dev build deploy quality test docs-dev docs-build clean help
+.PHONY: setup dev build deploy lint quality test docs-dev docs-build clean help
 
 ## setup: install all dependencies
 setup:
@@ -27,9 +27,14 @@ deploy:
 	cd space && python3 -c "from huggingface_hub import HfApi; HfApi().upload_folder(folder_path='.', repo_id='carpelan/lejonet', repo_type='space')"
 	@echo "Deployed to https://huggingface.co/spaces/carpelan/lejonet"
 
+## lint: run eslint
+lint:
+	cd frontend && npx eslint src/
+
 ## quality: run all quality checks
 quality:
-	cd frontend && npx prettier --write "src/**/*.{svelte,ts,js,css}"
+	cd frontend && npx prettier --check "src/**/*.{svelte,ts,js,css}"
+	cd frontend && npx eslint src/
 	cd frontend && npx svelte-check --threshold error
 
 ## test: run tests
