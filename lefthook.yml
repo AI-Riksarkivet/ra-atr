@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: false
+  commands:
+    prettier:
+      root: frontend/
+      glob: "*.{svelte,ts,js,css}"
+      run: npx prettier --check {staged_files}
+    eslint:
+      root: frontend/
+      glob: "*.{svelte,ts,js}"
+      run: npx eslint {staged_files}
+    svelte-check:
+      root: frontend/
+      run: npx svelte-check --threshold error
