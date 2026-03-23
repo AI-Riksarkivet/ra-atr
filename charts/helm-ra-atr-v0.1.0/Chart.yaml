@@ -1,11 +1,11 @@
 apiVersion: v2
-name: lejonet
+name: ra-atr
 description: Svelte 5 frontend for handwritten text recognition with in-browser ONNX Runtime WASM inference
 type: application
 version: 0.1.0
 appVersion: "v0.1.0"
-home: https://github.com/carpelan/lejonet
+home: https://github.com/AI-Riksarkivet/ra-atr
 sources:
-  - https://github.com/carpelan/lejonet
+  - https://github.com/AI-Riksarkivet/ra-atr
 maintainers:
   - name: carpelan

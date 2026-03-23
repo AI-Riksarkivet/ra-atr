@@ -1,4 +1,4 @@
-# Lejonet HTR — Development Guide
+# ra-atr — Development Guide
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ make deploy   # Build and deploy to HF Space
 ## Architecture
 
 ```
-lejonet/
+ra-atr/
 ├── frontend/             # Svelte 5 frontend (WASM HTR inference)
 │   ├── src/
 │   ├── static/

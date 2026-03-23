@@ -4,7 +4,7 @@ imagePullSecrets: []
   # - name: regcred
 
 image:
-  repository: carpelan/lejonet
+  repository: AI-Riksarkivet/ra-atr
   tag: ""  # defaults to appVersion from Chart.yaml
   pullPolicy: IfNotPresent
 

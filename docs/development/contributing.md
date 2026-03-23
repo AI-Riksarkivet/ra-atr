@@ -1,6 +1,6 @@
 # Contributing
 
-See [CONTRIBUTING.md](https://github.com/AI-Riksarkivet/lejonet/blob/main/.github/CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](https://github.com/AI-Riksarkivet/ra-atr/blob/main/.github/CONTRIBUTING.md) for guidelines.
 
 ## Development Workflow
 

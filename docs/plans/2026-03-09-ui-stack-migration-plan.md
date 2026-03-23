@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Migrate lejonet from plain Vite + hand-written CSS to SvelteKit + Tailwind CSS v4 + bits-ui + Storybook 10, matching the AI-Riksarkivet/hcp project patterns.
+**Goal:** Migrate ra-atr from plain Vite + hand-written CSS to SvelteKit + Tailwind CSS v4 + bits-ui + Storybook 10, matching the AI-Riksarkivet/hcp project patterns.
 
 **Architecture:** SvelteKit app with two routes (`/` for upload, `/viewer` for workspace). Shared app state via a Svelte 5 runes store. UI components copied from hcp's bits-ui wrappers. All scoped CSS replaced with Tailwind utility classes.
 

@@ -3,7 +3,7 @@
  * Stores the server URL in localStorage and provides inference functions.
  */
 
-const STORAGE_KEY = 'lejonet-gpu-server-url';
+const STORAGE_KEY = 'ra-atr-gpu-server-url';
 
 export const gpuServerUrl = {
 	get(): string {

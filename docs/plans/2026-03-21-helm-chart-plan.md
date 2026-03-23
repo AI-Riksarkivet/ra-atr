@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Create a Helm chart for Kubernetes deployment of the Lejonet frontend (nginx serving static SPA).
+**Goal:** Create a Helm chart for Kubernetes deployment of the ra-atr frontend (nginx serving static SPA).
 
 **Architecture:** Single-container deployment serving the pre-built SPA via nginx. nginx config lives in a ConfigMap for per-deployment tuning of COOP/COEP headers and SPA fallback routing. Follows ra-hcp chart conventions for helpers, labels, and security context.
 
@@ -15,21 +15,21 @@
 ### Task 1: Chart.yaml and .helmignore
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/Chart.yaml`
-- Create: `charts/helm-lejonet-v0.1.0/.helmignore`
+- Create: `charts/helm-ra-atr-v0.1.0/Chart.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/.helmignore`
 
 **Step 1: Create Chart.yaml**
 
 ```yaml
 apiVersion: v2
-name: lejonet
+name: ra-atr
 description: Svelte 5 frontend for handwritten text recognition with in-browser ONNX Runtime WASM inference
 type: application
 version: 0.1.0
 appVersion: "v0.1.0"
-home: https://github.com/carpelan/lejonet
+home: https://github.com/AI-Riksarkivet/ra-atr
 sources:
-  - https://github.com/carpelan/lejonet
+  - https://github.com/AI-Riksarkivet/ra-atr
 maintainers:
   - name: carpelan
 ```
@@ -58,24 +58,24 @@ git commit -m "chore: scaffold helm chart with Chart.yaml"
 ### Task 2: _helpers.tpl
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/_helpers.tpl`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/_helpers.tpl`
 
 **Step 1: Create helpers**
 
-Adapted from ra-hcp — provides `lejonet.name`, `lejonet.fullname`, `lejonet.chart`, `lejonet.labels`, `lejonet.selectorLabels`.
+Adapted from ra-hcp — provides `ra-atr.name`, `ra-atr.fullname`, `ra-atr.chart`, `ra-atr.labels`, `ra-atr.selectorLabels`.
 
 ```gotemplate
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "lejonet.name" -}}
+{{- define "ra-atr.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "lejonet.fullname" -}}
+{{- define "ra-atr.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -91,16 +91,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "lejonet.chart" -}}
+{{- define "ra-atr.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels.
 */}}
-{{- define "lejonet.labels" -}}
-helm.sh/chart: {{ include "lejonet.chart" . }}
-{{ include "lejonet.selectorLabels" . }}
+{{- define "ra-atr.labels" -}}
+helm.sh/chart: {{ include "ra-atr.chart" . }}
+{{ include "ra-atr.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -110,8 +110,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels.
 */}}
-{{- define "lejonet.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "lejonet.name" . }}
+{{- define "ra-atr.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ra-atr.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 ```
@@ -128,7 +128,7 @@ git commit -m "chore: add helm template helpers"
 ### Task 3: configmap.yaml (nginx config)
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/configmap.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/configmap.yaml`
 
 **Step 1: Create nginx ConfigMap**
 
@@ -138,9 +138,9 @@ nginx config with SPA fallback and COOP/COEP headers for SharedArrayBuffer (requ
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "lejonet.fullname" . }}-nginx
+  name: {{ include "ra-atr.fullname" . }}-nginx
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 data:
   default.conf: |
     server {
@@ -180,7 +180,7 @@ git commit -m "feat: add nginx configmap with COOP/COEP headers"
 ### Task 4: deployment.yaml
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/deployment.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/deployment.yaml`
 
 **Step 1: Create deployment**
 
@@ -188,16 +188,16 @@ git commit -m "feat: add nginx configmap with COOP/COEP headers"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "lejonet.selectorLabels" . | nindent 6 }}
+      {{- include "ra-atr.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -205,7 +205,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "lejonet.selectorLabels" . | nindent 8 }}
+        {{- include "ra-atr.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -256,7 +256,7 @@ spec:
       volumes:
         - name: nginx-config
           configMap:
-            name: {{ include "lejonet.fullname" . }}-nginx
+            name: {{ include "ra-atr.fullname" . }}-nginx
         - name: tmp
           emptyDir: {}
         - name: nginx-cache
@@ -289,7 +289,7 @@ git commit -m "feat: add frontend deployment template"
 ### Task 5: service.yaml
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/service.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/service.yaml`
 
 **Step 1: Create service**
 
@@ -297,9 +297,9 @@ git commit -m "feat: add frontend deployment template"
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -311,7 +311,7 @@ spec:
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
   selector:
-    {{- include "lejonet.selectorLabels" . | nindent 4 }}
+    {{- include "ra-atr.selectorLabels" . | nindent 4 }}
 ```
 
 **Step 2: Commit**
@@ -326,7 +326,7 @@ git commit -m "feat: add service template"
 ### Task 6: ingress.yaml
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/ingress.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/ingress.yaml`
 
 **Step 1: Create ingress**
 
@@ -335,9 +335,9 @@ git commit -m "feat: add service template"
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -365,7 +365,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "lejonet.fullname" $ }}
+                name: {{ include "ra-atr.fullname" $ }}
                 port:
                   number: {{ $.Values.service.port }}
     {{- end }}
@@ -384,8 +384,8 @@ git commit -m "feat: add ingress template"
 ### Task 7: hpa.yaml and pdb.yaml
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/templates/hpa.yaml`
-- Create: `charts/helm-lejonet-v0.1.0/templates/pdb.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/hpa.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/pdb.yaml`
 
 **Step 1: Create HPA**
 
@@ -394,14 +394,14 @@ git commit -m "feat: add ingress template"
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "lejonet.fullname" . }}
+    name: {{ include "ra-atr.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:
@@ -421,9 +421,9 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 spec:
   {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
@@ -432,7 +432,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "lejonet.selectorLabels" . | nindent 6 }}
+      {{- include "ra-atr.selectorLabels" . | nindent 6 }}
 {{- end }}
 ```
 
@@ -448,8 +448,8 @@ git commit -m "feat: add HPA and PDB templates"
 ### Task 8: values.yaml and NOTES.txt
 
 **Files:**
-- Create: `charts/helm-lejonet-v0.1.0/values.yaml`
-- Create: `charts/helm-lejonet-v0.1.0/templates/NOTES.txt`
+- Create: `charts/helm-ra-atr-v0.1.0/values.yaml`
+- Create: `charts/helm-ra-atr-v0.1.0/templates/NOTES.txt`
 
 **Step 1: Create values.yaml**
 
@@ -460,7 +460,7 @@ imagePullSecrets: []
   # - name: regcred
 
 image:
-  repository: carpelan/lejonet
+  repository: AI-Riksarkivet/ra-atr
   tag: ""  # defaults to appVersion from Chart.yaml
   pullPolicy: IfNotPresent
 
@@ -515,7 +515,7 @@ securityContext:
 **Step 2: Create NOTES.txt**
 
 ```
-Lejonet HTR has been deployed!
+ra-atr has been deployed!
 
 1. Get the application URL:
 {{- if .Values.ingress.enabled }}
@@ -527,9 +527,9 @@ Lejonet HTR has been deployed!
   echo "Frontend: http://$NODE_IP:{{ .Values.service.nodePort }}"
 {{- else if eq .Values.service.type "LoadBalancer" }}
   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "lejonet.fullname" . }} -w
+  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "ra-atr.fullname" . }} -w
 {{- else }}
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "lejonet.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "ra-atr.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   echo "Frontend: http://127.0.0.1:{{ .Values.service.port }}"
 {{- end }}
 ```
@@ -548,7 +548,7 @@ git commit -m "feat: add values.yaml and NOTES.txt"
 **Step 1: Lint the chart**
 
 ```bash
-helm lint charts/helm-lejonet-v0.1.0/
+helm lint charts/helm-ra-atr-v0.1.0/
 ```
 
 Expected: `1 chart(s) linted, 0 chart(s) failed`
@@ -556,7 +556,7 @@ Expected: `1 chart(s) linted, 0 chart(s) failed`
 **Step 2: Template render check**
 
 ```bash
-helm template test charts/helm-lejonet-v0.1.0/ | head -80
+helm template test charts/helm-ra-atr-v0.1.0/ | head -80
 ```
 
 Expected: Valid YAML output with all templates rendered.
@@ -565,5 +565,5 @@ Expected: Valid YAML output with all templates rendered.
 
 ```bash
 git add charts/
-git commit -m "feat: complete lejonet helm chart"
+git commit -m "feat: complete ra-atr helm chart"
 ```

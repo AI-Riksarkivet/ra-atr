@@ -2,14 +2,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "lejonet.fullname" . }}
+  name: {{ include "ra-atr.fullname" . }}
   labels:
-    {{- include "lejonet.labels" . | nindent 4 }}
+    {{- include "ra-atr.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "lejonet.fullname" . }}
+    name: {{ include "ra-atr.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

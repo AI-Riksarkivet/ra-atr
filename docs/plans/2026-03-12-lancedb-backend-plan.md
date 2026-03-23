@@ -68,7 +68,7 @@ CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
 
 ```markdown
 ---
-title: Lejonet Transcription Backend
+title: ra-atr Transcription Backend
 emoji: 🦁
 colorFrom: yellow
 colorTo: orange
@@ -113,7 +113,7 @@ import lancedb
 import pyarrow as pa
 from huggingface_hub import hf_hub_download, HfApi
 
-DATASET_REPO = os.environ.get("DATASET_REPO", "your-username/lejonet-transcriptions")
+DATASET_REPO = os.environ.get("DATASET_REPO", "your-username/ra-atr-transcriptions")
 TABLE_NAME = "transcriptions"
 DB_PATH = "/tmp/lancedb"
 

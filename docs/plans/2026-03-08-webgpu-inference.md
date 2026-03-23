@@ -24,8 +24,8 @@ const output = results['output_name'];  // ort.Tensor with .data and .dims
 ### Task 1: Install onnxruntime-web and configure Vite
 
 **Files:**
-- Modify: `/home/m/lejonet/package.json`
-- Modify: `/home/m/lejonet/vite.config.ts`
+- Modify: `/home/m/ra-atr/package.json`
+- Modify: `/home/m/ra-atr/vite.config.ts`
 
 **Step 1: Install onnxruntime-web**
 
@@ -38,7 +38,7 @@ npm install onnxruntime-web
 
 onnxruntime-web ships `.wasm` files that must be accessible at runtime. Vite needs to exclude them from bundling in the worker.
 
-Edit `/home/m/lejonet/vite.config.ts` — add `optimizeDeps` and `assetsInclude` config:
+Edit `/home/m/ra-atr/vite.config.ts` — add `optimizeDeps` and `assetsInclude` config:
 
 ```ts
 import { defineConfig } from 'vite';
@@ -105,7 +105,7 @@ git commit -m "add onnxruntime-web dependency and vite config"
 ### Task 2: Port image preprocessing to TypeScript
 
 **Files:**
-- Create: `/home/m/lejonet/src/lib/preprocessing.ts`
+- Create: `/home/m/ra-atr/src/lib/preprocessing.ts`
 
 These are pure-CPU functions that prepare image pixels for YOLO and TrOCR. They replace `crates/htr-wasm/src/preprocessing.rs`.
 
@@ -234,7 +234,7 @@ git commit -m "add TypeScript image preprocessing for YOLO and TrOCR"
 ### Task 3: Port YOLO post-processing to TypeScript
 
 **Files:**
-- Create: `/home/m/lejonet/src/lib/yolo.ts`
+- Create: `/home/m/ra-atr/src/lib/yolo.ts`
 
 This handles parsing the raw YOLO output tensor, applying confidence threshold, coordinate conversion from padded 640x640 back to original image coords, and NMS. Ported from `crates/htr-wasm/src/yolo.rs`.
 
@@ -374,7 +374,7 @@ git commit -m "add TypeScript YOLO post-processing with NMS"
 ### Task 4: Port BPE tokenizer to TypeScript
 
 **Files:**
-- Create: `/home/m/lejonet/src/lib/tokenizer.ts`
+- Create: `/home/m/ra-atr/src/lib/tokenizer.ts`
 
 Port of `crates/htr-wasm/src/tokenizer.rs`. Parses HuggingFace `tokenizer.json`, handles RoBERTa Ġ→space mapping, provides `decodeToken(id)` and `decode(ids)`.
 
@@ -454,7 +454,7 @@ git commit -m "add TypeScript BPE tokenizer for TrOCR decoding"
 ### Task 5: Write the onnxruntime-web worker
 
 **Files:**
-- Create: `/home/m/lejonet/src/worker-ortw.ts`
+- Create: `/home/m/ra-atr/src/worker-ortw.ts`
 
 This is the main worker that replaces `src/worker.ts` for the WebGPU path. Same message protocol, but uses `ort.InferenceSession` instead of WASM imports. The key difference: ort-web handles dynamic shapes natively, so the decoder doesn't need rebuilding per token.
 
@@ -685,7 +685,7 @@ git commit -m "add onnxruntime-web worker with WebGPU inference"
 ### Task 6: Wire up worker selection in worker-state
 
 **Files:**
-- Modify: `/home/m/lejonet/src/lib/worker-state.svelte.ts`
+- Modify: `/home/m/ra-atr/src/lib/worker-state.svelte.ts`
 
 Add a constructor parameter to select the inference backend. The worker message protocol is identical, so only the `new Worker(...)` URL changes.
 
@@ -727,7 +727,7 @@ git commit -m "add backend selection to HTRWorkerState constructor"
 ### Task 7: Add backend selector to the UI
 
 **Files:**
-- Modify: `/home/m/lejonet/src/App.svelte`
+- Modify: `/home/m/ra-atr/src/App.svelte`
 
 Add a simple toggle in the header or ModelManager so users can pick WebGPU vs WASM before loading models. Once models are loaded, the choice is locked.
 

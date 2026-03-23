@@ -7,8 +7,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/carpelan/lejonet.git
-cd lejonet
+git clone https://github.com/AI-Riksarkivet/ra-atr.git
+cd ra-atr
 
 # Install dependencies
 make setup

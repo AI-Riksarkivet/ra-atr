@@ -1,9 +1,9 @@
-# Lejonet HTR
+# ra-atr
 
-[![CI](https://github.com/carpelan/lejonet/actions/workflows/ci.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/ci.yml)
-[![Docs](https://github.com/carpelan/lejonet/actions/workflows/docs.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/docs.yml)
-[![CodeQL](https://github.com/carpelan/lejonet/actions/workflows/codeql.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/codeql.yml)
-[![Scorecard](https://github.com/carpelan/lejonet/actions/workflows/scorecard.yml/badge.svg)](https://github.com/carpelan/lejonet/actions/workflows/scorecard.yml)
+[![CI](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/ci.yml/badge.svg)](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/ci.yml)
+[![Docs](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/docs.yml/badge.svg)](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/docs.yml)
+[![CodeQL](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/codeql.yml/badge.svg)](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/codeql.yml)
+[![Scorecard](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/scorecard.yml/badge.svg)](https://github.com/AI-Riksarkivet/ra-atr/actions/workflows/scorecard.yml)
 
 Collaborative handwritten text recognition for historical documents from Sweden's National Archives (Riksarkivet).
 
@@ -39,7 +39,7 @@ The frontend auto-detects the search backend at localhost:8000 and GPU server at
 
 ## Documentation
 
-- [Docs site](https://carpelan.github.io/lejonet/) — architecture, configuration, getting started
+- [Docs site](https://AI-Riksarkivet.github.io/ra-atr/) — architecture, configuration, getting started
 
 ## Features
 

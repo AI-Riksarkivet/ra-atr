@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add prettier-plugin-svelte, eslint, vitest, lefthook, and knip to the lejonet frontend, plus fix stale doc paths.
+**Goal:** Add prettier-plugin-svelte, eslint, vitest, lefthook, and knip to the ra-atr frontend, plus fix stale doc paths.
 
 **Architecture:** All quality tools install into `frontend/` as devDependencies. Lefthook config lives at repo root (it's a git hook manager). Makefile gets updated quality targets.
 

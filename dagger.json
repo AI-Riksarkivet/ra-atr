@@ -1,5 +1,5 @@
 {
-  "name": "lejonet",
+  "name": "ra-atr",
   "engineVersion": "v0.20.1",
   "sdk": {
     "source": "go"

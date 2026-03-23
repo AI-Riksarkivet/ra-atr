@@ -1,6 +1,6 @@
 # GPU Inference Server — Design
 
-**Goal:** A Docker-packaged FastAPI server that runs ONNX models on GPU. Users pull the image, run it with GPU passthrough, and point the lejonet app at it.
+**Goal:** A Docker-packaged FastAPI server that runs ONNX models on GPU. Users pull the image, run it with GPU passthrough, and point the ra-atr app at it.
 
 ## Endpoints
 

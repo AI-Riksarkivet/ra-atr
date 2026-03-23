@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────
-#  Lejonet HTR — Development commands
+#  ra-atr — Development commands
 # ──────────────────────────────────────────────────────────────────────
 .PHONY: setup dev build deploy lint quality test docs-dev docs-build clean help
 

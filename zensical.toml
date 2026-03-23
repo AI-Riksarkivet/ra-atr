@@ -1,14 +1,14 @@
 [project]
-site_name = "lejonet"
-site_url = "https://carpelan.github.io/lejonet/"
+site_name = "ra-atr"
+site_url = "https://AI-Riksarkivet.github.io/ra-atr/"
 site_description = "Collaborative handwritten text recognition app for historical documents from Sweden's National Archives."
 site_author = "carpelan"
 copyright = "Copyright &copy; 2026 carpelan"
-repo_url = "https://github.com/carpelan/lejonet"
-repo_name = "carpelan/lejonet"
+repo_url = "https://github.com/AI-Riksarkivet/ra-atr"
+repo_name = "AI-Riksarkivet/ra-atr"
 
 nav = [
-  { "lejonet" = [
+  { "ra-atr" = [
     "index.md",
   ]},
   { "Getting Started" = [

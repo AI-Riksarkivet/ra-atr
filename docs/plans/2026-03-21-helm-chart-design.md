@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create a Helm chart for Kubernetes deployment of the Lejonet frontend, following the ra-hcp chart conventions.
+Create a Helm chart for Kubernetes deployment of the ra-atr frontend, following the ra-hcp chart conventions.
 
 ## Scope
 
@@ -11,7 +11,7 @@ Frontend-only: nginx serving the static SPA build from `.docker/frontend.dockerf
 ## Chart Structure
 
 ```
-charts/helm-lejonet-v0.1.0/
+charts/helm-ra-atr-v0.1.0/
 ├── Chart.yaml
 ├── values.yaml
 ├── .helmignore
@@ -52,7 +52,7 @@ These are included in the nginx ConfigMap by default.
 ```yaml
 replicaCount: 1
 image:
-  repository: carpelan/lejonet
+  repository: AI-Riksarkivet/ra-atr
   tag: ""  # defaults to appVersion
   pullPolicy: IfNotPresent
 service:

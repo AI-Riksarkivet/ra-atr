@@ -1,8 +1,8 @@
-# Lejonet Frontend Restructure — ra-hcp Pattern
+# ra-atr Frontend Restructure — ra-hcp Pattern
 
 ## Goal
 
-Restructure the `lejonet` repo to match the `AI-Riksarkivet/ra-hcp` monorepo conventions. This is the frontend-only repo — inference and search are separate repos.
+Restructure the `ra-atr` repo to match the `AI-Riksarkivet/ra-hcp` monorepo conventions. This is the frontend-only repo — inference and search are separate repos.
 
 ## Reference
 

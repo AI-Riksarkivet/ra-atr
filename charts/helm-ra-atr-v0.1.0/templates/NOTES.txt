@@ -1,4 +1,4 @@
-Lejonet HTR has been deployed!
+ra-atr has been deployed!
 
 1. Get the application URL:
 {{- if .Values.ingress.enabled }}
@@ -10,8 +10,8 @@ Lejonet HTR has been deployed!
   echo "Frontend: http://$NODE_IP:{{ .Values.service.nodePort }}"
 {{- else if eq .Values.service.type "LoadBalancer" }}
   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "lejonet.fullname" . }} -w
+  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "ra-atr.fullname" . }} -w
 {{- else }}
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "lejonet.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "ra-atr.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   echo "Frontend: http://127.0.0.1:{{ .Values.service.port }}"
 {{- end }}

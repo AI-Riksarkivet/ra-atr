@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add code quality tooling to the lejonet frontend: prettier-plugin-svelte, eslint, vitest, lefthook, and knip.
+Add code quality tooling to the ra-atr frontend: prettier-plugin-svelte, eslint, vitest, lefthook, and knip.
 
 ## Tools
 

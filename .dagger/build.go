@@ -1,11 +1,11 @@
 package main
 
 import (
-	"dagger/lejonet/internal/dagger"
+	"dagger/ra-atr/internal/dagger"
 )
 
 // BuildFrontend builds the frontend container from .docker/frontend.dockerfile.
-func (m *Lejonet) BuildFrontend(source *dagger.Directory) *dagger.Container {
+func (m *RaAtr) BuildFrontend(source *dagger.Directory) *dagger.Container {
 	return source.
 		DockerBuild(dagger.DirectoryDockerBuildOpts{
 			Dockerfile: ".docker/frontend.dockerfile",

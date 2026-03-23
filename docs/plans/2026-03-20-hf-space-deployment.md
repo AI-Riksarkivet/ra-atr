@@ -10,7 +10,7 @@ The `space/README.md` must contain:
 
 ```yaml
 ---
-title: Lejonet HTR
+title: ra-atr
 emoji: 🦁
 colorFrom: yellow
 colorTo: red

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Migrate lejonet from hand-written CSS + plain Vite to the same stack as AI-Riksarkivet/hcp:
+Migrate ra-atr from hand-written CSS + plain Vite to the same stack as AI-Riksarkivet/hcp:
 SvelteKit, Tailwind CSS v4, bits-ui, tailwind-variants, Storybook 10, lucide-svelte, mode-watcher.
 
 ## Tech Stack

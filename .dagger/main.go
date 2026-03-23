@@ -1,12 +1,12 @@
-// Lejonet HTR CI/CD pipeline powered by Dagger
+// ra-atr CI/CD pipeline powered by Dagger
 //
 // Provides build, lint, type-check, and serve functions for the
-// lejonet frontend (SvelteKit/Node).
+// ra-atr frontend (SvelteKit/Node).
 
 package main
 
 import (
-	"dagger/lejonet/internal/dagger"
+	"dagger/ra-atr/internal/dagger"
 )
 
 const (
@@ -14,10 +14,10 @@ const (
 	frontendDir = "frontend"
 )
 
-type Lejonet struct{}
+type RaAtr struct{}
 
 // buildFrontendDev returns a Node container with frontend deps installed.
-func (m *Lejonet) buildFrontendDev(source *dagger.Directory) *dagger.Container {
+func (m *RaAtr) buildFrontendDev(source *dagger.Directory) *dagger.Container {
 	frontend := source.Directory(frontendDir)
 
 	return dag.Container().From(nodeImage).

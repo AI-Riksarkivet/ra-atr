@@ -1,10 +1,10 @@
-/** Lightweight i18n for Lejonet — Swedish + English */
+/** Lightweight i18n for ra-atr — Swedish + English */
 
 export type Locale = 'en' | 'sv';
 
 const translations: Record<string, Record<Locale, string>> = {
 	// Loading screen
-	'app.title': { en: 'Lejonet HTR', sv: 'Lejonet HTR' },
+	'app.title': { en: 'ra-atr', sv: 'ra-atr' },
 	'app.description': {
 		en: 'Transcribe handwritten Swedish historical documents directly in your browser. All inference runs locally — no data leaves your device.',
 		sv: 'Transkribera handskrivna svenska historiska dokument direkt i din webbläsare. All inferens körs lokalt — ingen data lämnar din enhet.',
@@ -145,7 +145,7 @@ const translations: Record<string, Record<Locale, string>> = {
 };
 
 // Persisted locale state
-const STORAGE_KEY = 'lejonet-locale';
+const STORAGE_KEY = 'ra-atr-locale';
 
 function getInitialLocale(): Locale {
 	if (typeof localStorage !== 'undefined') {

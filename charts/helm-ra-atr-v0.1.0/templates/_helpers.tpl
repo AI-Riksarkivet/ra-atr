@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "lejonet.name" -}}
+{{- define "ra-atr.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "lejonet.fullname" -}}
+{{- define "ra-atr.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "lejonet.chart" -}}
+{{- define "ra-atr.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels.
 */}}
-{{- define "lejonet.labels" -}}
-helm.sh/chart: {{ include "lejonet.chart" . }}
-{{ include "lejonet.selectorLabels" . }}
+{{- define "ra-atr.labels" -}}
+helm.sh/chart: {{ include "ra-atr.chart" . }}
+{{ include "ra-atr.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -43,7 +43,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels.
 */}}
-{{- define "lejonet.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "lejonet.name" . }}
+{{- define "ra-atr.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ra-atr.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
