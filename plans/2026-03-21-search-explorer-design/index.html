@@ -1,0 +1,1433 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Collaborative handwritten text recognition app for historical documents from Sweden's National Archives.">
+      
+      
+        <meta name="author" content="carpelan">
+      
+      
+        <link rel="canonical" href="https://carpelan.github.io/lejonet/plans/2026-03-21-search-explorer-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.28">
+    
+    
+      
+        <title>Lejonet Search Explorer — Design - lejonet</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.6f2fbb28.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lejonet-search-explorer-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lejonet" class="md-header__button md-logo" aria-label="lejonet" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lejonet
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Lejonet Search Explorer — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/carpelan/lejonet" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    carpelan/lejonet
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  lejonet
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/" class="md-tabs__link">
+          
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lejonet" class="md-nav__button md-logo" aria-label="lejonet" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    lejonet
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/carpelan/lejonet" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    carpelan/lejonet
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lejonet
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    lejonet
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lejonet HTR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-model-lancedb-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Model (LanceDB table)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-estimates-50m-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Estimates (50M pages)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Search Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-text-search-always-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full-text search (always available)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vector-search-with-gpu-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector search (with GPU cluster)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vector-search-without-gpu-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector search (without GPU cluster)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browse-infinite-scroll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browse (Infinite Scroll)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thumbnail-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thumbnail Naming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#huggingface-primary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HuggingFace (primary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local development
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-self-hosted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production (self-hosted)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Targets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-crowdsourced-transcriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Crowdsourced Transcriptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — Crowdsourced Transcriptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-model-append-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data model — append-only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automatic-quality-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic quality signals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-vlm-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For VLM training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deferred-phase-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred (phase 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tech-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tech Stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/carpelan/lejonet/edit/master/docs/plans/2026-03-21-search-explorer-design.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/carpelan/lejonet/raw/master/docs/plans/2026-03-21-search-explorer-design.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="lejonet-search-explorer-design">Lejonet Search Explorer — Design<a class="headerlink" href="#lejonet-search-explorer-design" title="Permanent link">&para;</a></h1>
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>A fast, scalable document search and browse interface for 50M+ transcribed historical pages. Read-only phase 1; crowdsourced corrections in phase 2.</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>Browser (static Svelte)
+  ├── Infinite scroll thumbnail grid
+  ├── Search bar (FTS + vector)
+  └── Page viewer with transcription overlay
+          │
+          ▼
+FastAPI (lightweight, HF Space Docker or local)
+  ├── /search — FTS + vector search via LanceDB
+  ├── /browse — paginated metadata for grid
+  ├── /random — random page
+  └── /page/:id — full transcription + image URL
+          │
+          ▼
+HF Bucket (S3-compatible, Xet-backed)
+  ├── LanceDB tables (transcriptions, embeddings, metadata)
+  └── Thumbnails ({manifestId}_{pageNumber}.webp, 128×128)
+
+Ray GPU Cluster (optional, attach for speed)
+  ├── Arctic embedding for query vectors
+  └── HTR pipeline for live transcription
+</code></pre></div>
+<h2 id="data-model-lancedb-table">Data Model (LanceDB table)<a class="headerlink" href="#data-model-lancedb-table" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>string</td>
+<td><code>{manifestId}_{pageNumber}</code></td>
+</tr>
+<tr>
+<td>manifest_id</td>
+<td>string</td>
+<td>Riksarkivet volume identifier</td>
+</tr>
+<tr>
+<td>page_number</td>
+<td>int</td>
+<td>Page within volume</td>
+</tr>
+<tr>
+<td>reference_code</td>
+<td>string</td>
+<td><code>SE/GLA/12096/A I/5</code></td>
+</tr>
+<tr>
+<td>archive_code</td>
+<td>string</td>
+<td><code>SE_GLA</code></td>
+</tr>
+<tr>
+<td>fonds_title</td>
+<td>string</td>
+<td></td>
+</tr>
+<tr>
+<td>series_title</td>
+<td>string</td>
+<td></td>
+</tr>
+<tr>
+<td>date_text</td>
+<td>string</td>
+<td><code>1783--1792</code></td>
+</tr>
+<tr>
+<td>transcription</td>
+<td>string</td>
+<td>Full page text (all lines joined)</td>
+</tr>
+<tr>
+<td>vector</td>
+<td>float32[256]</td>
+<td>Snowflake Arctic Embed L v2.0</td>
+</tr>
+<tr>
+<td>thumbnail_url</td>
+<td>string</td>
+<td><code>{manifestId}_{pageNumber}.webp</code></td>
+</tr>
+<tr>
+<td>image_url</td>
+<td>string</td>
+<td>IIIF URL to full-resolution image</td>
+</tr>
+<tr>
+<td>digitized</td>
+<td>bool</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="storage-estimates-50m-pages">Storage Estimates (50M pages)<a class="headerlink" href="#storage-estimates-50m-pages" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Size</th>
+<th>HF Bucket cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LanceDB (text + vectors + metadata)</td>
+<td>~100 GB</td>
+<td>~$1.20/mo</td>
+</tr>
+<tr>
+<td>Thumbnails (128×128 WebP, ~3KB each)</td>
+<td>~150 GB</td>
+<td>~$1.80/mo</td>
+</tr>
+<tr>
+<td>IVF-PQ vector index</td>
+<td>~5 GB</td>
+<td>included</td>
+</tr>
+<tr>
+<td>FTS tantivy index</td>
+<td>~10 GB</td>
+<td>included</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>~265 GB</strong></td>
+<td><strong>~$3/mo</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="search-modes">Search Modes<a class="headerlink" href="#search-modes" title="Permanent link">&para;</a></h2>
+<h3 id="full-text-search-always-available">Full-text search (always available)<a class="headerlink" href="#full-text-search-always-available" title="Permanent link">&para;</a></h3>
+<ul>
+<li>LanceDB tantivy FTS over transcription column</li>
+<li>Sub-50ms on server, no GPU needed</li>
+<li>Supports Swedish characters, prefix matching</li>
+</ul>
+<h3 id="vector-search-with-gpu-cluster">Vector search (with GPU cluster)<a class="headerlink" href="#vector-search-with-gpu-cluster" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Query embedded via Arctic on Ray cluster → vector sent to LanceDB ANN search</li>
+<li>IVF-PQ index for sub-10ms search over 50M vectors</li>
+<li>Semantic: "domstolsprotokoll" finds "domböcker", "tingsrätt", etc.</li>
+</ul>
+<h3 id="vector-search-without-gpu-cluster">Vector search (without GPU cluster)<a class="headerlink" href="#vector-search-without-gpu-cluster" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fall back to local CPU embedding (slower, ~500ms per query)</li>
+<li>Or FTS-only mode</li>
+</ul>
+<h2 id="browse-infinite-scroll">Browse (Infinite Scroll)<a class="headerlink" href="#browse-infinite-scroll" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Virtual scrolling grid — only render visible thumbnails</li>
+<li>Backend serves paginated results: <code>/browse?offset=0&amp;limit=100</code></li>
+<li>Default sort: random or by archive/date</li>
+<li>Lazy-load thumbnails from HF Bucket CDN</li>
+<li>Click thumbnail → full page view with transcription overlay</li>
+<li>Filter sidebar: archive, date range, document type</li>
+</ul>
+<h2 id="thumbnail-naming">Thumbnail Naming<a class="headerlink" href="#thumbnail-naming" title="Permanent link">&para;</a></h2>
+<p><code>{manifestId}_{pageNumber}.webp</code></p>
+<p>Example: <code>G0000093_00001.webp</code></p>
+<p>Stored flat in the HF Bucket, served directly via URL.</p>
+<h2 id="deployment-options">Deployment Options<a class="headerlink" href="#deployment-options" title="Permanent link">&para;</a></h2>
+<h3 id="huggingface-primary">HuggingFace (primary)<a class="headerlink" href="#huggingface-primary" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>HF Bucket</strong>: LanceDB tables + thumbnails ($3/mo for 50M pages)</li>
+<li><strong>HF Space (Docker)</strong>: FastAPI + LanceDB reading from bucket (free tier)</li>
+<li><strong>Frontend</strong>: Same Space or separate static Space</li>
+</ul>
+<h3 id="local-development">Local development<a class="headerlink" href="#local-development" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Same code, LanceDB points to local directory</li>
+<li><code>make serve</code> starts backend + frontend</li>
+</ul>
+<h3 id="production-self-hosted">Production (self-hosted)<a class="headerlink" href="#production-self-hosted" title="Permanent link">&para;</a></h3>
+<ul>
+<li>FastAPI behind nginx/Caddy</li>
+<li>LanceDB reads from local disk or S3-compatible storage</li>
+<li>Optional: Ray GPU cluster for fast embedding + HTR</li>
+</ul>
+<h2 id="performance-targets">Performance Targets<a class="headerlink" href="#performance-targets" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vector search (50M rows)</td>
+<td>&lt; 100ms</td>
+</tr>
+<tr>
+<td>FTS search</td>
+<td>&lt; 50ms</td>
+</tr>
+<tr>
+<td>Browse page load (100 thumbnails)</td>
+<td>&lt; 200ms</td>
+</tr>
+<tr>
+<td>Thumbnail load (single)</td>
+<td>&lt; 50ms (CDN cached)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="phase-2-crowdsourced-transcriptions">Phase 2 — Crowdsourced Transcriptions<a class="headerlink" href="#phase-2-crowdsourced-transcriptions" title="Permanent link">&para;</a></h2>
+<h3 id="architecture_1">Architecture<a class="headerlink" href="#architecture_1" title="Permanent link">&para;</a></h3>
+<p>Separate write Space from the read Space:</p>
+<div class="highlight"><pre><span></span><code>Read Space (free/cheap)              Write Space (free)
+  FastAPI + LanceDB                    FastAPI + SQLite
+  read-only, fast                      HF OAuth login
+  serves search/browse                 append-only transcription log
+       │                                     │
+       └──────── HF Bucket ─────────────────┘
+                 (rebuilt periodically)
+</code></pre></div>
+<h3 id="data-model-append-only">Data model — append-only<a class="headerlink" href="#data-model-append-only" title="Permanent link">&para;</a></h3>
+<p>No edits, no overwrites, no consensus. Every transcription is saved separately.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>string</td>
+<td>UUID</td>
+</tr>
+<tr>
+<td>user_id</td>
+<td>string</td>
+<td>HF username</td>
+</tr>
+<tr>
+<td>manifest_id</td>
+<td>string</td>
+<td>Volume identifier</td>
+</tr>
+<tr>
+<td>page_number</td>
+<td>int</td>
+<td></td>
+</tr>
+<tr>
+<td>line_index</td>
+<td>int</td>
+<td></td>
+</tr>
+<tr>
+<td>bbox</td>
+<td>json</td>
+<td><code>{x, y, w, h}</code></td>
+</tr>
+<tr>
+<td>text</td>
+<td>string</td>
+<td>Transcribed text</td>
+</tr>
+<tr>
+<td>source</td>
+<td>string</td>
+<td><code>htr-trocr</code>, <code>htr-gpu</code>, <code>human</code>, <code>human-corrected</code></td>
+</tr>
+<tr>
+<td>confidence</td>
+<td>float</td>
+<td>Model confidence (0-1), null for human</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>timestamp</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Multiple users can transcribe the same page — all rows are kept.
+The read/search index picks the best transcription per page using a simple heuristic (human &gt; human-corrected &gt; high-confidence HTR &gt; low-confidence HTR).</p>
+<h3 id="source-tagging">Source tagging<a class="headerlink" href="#source-tagging" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Meaning</th>
+<th>Training value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>htr-trocr</code></td>
+<td>WASM pipeline output</td>
+<td>Bronze (pre-training)</td>
+</tr>
+<tr>
+<td><code>htr-gpu</code></td>
+<td>GPU server pipeline output</td>
+<td>Bronze (pre-training)</td>
+</tr>
+<tr>
+<td><code>human</code></td>
+<td>User transcribed from scratch</td>
+<td>Gold (fine-tuning)</td>
+</tr>
+<tr>
+<td><code>human-corrected</code></td>
+<td>User edited existing transcription</td>
+<td>Gold (fine-tuning)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="automatic-quality-signals">Automatic quality signals<a class="headerlink" href="#automatic-quality-signals" title="Permanent link">&para;</a></h3>
+<p>No human review needed. Quality inferred from:</p>
+<ul>
+<li><strong>Confidence score</strong> — TrOCR outputs per-line confidence. Low = likely wrong</li>
+<li><strong>Language model perplexity</strong> — small Swedish LM scores gibberish high</li>
+<li><strong>Character n-gram frequency</strong> — old Swedish has patterns, random misreads don't</li>
+<li><strong>Agreement</strong> — if 2+ transcriptions exist, similarity between them = quality</li>
+<li><strong>Length ratio</strong> — transcription length vs image dimensions, outliers are suspicious</li>
+<li><strong>Source</strong> — human transcriptions weighted higher than HTR</li>
+</ul>
+<h3 id="for-vlm-training">For VLM training<a class="headerlink" href="#for-vlm-training" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Duplicates don't matter — multiple transcriptions of the same image add robustness</li>
+<li>Disagreements are useful — ambiguous handwriting has multiple valid readings</li>
+<li>Quality tiers: gold (human) for fine-tuning, bronze (HTR) for pre-training</li>
+<li>Each training sample: <code>(line_image_crop, text, confidence, source)</code></li>
+</ul>
+<h3 id="deferred-phase-3">Deferred (phase 3)<a class="headerlink" href="#deferred-phase-3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Leaderboard / contribution stats</li>
+<li>Active learning — prioritize pages where model is least confident for human review</li>
+<li>Gamification — show users pages that need transcription most</li>
+</ul>
+<h2 id="tech-stack">Tech Stack<a class="headerlink" href="#tech-stack" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Frontend</strong>: Svelte 5, Tailwind, virtual scroll</li>
+<li><strong>Backend</strong>: FastAPI, LanceDB, pyarrow</li>
+<li><strong>Storage</strong>: HF Buckets (S3-compatible, Xet-backed)</li>
+<li><strong>Embeddings</strong>: Snowflake Arctic Embed L v2.0 (256 dims)</li>
+<li><strong>GPU</strong>: Ray Serve + ONNX Runtime (optional)</li>
+<li><strong>Thumbnails</strong>: Pre-generated 128×128 WebP</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 carpelan
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["announce.dismiss","content.action.edit","content.action.view","content.code.annotate","content.code.copy","content.code.select","content.tabs.link","content.tooltips","content.footnote.tooltips","navigation.footer","navigation.instant","navigation.instant.prefetch","navigation.path","navigation.tabs","navigation.tabs.sticky","navigation.top","navigation.tracking","search.highlight"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c2b142ea.min.js"></script>
+      
+    
+  </body>
+</html>
