@@ -85,7 +85,7 @@ export function exportAltoXML(doc: ImageDocument): string {
     <Processing ID="proc_0">
       <processingDateTime>${now}</processingDateTime>
       <processingSoftware>
-        <softwareName>Lejonet HTR</softwareName>
+        <softwareName>RA-ATR</softwareName>
       </processingSoftware>
     </Processing>
   </Description>
@@ -186,7 +186,7 @@ ${textLines}
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd">
   <Metadata>
-    <Creator>Lejonet HTR</Creator>
+    <Creator>RA-ATR</Creator>
     <Created>${now}</Created>
   </Metadata>
   <Page imageFilename="${escapeXml(doc.name)}">

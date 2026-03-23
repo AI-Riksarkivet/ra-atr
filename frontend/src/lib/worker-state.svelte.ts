@@ -266,6 +266,27 @@ export class HTRWorkerState {
 				});
 				const assignedIds = this.onRegionDetected?.(imageId, regionId, startIndex, lines) ?? [];
 
+				// Empty region — immediately mark complete
+				if (lines.length === 0) {
+					this.regionPending.delete(regionId);
+					const nextRegions = new Set(this.pendingRegions);
+					nextRegions.delete(regionId);
+					this.pendingRegions = nextRegions;
+					const imageStillActive = [...this.regionPending.values()].some(
+						(r) => r.imageId === imageId,
+					);
+					if (!imageStillActive) {
+						const nextImages = new Set(this.pendingImageIds);
+						nextImages.delete(imageId);
+						this.pendingImageIds = nextImages;
+					}
+					this.onRegionComplete?.(imageId, regionId);
+					if (this.pendingLines === 0 && this.regionPending.size === 0) {
+						this.stage = 'done';
+					}
+					break;
+				}
+
 				// Distribute lines round-robin using assigned line IDs
 				const poolSz = this.transcribeWorkers.length;
 				for (let i = 0; i < lines.length; i++) {

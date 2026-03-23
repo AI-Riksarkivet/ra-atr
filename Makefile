@@ -24,8 +24,8 @@ deploy:
 	cp space/viewer.html space/viewer/index.html
 	cp space/index.html space/200.html
 	cp space/index.html space/404.html
-	cd space && python3 -c "from huggingface_hub import HfApi; HfApi().upload_folder(folder_path='.', repo_id='carpelan/lejonet', repo_type='space')"
-	@echo "Deployed to https://huggingface.co/spaces/carpelan/lejonet"
+	cd space && python3 -c "from huggingface_hub import HfApi; HfApi().upload_folder(folder_path='.', repo_id='Riksarkivet/ra-atr', repo_type='space')"
+	@echo "Deployed to https://huggingface.co/spaces/Riksarkivet/ra-atr"
 
 ## lint: run eslint
 lint:
