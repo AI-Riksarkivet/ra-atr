@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
       <url>
-        <loc>https://carpelan.github.io/lejonet/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/getting-started/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/getting-started/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/getting-started/configuration/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/getting-started/configuration/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/architecture/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/architecture/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/architecture/frontend/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/architecture/frontend/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/architecture/inference/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/architecture/inference/</loc>
       </url>
       <url>
-        <loc>https://carpelan.github.io/lejonet/architecture/search/</loc>
+        <loc>https://AI-Riksarkivet.github.io/ra-atr/architecture/search/</loc>
       </url>
 </urlset>
