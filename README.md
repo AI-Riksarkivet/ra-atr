@@ -12,8 +12,6 @@ Collaborative handwritten text recognition for historical documents from Sweden'
 | Layer | Technology |
 |-------|------------|
 | Frontend | Svelte 5, Tailwind CSS 4, ONNX Runtime Web |
-| Inference | Ray Serve, ONNX Runtime GPU ([lejonet-inference](https://github.com/carpelan/lejonet-inference)) |
-| Search | FastAPI, LanceDB ([lejonet-search](https://github.com/carpelan/lejonet-search)) |
 | Docs | Zensical |
 | CI/CD | Dagger, Docker, GitHub Actions |
 
