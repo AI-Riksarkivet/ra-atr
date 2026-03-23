@@ -39,6 +39,8 @@
 	let showBoxes = $state(false);
 	let imageFilters = $state({ brightness: 100, contrast: 100, saturate: 100 });
 	let showFilters = $state(false);
+	let pipelineActive = $state(false);
+	let flashPulse = $state(false);
 
 	// Redirect to home if models not loaded (wait for cache check first)
 	$effect(() => {
@@ -238,7 +240,12 @@
 	/** Run the HTR pipeline on a single page: layout → lines → transcription */
 	async function transcribePage(doc: import('$lib/types').ImageDocument) {
 		// Don't re-run if already working on this page
-		if (appState.htr.pendingImageIds.has(doc.id) || appState.htr.running) return;
+		if (pipelineActive || appState.htr.pendingImageIds.has(doc.id) || appState.htr.running) return;
+
+		// Immediate visual feedback
+		pipelineActive = true;
+		flashPulse = true;
+		setTimeout(() => (flashPulse = false), 400);
 
 		// Ensure image is loaded (placeholder pages from catalog)
 		if (!appState.htr.storedImages.has(doc.id)) {
@@ -265,6 +272,10 @@
 		} else {
 			appState.htr.run(doc.id);
 		}
+
+		// Keep disabled until pipeline fully completes
+		await waitForPipelineDone();
+		pipelineActive = false;
 	}
 
 	/** Wait until the HTR pipeline finishes all stages for the current page */
@@ -503,6 +514,7 @@
 
 	<!-- Center: Document viewer -->
 	<div class="relative overflow-hidden flex-1">
+		<div class="absolute inset-0 z-20 pointer-events-none" class:animate-flash={flashPulse}></div>
 		{#if activeDoc}
 			<DocumentViewer
 				bind:this={docViewer}
@@ -582,7 +594,8 @@
 			<!-- Floating toolbar -->
 			{@const pageTranscribed =
 				activeDoc && activeDoc.lines.length > 0 && activeDoc.lines.every((l) => l.complete)}
-			{@const isRunning = appState.htr.stage !== 'idle' && appState.htr.stage !== 'done'}
+			{@const isRunning =
+				pipelineActive || (appState.htr.stage !== 'idle' && appState.htr.stage !== 'done')}
 			{@const totalLines = activeDoc?.lines.length ?? 0}
 			{@const completedLines = activeDoc?.lines.filter((l) => l.complete).length ?? 0}
 			<div
@@ -868,3 +881,20 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	@keyframes flash {
+		0% {
+			background: rgba(99, 164, 255, 0.15);
+		}
+		50% {
+			background: rgba(99, 164, 255, 0.08);
+		}
+		100% {
+			background: transparent;
+		}
+	}
+	:global(.animate-flash) {
+		animation: flash 0.5s ease-out forwards;
+	}
+</style>

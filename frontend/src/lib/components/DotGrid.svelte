@@ -21,19 +21,25 @@
 		const FONT_SIZE = 10;
 		const ATLAS_SIZE = 32; // render each rune at this size for quality
 
-		// Pre-render rune atlas — one offscreen canvas per rune
-		const runeAtlas = new Map<string, HTMLCanvasElement>();
+		// Pre-render rune atlases — dark (white runes) and light (black runes)
+		const runeAtlasDark = new Map<string, HTMLCanvasElement>();
+		const runeAtlasLight = new Map<string, HTMLCanvasElement>();
 		for (const rune of RUNES) {
-			const oc = document.createElement('canvas');
-			oc.width = ATLAS_SIZE;
-			oc.height = ATLAS_SIZE;
-			const octx = oc.getContext('2d')!;
-			octx.font = `${ATLAS_SIZE * 0.75}px serif`;
-			octx.textAlign = 'center';
-			octx.textBaseline = 'middle';
-			octx.fillStyle = '#fff';
-			octx.fillText(rune, ATLAS_SIZE / 2, ATLAS_SIZE / 2);
-			runeAtlas.set(rune, oc);
+			for (const [atlas, color] of [
+				[runeAtlasDark, '#fff'],
+				[runeAtlasLight, '#000'],
+			] as const) {
+				const oc = document.createElement('canvas');
+				oc.width = ATLAS_SIZE;
+				oc.height = ATLAS_SIZE;
+				const octx = oc.getContext('2d')!;
+				octx.font = `${ATLAS_SIZE * 0.75}px serif`;
+				octx.textAlign = 'center';
+				octx.textBaseline = 'middle';
+				octx.fillStyle = color;
+				octx.fillText(rune, ATLAS_SIZE / 2, ATLAS_SIZE / 2);
+				atlas.set(rune, oc);
+			}
 		}
 
 		let dots: {
@@ -119,11 +125,8 @@
 				const size = FONT_SIZE * (0.85 + 0.15 * pulse) + FONT_SIZE * 0.8 * glow;
 				const half = size / 2;
 				ctx.globalAlpha = alpha;
-				if (!isDark) {
-					ctx.filter = 'invert(1)';
-				}
-				ctx.drawImage(runeAtlas.get(dot.rune)!, dot.x - half, dot.y - half, size, size);
-				ctx.filter = 'none';
+				const atlas = isDark ? runeAtlasDark : runeAtlasLight;
+				ctx.drawImage(atlas.get(dot.rune)!, dot.x - half, dot.y - half, size, size);
 				ctx.globalAlpha = 1;
 			}
 
