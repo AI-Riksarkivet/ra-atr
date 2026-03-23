@@ -1,5 +1,5 @@
 # Static build for HF Space or any static hosting
-FROM node:22-slim AS build
+FROM node:25-slim AS build
 
 WORKDIR /app
 
