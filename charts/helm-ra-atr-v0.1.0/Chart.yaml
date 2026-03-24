@@ -7,5 +7,3 @@ appVersion: "v0.1.0"
 home: https://github.com/AI-Riksarkivet/ra-atr
 sources:
   - https://github.com/AI-Riksarkivet/ra-atr
-maintainers:
-  - name: carpelan

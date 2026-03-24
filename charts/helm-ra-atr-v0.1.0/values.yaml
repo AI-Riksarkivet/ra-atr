@@ -5,13 +5,12 @@ imagePullSecrets: []
 
 image:
   repository: AI-Riksarkivet/ra-atr
-  tag: ""  # defaults to appVersion from Chart.yaml
+  tag: "v0.1.0"  # defaults to appVersion from Chart.yaml
   pullPolicy: IfNotPresent
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 80
-  nodePort: 30517
 
 ingress:
   enabled: false
