@@ -28,6 +28,29 @@ const translations: Record<string, Record<Locale, string>> = {
 	'models.failed': { en: 'Download failed', sv: 'Nedladdning misslyckades' },
 	'models.retry': { en: 'Retry', sv: 'Försök igen' },
 
+	// Mode picker
+	'mode.choose': { en: 'Choose inference mode', sv: 'Välj inferensläge' },
+	'mode.gpu.title': { en: 'GPU Server', sv: 'GPU-server' },
+	'mode.gpu.desc': {
+		en: 'Connect to a remote GPU server for fast inference',
+		sv: 'Anslut till en fjärr-GPU-server för snabb inferens',
+	},
+	'mode.gpu.placeholder': { en: 'http://192.168.1.10:8080', sv: 'http://192.168.1.10:8080' },
+	'mode.gpu.connect': { en: 'Connect', sv: 'Anslut' },
+	'mode.gpu.connecting': { en: 'Connecting...', sv: 'Ansluter...' },
+	'mode.gpu.connected': { en: 'Connected', sv: 'Ansluten' },
+	'mode.gpu.error': {
+		en: 'Could not connect. Check the URL and try again.',
+		sv: 'Kunde inte ansluta. Kontrollera URL:en och försök igen.',
+	},
+	'mode.wasm.title': { en: 'Local (WASM)', sv: 'Lokal (WASM)' },
+	'mode.wasm.desc': {
+		en: 'Download ~1.8 GB of models to run entirely in your browser',
+		sv: 'Ladda ner ~1,8 GB modeller för att köra helt i din webbläsare',
+	},
+	'mode.wasm.cached': { en: 'Models cached — ready to go', sv: 'Modeller cachade — redo att köra' },
+	'mode.wasm.continue': { en: 'Continue', sv: 'Fortsätt' },
+
 	// Model names
 	'model.layout': { en: 'Layout Detection', sv: 'Layoutdetektering' },
 	'model.layout.desc': { en: 'RTMDet regions', sv: 'RTMDet-regioner' },
