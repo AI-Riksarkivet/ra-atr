@@ -131,122 +131,124 @@
 	{/if}
 
 	<div class="ml-auto flex items-center gap-1">
-		<div class="relative">
-			{#if appState.htr.modelsReady && gpuConnected}
-				<button
-					class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors"
-					onclick={() => (showGpuSettings = !showGpuSettings)}
-					title="GPU server settings"
-				>
-					<Server class="size-3" />GPU{gpuName || getGpuName()
-						? ` (${gpuName || getGpuName()})`
-						: ''}
-				</button>
-			{:else if appState.htr.modelsReady}
-				<button
-					class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors"
-					onclick={() => (showGpuSettings = !showGpuSettings)}
-					title="GPU server settings"
-				>
-					<Server class="size-3" />WASM
-				</button>
-			{:else if appState.htr.stage === 'loading_models'}
-				<button
-					class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground animate-pulse cursor-pointer hover:bg-muted/50 transition-colors"
-					onclick={() => (showGpuSettings = !showGpuSettings)}
-					title="GPU server settings"
-				>
-					<Server class="size-3" />Loading...
-				</button>
-			{:else}
-				<button
-					class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
-					onclick={() => (showGpuSettings = !showGpuSettings)}
-					title="GPU server settings"
-				>
-					<Server class="size-3" />{gpuConnected ? 'GPU' : 'Connect GPU'}
-				</button>
-			{/if}
-			{#if showGpuSettings}
-				<div
-					class="absolute right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg p-3 w-72"
-				>
-					<div class="text-xs font-medium mb-2">GPU Inference Server</div>
-					<div class="flex gap-1.5">
-						<input
-							type="text"
-							bind:value={gpuUrl}
-							placeholder="http://192.168.1.10:8080"
-							class="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-							onkeydown={(e) => {
-								if (e.key === 'Enter') checkGpu();
-							}}
-						/>
-						<button
-							class="rounded bg-primary px-2 py-1 text-[0.65rem] text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-							onclick={checkGpu}
-						>
-							{gpuStatus === 'checking' ? '...' : 'Connect'}
-						</button>
-					</div>
-					{#if gpuStatus === 'ok'}
-						<div class="text-[0.65rem] text-green-500 mt-1.5">
-							Connected{gpuName ? ` — ${gpuName}` : ''}
+		{#if isViewer}
+			<div class="relative">
+				{#if appState.htr.modelsReady && gpuConnected}
+					<button
+						class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors"
+						onclick={() => (showGpuSettings = !showGpuSettings)}
+						title="GPU server settings"
+					>
+						<Server class="size-3" />GPU{gpuName || getGpuName()
+							? ` (${gpuName || getGpuName()})`
+							: ''}
+					</button>
+				{:else if appState.htr.modelsReady}
+					<button
+						class="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[0.65rem] font-medium text-green-600 dark:text-green-400 cursor-pointer hover:bg-green-500/20 transition-colors"
+						onclick={() => (showGpuSettings = !showGpuSettings)}
+						title="GPU server settings"
+					>
+						<Server class="size-3" />WASM
+					</button>
+				{:else if appState.htr.stage === 'loading_models'}
+					<button
+						class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground animate-pulse cursor-pointer hover:bg-muted/50 transition-colors"
+						onclick={() => (showGpuSettings = !showGpuSettings)}
+						title="GPU server settings"
+					>
+						<Server class="size-3" />Loading...
+					</button>
+				{:else}
+					<button
+						class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[0.65rem] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+						onclick={() => (showGpuSettings = !showGpuSettings)}
+						title="GPU server settings"
+					>
+						<Server class="size-3" />{gpuConnected ? 'GPU' : 'Connect GPU'}
+					</button>
+				{/if}
+				{#if showGpuSettings}
+					<div
+						class="absolute right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg p-3 w-72"
+					>
+						<div class="text-xs font-medium mb-2">GPU Inference Server</div>
+						<div class="flex gap-1.5">
+							<input
+								type="text"
+								bind:value={gpuUrl}
+								placeholder="http://192.168.1.10:8080"
+								class="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+								onkeydown={(e) => {
+									if (e.key === 'Enter') checkGpu();
+								}}
+							/>
+							<button
+								class="rounded bg-primary px-2 py-1 text-[0.65rem] text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+								onclick={checkGpu}
+							>
+								{gpuStatus === 'checking' ? '...' : 'Connect'}
+							</button>
 						</div>
-					{:else if gpuStatus === 'error'}
-						<div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
-					{/if}
-					{#if DEFAULT_GPU_SERVER && !gpuConnected}
-						<button
-							class="w-full mt-1.5 rounded bg-green-600 px-2 py-1.5 text-[0.65rem] text-white font-medium hover:bg-green-700 transition-colors"
-							onclick={() => {
-								gpuUrl = DEFAULT_GPU_SERVER;
-								checkGpu();
-							}}>Connect to GPU server</button
-						>
-					{/if}
-					{#if gpuConnected}
-						<!-- Deployment status -->
-						{#if gpuDetails}
-							<div class="mt-2 pt-2 border-t border-border space-y-1">
-								{#each Object.entries(gpuDetails.deployments) as [name, dep] (name)}
-									<div class="flex items-center gap-2 text-[0.6rem]">
-										<span
-											class="size-1.5 rounded-full {dep.status === 'HEALTHY'
-												? 'bg-green-500'
-												: dep.status === 'UPDATING'
-													? 'bg-yellow-500'
-													: 'bg-red-500'}"
-										></span>
-										<span class="text-muted-foreground flex-1">{name}</span>
-										<span class="font-mono text-muted-foreground/60">{dep.status}</span>
+						{#if gpuStatus === 'ok'}
+							<div class="text-[0.65rem] text-green-500 mt-1.5">
+								Connected{gpuName ? ` — ${gpuName}` : ''}
+							</div>
+						{:else if gpuStatus === 'error'}
+							<div class="text-[0.65rem] text-destructive mt-1.5">Failed to connect</div>
+						{/if}
+						{#if DEFAULT_GPU_SERVER && !gpuConnected}
+							<button
+								class="w-full mt-1.5 rounded bg-green-600 px-2 py-1.5 text-[0.65rem] text-white font-medium hover:bg-green-700 transition-colors"
+								onclick={() => {
+									gpuUrl = DEFAULT_GPU_SERVER;
+									checkGpu();
+								}}>Connect to GPU server</button
+							>
+						{/if}
+						{#if gpuConnected}
+							<!-- Deployment status -->
+							{#if gpuDetails}
+								<div class="mt-2 pt-2 border-t border-border space-y-1">
+									{#each Object.entries(gpuDetails.deployments) as [name, dep] (name)}
+										<div class="flex items-center gap-2 text-[0.6rem]">
+											<span
+												class="size-1.5 rounded-full {dep.status === 'HEALTHY'
+													? 'bg-green-500'
+													: dep.status === 'UPDATING'
+														? 'bg-yellow-500'
+														: 'bg-red-500'}"
+											></span>
+											<span class="text-muted-foreground flex-1">{name}</span>
+											<span class="font-mono text-muted-foreground/60">{dep.status}</span>
+										</div>
+									{/each}
+									<div class="flex items-center gap-3 text-[0.6rem] text-muted-foreground/60 pt-1">
+										<span>GPU: {gpuDetails.gpu.name}</span>
+										<span>{gpuDetails.cluster.memory_gb}GB</span>
+										<span>{gpuDetails.cluster.cpu_available} CPU</span>
 									</div>
-								{/each}
-								<div class="flex items-center gap-3 text-[0.6rem] text-muted-foreground/60 pt-1">
-									<span>GPU: {gpuDetails.gpu.name}</span>
-									<span>{gpuDetails.cluster.memory_gb}GB</span>
-									<span>{gpuDetails.cluster.cpu_available} CPU</span>
 								</div>
+							{/if}
+							<button
+								class="text-[0.65rem] text-muted-foreground hover:text-foreground mt-2 cursor-pointer"
+								onclick={() => {
+									gpuUrl = '';
+									gpuServerUrl.set('');
+									gpuConnected = false;
+									gpuStatus = 'idle';
+									gpuDetails = null;
+								}}>Disconnect (use WASM)</button
+							>
+						{:else}
+							<div class="text-[0.65rem] text-muted-foreground mt-1.5">
+								Using local WASM inference
 							</div>
 						{/if}
-						<button
-							class="text-[0.65rem] text-muted-foreground hover:text-foreground mt-2 cursor-pointer"
-							onclick={() => {
-								gpuUrl = '';
-								gpuServerUrl.set('');
-								gpuConnected = false;
-								gpuStatus = 'idle';
-								gpuDetails = null;
-							}}>Disconnect (use WASM)</button
-						>
-					{:else}
-						<div class="text-[0.65rem] text-muted-foreground mt-1.5">
-							Using local WASM inference
-						</div>
-					{/if}
-				</div>
-			{/if}
-		</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		{#if isViewer}
 			<Button

@@ -38,7 +38,9 @@
 			// Models already cached — load them and the effect will redirect
 			appState.htr.loadModels();
 		} else {
+			// Switch to download view and start downloading immediately
 			mode = 'wasm';
+			appState.htr.loadModels();
 		}
 	}
 </script>

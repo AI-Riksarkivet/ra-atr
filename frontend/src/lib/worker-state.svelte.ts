@@ -68,7 +68,6 @@ type LayoutWorkerMessage =
 	| WorkerImageReadyMessage
 	| WorkerErrorMessage
 	| WorkerLayoutResultMessage;
-import { areAllModelsCached } from './model-cache';
 import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe } from './gpu-client';
 import { getModelUrls, getModelFetchHeaders } from './model-config';
 
@@ -137,15 +136,9 @@ export class HTRWorkerState {
 		this._init();
 	}
 
-	private async _init() {
-		if (import.meta.env.DEV) console.log('[htr] Checking model cache');
-		try {
-			await areAllModelsCached(Object.values(getModelUrls()));
-		} catch (e) {
-			console.warn('[htr] Cache check failed, continuing:', e);
-		}
+	private _init() {
+		// Signal ready immediately — the mode picker handles cache checking
 		this.cacheChecked = true;
-		// Do NOT auto-load — the mode picker decides when to load
 	}
 
 	private createDetectWorker() {

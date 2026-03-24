@@ -37,7 +37,7 @@ ra-atr/
 Layout Detection (RTMDet) → Line Detection (YOLO) → Transcription (TrOCR)
 ```
 
-Runs either in-browser (WASM) or on GPU server. Frontend auto-detects GPU server at localhost:8080.
+Runs either in-browser (WASM) or on GPU server. User chooses inference mode on the start screen.
 
 ## Coding Guidelines
 
