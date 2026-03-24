@@ -69,14 +69,7 @@ type LayoutWorkerMessage =
 	| WorkerErrorMessage
 	| WorkerLayoutResultMessage;
 import { areAllModelsCached } from './model-cache';
-import {
-	isGpuServerEnabled,
-	gpuDetectLayout,
-	gpuDetectLines,
-	gpuTranscribe,
-	autoDetectGpuServer,
-	gpuServerUrl,
-} from './gpu-client';
+import { isGpuServerEnabled, gpuDetectLayout, gpuDetectLines, gpuTranscribe } from './gpu-client';
 import { getModelUrls, getModelFetchHeaders } from './model-config';
 
 export class HTRWorkerState {
@@ -145,37 +138,14 @@ export class HTRWorkerState {
 	}
 
 	private async _init() {
-		// Always start with WASM — GPU is an optional upgrade
-		if (import.meta.env.DEV) console.log('[htr] Starting with WASM inference');
-		let cached = false;
+		if (import.meta.env.DEV) console.log('[htr] Checking model cache');
 		try {
-			cached = await areAllModelsCached(Object.values(getModelUrls()));
+			await areAllModelsCached(Object.values(getModelUrls()));
 		} catch (e) {
 			console.warn('[htr] Cache check failed, continuing:', e);
 		}
 		this.cacheChecked = true;
-		if (cached) {
-			this.loadModels();
-		}
-
-		// Try to detect GPU server in the background (non-blocking)
-		this._detectGpuInBackground();
-	}
-
-	private async _detectGpuInBackground() {
-		// Check if already configured via localStorage
-		if (isGpuServerEnabled()) {
-			if (import.meta.env.DEV)
-				console.log(`[htr] GPU server already configured: ${gpuServerUrl.get()}`);
-			return;
-		}
-
-		// Try auto-detect once (non-blocking, no retries)
-		const url = await autoDetectGpuServer();
-		if (url) {
-			gpuServerUrl.set(url);
-			if (import.meta.env.DEV) console.log(`[htr] GPU server auto-detected at ${url}`);
-		}
+		// Do NOT auto-load — the mode picker decides when to load
 	}
 
 	private createDetectWorker() {
