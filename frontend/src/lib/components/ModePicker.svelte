@@ -5,12 +5,11 @@
 	import { t } from '$lib/i18n.svelte';
 
 	interface Props {
-		modelsCached: boolean;
 		onChooseGpu: () => void;
 		onChooseWasm: () => void;
 	}
 
-	let { modelsCached, onChooseGpu, onChooseWasm }: Props = $props();
+	let { onChooseGpu, onChooseWasm }: Props = $props();
 
 	let gpuUrl = $state(gpuServerUrl.get());
 	let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
@@ -75,44 +74,23 @@
 				<span>{t('mode.wasm.con.download')}</span>
 			</li>
 		</ul>
-		{#if modelsCached}
-			<p class="text-xs text-green-500">{t('mode.wasm.cached')}</p>
-			<Button
-				class="w-full"
-				disabled={wasmLoading}
-				onclick={() => {
-					wasmLoading = true;
-					onChooseWasm();
-				}}
-			>
-				{#if wasmLoading}
-					<span
-						class="inline-block size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
-					></span>
-					{t('models.loading')}
-				{:else}
-					{t('mode.wasm.continue')}
-				{/if}
-			</Button>
-		{:else}
-			<Button
-				class="w-full"
-				disabled={wasmLoading}
-				onclick={() => {
-					wasmLoading = true;
-					onChooseWasm();
-				}}
-			>
-				{#if wasmLoading}
-					<span
-						class="inline-block size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
-					></span>
-					{t('models.loading')}
-				{:else}
-					{t('models.download')}
-				{/if}
-			</Button>
-		{/if}
+		<Button
+			class="w-full"
+			disabled={wasmLoading}
+			onclick={() => {
+				wasmLoading = true;
+				onChooseWasm();
+			}}
+		>
+			{#if wasmLoading}
+				<span
+					class="inline-block size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
+				></span>
+				{t('models.loading')}
+			{:else}
+				{t('models.download')}
+			{/if}
+		</Button>
 	</div>
 
 	<!-- GPU — collapsible secondary option -->
