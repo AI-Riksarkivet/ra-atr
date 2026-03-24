@@ -6,8 +6,8 @@ const translations: Record<string, Record<Locale, string>> = {
 	// Loading screen
 	'app.title': { en: 'ra-atr', sv: 'ra-atr' },
 	'app.description': {
-		en: 'Transcribe handwritten Swedish historical documents directly in your browser. All inference runs locally — no data leaves your device.',
-		sv: 'Transkribera handskrivna svenska historiska dokument direkt i din webbläsare. All inferens körs lokalt — ingen data lämnar din enhet.',
+		en: 'Transcribe handwritten Swedish historical documents. Run locally in your browser or connect to a GPU server.',
+		sv: 'Transkribera handskrivna svenska historiska dokument. Kör lokalt i webbläsaren eller anslut till en GPU-server.',
 	},
 	'models.pipeline': { en: 'HTR Pipeline', sv: 'HTR-pipeline' },
 	'models.ready': { en: 'Models Ready', sv: 'Modeller redo' },
@@ -30,10 +30,26 @@ const translations: Record<string, Record<Locale, string>> = {
 
 	// Mode picker
 	'mode.choose': { en: 'Choose inference mode', sv: 'Välj inferensläge' },
-	'mode.gpu.title': { en: 'GPU Server', sv: 'GPU-server' },
+	'mode.gpu.title': { en: 'GPU server', sv: 'GPU-server' },
 	'mode.gpu.desc': {
-		en: 'Connect to a remote GPU server for fast inference',
-		sv: 'Anslut till en fjärr-GPU-server för snabb inferens',
+		en: 'Connect to a GPU server for much faster transcription. Requires a running server.',
+		sv: 'Anslut till en GPU-server för mycket snabbare transkribering. Kräver en körande server.',
+	},
+	'mode.gpu.pro.fast': {
+		en: 'Much faster — GPU-accelerated inference',
+		sv: 'Mycket snabbare — GPU-accelererad inferens',
+	},
+	'mode.gpu.pro.nodownload': {
+		en: 'No large download needed',
+		sv: 'Ingen stor nedladdning behövs',
+	},
+	'mode.gpu.con.server': {
+		en: 'Requires access to a GPU server',
+		sv: 'Kräver tillgång till en GPU-server',
+	},
+	'mode.gpu.con.network': {
+		en: 'Images are sent to the server for processing',
+		sv: 'Bilder skickas till servern för bearbetning',
 	},
 	'mode.gpu.placeholder': { en: 'http://192.168.1.10:8080', sv: 'http://192.168.1.10:8080' },
 	'mode.gpu.connect': { en: 'Connect', sv: 'Anslut' },
@@ -43,11 +59,24 @@ const translations: Record<string, Record<Locale, string>> = {
 		en: 'Could not connect. Check the URL and try again.',
 		sv: 'Kunde inte ansluta. Kontrollera URL:en och försök igen.',
 	},
-	'mode.wasm.title': { en: 'Local (WASM)', sv: 'Lokal (WASM)' },
+	'mode.wasm.title': { en: 'Run in browser', sv: 'Kör i webbläsaren' },
 	'mode.wasm.desc': {
-		en: 'Download ~1.8 GB of models to run entirely in your browser',
-		sv: 'Ladda ner ~1,8 GB modeller för att köra helt i din webbläsare',
+		en: 'Download AI models (~1.8 GB) and run everything on your computer. No data leaves your device.',
+		sv: 'Ladda ner AI-modeller (~1,8 GB) och kör allt på din dator. Ingen data lämnar din enhet.',
 	},
+	'mode.wasm.pro.private': {
+		en: 'Fully private — nothing sent to a server',
+		sv: 'Helt privat — inget skickas till en server',
+	},
+	'mode.wasm.pro.offline': {
+		en: 'Works offline after first download',
+		sv: 'Fungerar offline efter första nedladdningen',
+	},
+	'mode.wasm.con.slow': {
+		en: 'Slower — uses your CPU, not a GPU',
+		sv: 'Långsammare — använder din CPU, inte en GPU',
+	},
+	'mode.wasm.con.download': { en: 'Requires ~1.8 GB download', sv: 'Kräver ~1,8 GB nedladdning' },
 	'mode.wasm.cached': { en: 'Models cached — ready to go', sv: 'Modeller cachade — redo att köra' },
 	'mode.wasm.continue': { en: 'Continue', sv: 'Fortsätt' },
 

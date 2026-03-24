@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Server, Monitor, ChevronDown } from 'lucide-svelte';
+	import { Server, Monitor, ChevronDown, Check, Info } from 'lucide-svelte';
 	import { gpuServerUrl, probeGpuServer, getGpuName } from '$lib/gpu-client';
 	import { t } from '$lib/i18n.svelte';
 
@@ -16,6 +16,7 @@
 	let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 	let gpuName = $state('');
 	let gpuExpanded = $state(!!gpuServerUrl.get());
+	let wasmLoading = $state(false);
 
 	async function connectGpu() {
 		const url = gpuUrl.trim();
@@ -55,12 +56,62 @@
 				<h3 class="text-sm font-semibold">{t('mode.wasm.title')}</h3>
 			</div>
 		</div>
+		<p class="text-xs text-muted-foreground">{t('mode.wasm.desc')}</p>
+		<ul class="space-y-1.5 text-xs">
+			<li class="flex items-start gap-1.5 text-green-600 dark:text-green-400">
+				<Check class="size-3 mt-0.5 shrink-0" />
+				<span>{t('mode.wasm.pro.private')}</span>
+			</li>
+			<li class="flex items-start gap-1.5 text-green-600 dark:text-green-400">
+				<Check class="size-3 mt-0.5 shrink-0" />
+				<span>{t('mode.wasm.pro.offline')}</span>
+			</li>
+			<li class="flex items-start gap-1.5 text-muted-foreground">
+				<Info class="size-3 mt-0.5 shrink-0" />
+				<span>{t('mode.wasm.con.slow')}</span>
+			</li>
+			<li class="flex items-start gap-1.5 text-muted-foreground">
+				<Info class="size-3 mt-0.5 shrink-0" />
+				<span>{t('mode.wasm.con.download')}</span>
+			</li>
+		</ul>
 		{#if modelsCached}
 			<p class="text-xs text-green-500">{t('mode.wasm.cached')}</p>
-			<Button class="w-full" onclick={onChooseWasm}>{t('mode.wasm.continue')}</Button>
+			<Button
+				class="w-full"
+				disabled={wasmLoading}
+				onclick={() => {
+					wasmLoading = true;
+					onChooseWasm();
+				}}
+			>
+				{#if wasmLoading}
+					<span
+						class="inline-block size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
+					></span>
+					{t('models.loading')}
+				{:else}
+					{t('mode.wasm.continue')}
+				{/if}
+			</Button>
 		{:else}
-			<p class="text-xs text-muted-foreground">{t('mode.wasm.desc')}</p>
-			<Button class="w-full" onclick={onChooseWasm}>{t('models.download')}</Button>
+			<Button
+				class="w-full"
+				disabled={wasmLoading}
+				onclick={() => {
+					wasmLoading = true;
+					onChooseWasm();
+				}}
+			>
+				{#if wasmLoading}
+					<span
+						class="inline-block size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
+					></span>
+					{t('models.loading')}
+				{:else}
+					{t('models.download')}
+				{/if}
+			</Button>
 		{/if}
 	</div>
 
@@ -85,6 +136,24 @@
 		{#if gpuExpanded}
 			<div class="px-4 pb-4 space-y-3">
 				<p class="text-xs text-muted-foreground">{t('mode.gpu.desc')}</p>
+				<ul class="space-y-1.5 text-xs">
+					<li class="flex items-start gap-1.5 text-green-600 dark:text-green-400">
+						<Check class="size-3 mt-0.5 shrink-0" />
+						<span>{t('mode.gpu.pro.fast')}</span>
+					</li>
+					<li class="flex items-start gap-1.5 text-green-600 dark:text-green-400">
+						<Check class="size-3 mt-0.5 shrink-0" />
+						<span>{t('mode.gpu.pro.nodownload')}</span>
+					</li>
+					<li class="flex items-start gap-1.5 text-muted-foreground">
+						<Info class="size-3 mt-0.5 shrink-0" />
+						<span>{t('mode.gpu.con.server')}</span>
+					</li>
+					<li class="flex items-start gap-1.5 text-muted-foreground">
+						<Info class="size-3 mt-0.5 shrink-0" />
+						<span>{t('mode.gpu.con.network')}</span>
+					</li>
+				</ul>
 				<div class="flex gap-1.5">
 					<input
 						type="text"

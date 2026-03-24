@@ -6,6 +6,7 @@
 	import ModePicker from '$lib/components/ModePicker.svelte';
 	import { areAllModelsCached } from '$lib/model-cache';
 	import { getModelUrls } from '$lib/model-config';
+	import { gpuServerUrl } from '$lib/gpu-client';
 
 	let mode = $state<'pick' | 'wasm'>('pick');
 	let modelsCached = $state(false);
@@ -31,6 +32,8 @@
 	}
 
 	function handleChooseWasm() {
+		// Clear any previously saved GPU URL so the header shows WASM mode
+		gpuServerUrl.set('');
 		if (modelsCached) {
 			// Models already cached — load them and the effect will redirect
 			appState.htr.loadModels();
