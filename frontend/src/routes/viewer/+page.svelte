@@ -9,6 +9,7 @@
 	import TranscriptionPanel from '$lib/components/TranscriptionPanel.svelte';
 	import CatalogPanel from '$lib/components/CatalogPanel.svelte';
 	import UploadPanel from '$lib/components/UploadPanel.svelte';
+	import { isGpuServerEnabled } from '$lib/gpu-client';
 
 	import {
 		Maximize2,
@@ -42,9 +43,14 @@
 	let pipelineActive = $state(false);
 	let flashPulse = $state(false);
 
-	// Redirect to home if models not loaded (wait for cache check first)
+	// Redirect to home if neither WASM models loaded nor GPU server connected
 	$effect(() => {
-		if (appState.htr.cacheChecked && !appState.htr.modelsReady && appState.htr.stage === 'idle')
+		if (
+			appState.htr.cacheChecked &&
+			!appState.htr.modelsReady &&
+			appState.htr.stage === 'idle' &&
+			!isGpuServerEnabled()
+		)
 			goto('/');
 	});
 
