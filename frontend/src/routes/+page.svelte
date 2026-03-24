@@ -3,11 +3,41 @@
 	import { appState } from '$lib/stores/app-state.svelte';
 	import AppHeader from '$lib/components/layout/app-header.svelte';
 	import ModelManager from '$lib/components/ModelManager.svelte';
+	import ModePicker from '$lib/components/ModePicker.svelte';
+	import { areAllModelsCached } from '$lib/model-cache';
+	import { getModelUrls } from '$lib/model-config';
 
-	// Auto-redirect to viewer once models are ready
+	let mode = $state<'pick' | 'wasm'>('pick');
+	let modelsCached = $state(false);
+
+	// Check cache on mount
+	$effect(() => {
+		if (appState.htr.cacheChecked) {
+			areAllModelsCached(Object.values(getModelUrls())).then((cached) => {
+				modelsCached = cached;
+			});
+		}
+	});
+
+	// Redirect to viewer once models are ready (WASM loaded)
 	$effect(() => {
 		if (appState.htr.modelsReady) goto('/viewer');
 	});
+
+	function handleChooseGpu() {
+		// GPU is connected (probeGpuServer succeeded, URL saved to localStorage)
+		// Go straight to viewer — no WASM models needed
+		goto('/viewer');
+	}
+
+	function handleChooseWasm() {
+		if (modelsCached) {
+			// Models already cached — load them and the effect will redirect
+			appState.htr.loadModels();
+		} else {
+			mode = 'wasm';
+		}
+	}
 </script>
 
 <AppHeader />
@@ -21,9 +51,11 @@
 		autoplay
 		playsinline
 	></video>
-	<div class="relative w-full max-w-lg space-y-6 p-8">
+	<div class="relative w-full max-w-2xl px-8">
 		{#if !appState.htr.cacheChecked}
 			<p class="text-center text-muted-foreground">Checking cached models...</p>
+		{:else if mode === 'pick'}
+			<ModePicker {modelsCached} onChooseGpu={handleChooseGpu} onChooseWasm={handleChooseWasm} />
 		{:else}
 			<ModelManager
 				modelProgress={appState.htr.modelProgress}
