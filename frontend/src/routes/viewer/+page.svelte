@@ -814,7 +814,10 @@
 					playsinline
 				></video>
 				<div class="relative w-full max-w-md space-y-5 p-8">
-					<UploadPanel onUpload={handleUpload} disabled={!appState.htr.modelsReady} />
+					<UploadPanel
+						onUpload={handleUpload}
+						disabled={!appState.htr.modelsReady && !isGpuServerEnabled()}
+					/>
 				</div>
 			</div>
 		{/if}
