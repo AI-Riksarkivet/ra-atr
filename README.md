@@ -22,21 +22,6 @@ make setup   # Install dependencies
 make dev     # Start frontend dev server at http://localhost:5173
 ```
 
-## Full Stack
-
-```bash
-# 1. Frontend (this repo)
-make dev
-
-# 2. Search backend (separate repo)
-cd ../lejonet-search && make dev
-
-# 3. GPU inference (separate repo, requires GPU)
-cd ../lejonet-inference && make dev
-```
-
-The frontend auto-detects the search backend at localhost:8000 and GPU server at localhost:8080.
-
 ## Documentation
 
 - [Docs site](https://AI-Riksarkivet.github.io/ra-atr/) — architecture, configuration, getting started
