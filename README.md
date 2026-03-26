@@ -30,7 +30,6 @@ make dev     # Start frontend dev server at http://localhost:5173
 
 - **In-browser HTR** — ONNX Runtime Web (WASM) with multi-threaded inference
 - **GPU acceleration** — Optional GPU server for faster inference
-- **Archive catalog** — Search 3.7M Riksarkivet volumes (requires search backend)
 - **Export** — ALTO XML, PAGE XML, JSON, plain text
 - **i18n** — Swedish and English
 
