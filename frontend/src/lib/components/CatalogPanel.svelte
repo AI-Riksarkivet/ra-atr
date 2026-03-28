@@ -16,7 +16,6 @@
 	let catalogResults = $state<CatalogResult[]>([]);
 	let catalogTotal = $state(0);
 	let catalogLoading = $state(false);
-	let digitizedOnly = $state(true);
 	let showCatalog = $state(true);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -36,10 +35,9 @@
 		try {
 			const data = await searchCatalog({
 				q: q || undefined,
-				mode: 'vector',
+				mode: 'fts',
 				limit: 200,
 				offset: append ? catalogResults.length : 0,
-				digitized: digitizedOnly ? true : undefined,
 			});
 			if (append) {
 				catalogResults = [...catalogResults, ...data.results];
@@ -56,14 +54,6 @@
 			catalogLoading = false;
 		}
 	}
-
-	$effect(() => {
-		digitizedOnly;
-		if (searchQuery.trim() || showCatalog) {
-			clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(queryCatalog, 100);
-		}
-	});
 
 	// Group catalog results into a tree: fonds → series → volumes
 	interface CatalogFonds {
@@ -129,12 +119,6 @@
 		</div>
 
 		<div class="flex items-center gap-2 px-1">
-			<label
-				class="flex items-center gap-1 cursor-pointer select-none text-[0.65rem] text-muted-foreground"
-			>
-				<input type="checkbox" bind:checked={digitizedOnly} class="accent-primary" />
-				digitized only
-			</label>
 			{#if catalogLoading}
 				<span class="text-[0.65rem] text-muted-foreground animate-pulse ml-auto">Searching...</span>
 			{:else if catalogTotal > 0}
@@ -204,20 +188,16 @@
 						<div class="pl-2">
 							{#each series.volumes as vol (vol.reference_code)}
 								<div
-									class="flex items-center gap-2 px-2 py-1 rounded mb-0.5 {vol.digitized
-										? 'cursor-pointer hover:bg-muted/50'
-										: 'opacity-40'}"
-									onclick={() => {
-										if (vol.digitized) onLoadVolume(vol.reference_code, vol);
-									}}
+									class="flex items-center gap-2 px-2 py-1 rounded mb-0.5 cursor-pointer hover:bg-muted/50"
+									onclick={() => onLoadVolume(vol.reference_code, vol)}
 									onkeydown={(e) => {
-										if ((e.key === 'Enter' || e.key === ' ') && vol.digitized) {
+										if (e.key === 'Enter' || e.key === ' ') {
 											e.preventDefault();
 											onLoadVolume(vol.reference_code, vol);
 										}
 									}}
 									role="button"
-									tabindex={vol.digitized ? 0 : -1}
+									tabindex={0}
 								>
 									<span class="truncate flex-1">
 										vol. {vol.volume_id}
@@ -225,9 +205,7 @@
 											<span class="text-muted-foreground ml-1">({vol.date_text})</span>
 										{/if}
 									</span>
-									{#if vol.digitized}
-										<span class="text-[0.55rem] text-primary font-medium">Load</span>
-									{/if}
+									<span class="text-[0.55rem] text-primary font-medium">Load</span>
 								</div>
 								{#if vol.description}
 									<div class="text-[0.6rem] text-muted-foreground/60 px-4 pb-0.5">

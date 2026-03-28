@@ -104,12 +104,10 @@ export interface CatalogResult {
 	volume_id: string;
 	date_text: string;
 	description: string;
-	digitized: boolean;
 }
 
 export async function searchCatalog(params: {
 	q?: string;
-	digitized?: boolean;
 	date_start?: number;
 	date_end?: number;
 	archive?: string;
@@ -119,7 +117,6 @@ export async function searchCatalog(params: {
 }): Promise<{ results: CatalogResult[]; total: number }> {
 	const searchParams = new URLSearchParams();
 	if (params.q) searchParams.set('q', params.q);
-	if (params.digitized !== undefined) searchParams.set('digitized', String(params.digitized));
 	if (params.date_start !== undefined) searchParams.set('date_start', String(params.date_start));
 	if (params.date_end !== undefined) searchParams.set('date_end', String(params.date_end));
 	if (params.archive) searchParams.set('archive', params.archive);
