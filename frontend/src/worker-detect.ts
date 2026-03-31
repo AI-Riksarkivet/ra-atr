@@ -82,6 +82,13 @@ self.onmessage = async (e: MessageEvent) => {
 					console.log(
 						`[detect] image added: ${imageId} (${decoded.width}x${decoded.height}), total: ${imageStore.size}`,
 					);
+				break;
+			}
+
+			case 'remove_image': {
+				const { imageId } = e.data.payload;
+				imageStore.delete(imageId);
+				totalLinesSentPerImage.delete(imageId);
 				self.postMessage({ type: 'image_ready' });
 				break;
 			}

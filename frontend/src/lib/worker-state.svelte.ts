@@ -378,6 +378,14 @@ export class HTRWorkerState {
 		}
 	}
 
+	removeImage(imageId: string) {
+		this.storedImages.delete(imageId);
+		const msg = { type: 'remove_image', payload: { imageId } };
+		this.detectWorker.postMessage(msg);
+		this.layoutWorker?.postMessage(msg);
+		for (const w of this.transcribeWorkers) w.postMessage(msg);
+	}
+
 	addImage(imageId: string, imageData: ArrayBuffer) {
 		// Keep a copy for GPU client and re-sending to new workers
 		this.storedImages.set(imageId, imageData.slice(0));

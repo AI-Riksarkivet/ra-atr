@@ -65,6 +65,12 @@ self.onmessage = async (e: MessageEvent) => {
 				break;
 			}
 
+			case 'remove_image': {
+				const { imageId } = e.data.payload;
+				imageStore.delete(imageId);
+				break;
+			}
+
 			case 'detect_layout': {
 				const { imageId } = e.data.payload;
 				if (!session) throw new Error('Layout model not loaded');

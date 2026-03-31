@@ -121,6 +121,7 @@ class AppState {
 				doc.imageUrl = '';
 				doc.imageData = new ArrayBuffer(0);
 				doc.placeholder = true;
+				this.htr.removeImage(evictId);
 			}
 		}
 	}
@@ -149,6 +150,8 @@ class AppState {
 			}
 		}
 		this.documents = this.documents.filter((d) => !toRemove.has(d.id));
+		// Free worker image caches
+		for (const id of toRemove) this.htr.removeImage(id);
 		// Clear active if it was in this volume
 		if (this.activeDocumentId && toRemove.has(this.activeDocumentId)) {
 			this.activeDocumentId = null;
