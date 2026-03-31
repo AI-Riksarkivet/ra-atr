@@ -30,6 +30,10 @@ let encoderSession: ort.InferenceSession | null = null;
 let decoderSession: ort.InferenceSession | null = null;
 let tokenizer: BpeTokenizer | null = null;
 let ready = false;
+let useKVCache = false;
+let numLayers = 0;
+let numHeads = 0;
+let headDim = 0;
 
 const imageStore = new Map<string, ImageData>();
 
@@ -87,6 +91,14 @@ self.onmessage = async (e: MessageEvent) => {
 				});
 
 				decoderSession = await ort.InferenceSession.create(decoderBytes, sessionOpts);
+				useKVCache = decoderSession.inputNames.some((n) => n.startsWith('past.'));
+				if (useKVCache) {
+					numLayers = decoderSession.inputNames.filter((n) => n.endsWith('.key')).length;
+				}
+				console.log(
+					`[transcribe-${workerId}] decoder: ${useKVCache ? 'KV cache' : 'no cache'}, inputs:`,
+					decoderSession.inputNames,
+				);
 				self.postMessage({
 					type: 'model_status',
 					payload: { model: 'trocr-decoder', status: 'loaded' },
@@ -114,6 +126,12 @@ self.onmessage = async (e: MessageEvent) => {
 			case 'transcribe_line': {
 				lineQueue.push(e.data.payload);
 				processNext();
+				break;
+			}
+
+			case 'remove_image': {
+				const { imageId } = e.data.payload;
+				imageStore.delete(imageId);
 				break;
 			}
 
@@ -167,40 +185,86 @@ async function processNext() {
 		const encoderInput = preprocessTrOCR(lineCrop);
 
 		// Encoder
+		const t0 = performance.now();
 		const pixelValues = new ort.Tensor('float32', encoderInput, [1, 3, 384, 384]);
 		const encResult = await encoderSession.run({
 			[encoderSession.inputNames[0]]: pixelValues,
 		});
 		const hiddenStates = encResult[encoderSession.outputNames[0]];
+		const encTime = performance.now() - t0;
 
 		// Greedy decoding
+		const decodeStart = performance.now();
 		const maxLength = 256;
 		const tokenIds: number[] = [0]; // BOS
+
+		// KV cache: stores decoder self-attention keys/values between steps
+		let pastKV: ort.Tensor[] | null = null;
+		if (useKVCache) {
+			// Initialize empty cache (zero-length sequence dimension)
+			pastKV = [];
+			for (let i = 0; i < numLayers; i++) {
+				pastKV.push(new ort.Tensor('float32', new Float32Array(0), [1, 1, 0, 1]));
+				pastKV.push(new ort.Tensor('float32', new Float32Array(0), [1, 1, 0, 1]));
+			}
+		}
 
 		for (let step = 0; step < maxLength; step++) {
 			if (cancelledRegions.has(regionId)) break;
 
-			const seqLen = tokenIds.length;
-			const inputIds = new ort.Tensor(
-				'int64',
-				BigInt64Array.from(tokenIds.map((id) => BigInt(id))),
-				[1, seqLen],
-			);
-			const attentionMask = new ort.Tensor('int64', new BigInt64Array(seqLen).fill(1n), [
-				1,
-				seqLen,
-			]);
-
-			const decFeeds: Record<string, ort.Tensor> = {};
-			for (const name of decoderSession.inputNames) {
-				if (name === 'input_ids') decFeeds[name] = inputIds;
-				else if (name === 'attention_mask') decFeeds[name] = attentionMask;
-				else if (name === 'encoder_hidden_states') decFeeds[name] = hiddenStates;
-			}
-
 			let decResult;
 			try {
-				decResult = await decoderSession.run(decFeeds);
+				if (useKVCache && pastKV) {
+					// KV cache path: only feed the last token on steps 1+
+					const token = step === 0 ? tokenIds : [tokenIds[tokenIds.length - 1]];
+					const inputIds = new ort.Tensor(
+						'int64',
+						BigInt64Array.from(token.map((id) => BigInt(id))),
+						[1, token.length],
+					);
+					const decFeeds: Record<string, ort.Tensor> = {
+						input_ids: inputIds,
+						encoder_hidden_states: hiddenStates,
+					};
+					for (let i = 0; i < numLayers; i++) {
+						decFeeds[`past.${i}.key`] = pastKV[i * 2];
+						decFeeds[`past.${i}.value`] = pastKV[i * 2 + 1];
+					}
+					decResult = await decoderSession.run(decFeeds);
+					// Update KV cache from outputs
+					for (let i = 0; i < numLayers; i++) {
+						pastKV[i * 2] = decResult[`present.${i}.key`];
+						pastKV[i * 2 + 1] = decResult[`present.${i}.value`];
+					}
+					// Detect dims from first output (once)
+					if (step === 0 && numHeads === 0) {
+						const shape = decResult['present.0.key'].dims;
+						numHeads = shape[1];
+						headDim = shape[3];
+						console.log(
+							`[transcribe-${workerId}] detected: layers=${numLayers}, heads=${numHeads}, headDim=${headDim}`,
+						);
+					}
+				} else {
+					// No-cache path: feed full sequence every step
+					const seqLen = tokenIds.length;
+					const inputIds = new ort.Tensor(
+						'int64',
+						BigInt64Array.from(tokenIds.map((id) => BigInt(id))),
+						[1, seqLen],
+					);
+					const attentionMask = new ort.Tensor('int64', new BigInt64Array(seqLen).fill(1n), [
+						1,
+						seqLen,
+					]);
+					const decFeeds: Record<string, ort.Tensor> = {};
+					for (const name of decoderSession.inputNames) {
+						if (name === 'input_ids') decFeeds[name] = inputIds;
+						else if (name === 'attention_mask') decFeeds[name] = attentionMask;
+						else if (name === 'encoder_hidden_states') decFeeds[name] = hiddenStates;
+					}
+					decResult = await decoderSession.run(decFeeds);
+				}
 			} catch (decErr: unknown) {
 				console.error(
 					`[transcribe-${workerId} line ${lineIndex}] decoder step ${step} failed:`,
@@ -212,6 +276,8 @@ async function processNext() {
 			const logitsRaw = decResult['logits'];
 			const logitsData = logitsRaw.data as Float32Array;
 			const vocabSize = logitsRaw.dims[2];
+			// With KV cache, logits has seq_len=1 on steps 1+; without cache, use last position
+			const seqLen = logitsRaw.dims[1];
 			const offset = (seqLen - 1) * vocabSize;
 
 			// no_repeat_ngram_size=3
@@ -250,7 +316,12 @@ async function processNext() {
 
 		if (!cancelledRegions.has(regionId)) {
 			const fullText = tokenizer.decode(tokenIds.slice(1));
-			if (DEV) console.log(`[transcribe-${workerId} line ${lineIndex}] "${fullText}"`);
+			const totalTime = performance.now() - t0;
+			const decodeTime = performance.now() - decodeStart;
+			const tokens = tokenIds.length - 1;
+			console.log(
+				`[transcribe-${workerId} line ${lineIndex}] ${tokens} tokens, enc=${encTime.toFixed(0)}ms, dec=${decodeTime.toFixed(0)}ms (${tokens > 0 ? (decodeTime / tokens).toFixed(0) : 0}ms/tok), total=${totalTime.toFixed(0)}ms | "${fullText}"`,
+			);
 			self.postMessage({
 				type: 'line_done',
 				payload: { imageId, regionId, lineIndex, text: fullText, confidence },
