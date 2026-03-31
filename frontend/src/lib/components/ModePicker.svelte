@@ -3,6 +3,7 @@
 	import { Server, Monitor, ChevronDown, Check, Info } from 'lucide-svelte';
 	import { gpuServerUrl, probeGpuServer, getGpuName } from '$lib/gpu-client';
 	import { t } from '$lib/i18n.svelte';
+	import { getSelectedProfile } from '$lib/model-config';
 
 	interface Props {
 		onChooseGpu: () => void;
@@ -11,6 +12,7 @@
 
 	let { onChooseGpu, onChooseWasm }: Props = $props();
 
+	const profile = getSelectedProfile();
 	let gpuUrl = $state(gpuServerUrl.get());
 	let gpuStatus = $state<'idle' | 'checking' | 'ok' | 'error'>('idle');
 	let gpuName = $state('');
@@ -55,7 +57,9 @@
 				<h3 class="text-sm font-semibold">{t('mode.wasm.title')}</h3>
 			</div>
 		</div>
-		<p class="text-xs text-muted-foreground">{t('mode.wasm.desc')}</p>
+		<p class="text-xs text-muted-foreground">
+			{t('mode.wasm.desc.prefix')} ({profile.totalSize}) {t('mode.wasm.desc.suffix')}
+		</p>
 		<ul class="space-y-1.5 text-xs">
 			<li class="flex items-start gap-1.5 text-green-600 dark:text-green-400">
 				<Check class="size-3 mt-0.5 shrink-0" />
@@ -71,7 +75,7 @@
 			</li>
 			<li class="flex items-start gap-1.5 text-muted-foreground">
 				<Info class="size-3 mt-0.5 shrink-0" />
-				<span>{t('mode.wasm.con.download')}</span>
+				<span>{t('mode.wasm.con.download.prefix')} {profile.totalSize}</span>
 			</li>
 		</ul>
 		<Button

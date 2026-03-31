@@ -65,6 +65,14 @@ const translations: Record<string, Record<Locale, string>> = {
 		en: 'Download AI models (~1.8 GB) and run everything on your computer. No data leaves your device.',
 		sv: 'Ladda ner AI-modeller (~1,8 GB) och kör allt på din dator. Ingen data lämnar din enhet.',
 	},
+	'mode.wasm.desc.prefix': {
+		en: 'Download AI models',
+		sv: 'Ladda ner AI-modeller',
+	},
+	'mode.wasm.desc.suffix': {
+		en: 'and run everything on your computer. No data leaves your device.',
+		sv: 'och kör allt på din dator. Ingen data lämnar din enhet.',
+	},
 	'mode.wasm.pro.private': {
 		en: 'Fully private — nothing sent to a server',
 		sv: 'Helt privat — inget skickas till en server',
@@ -78,6 +86,7 @@ const translations: Record<string, Record<Locale, string>> = {
 		sv: 'Långsammare — använder din CPU, inte en GPU',
 	},
 	'mode.wasm.con.download': { en: 'Requires ~1.8 GB download', sv: 'Kräver ~1,8 GB nedladdning' },
+	'mode.wasm.con.download.prefix': { en: 'Requires', sv: 'Kräver' },
 	'mode.wasm.cached': { en: 'Models cached — ready to go', sv: 'Modeller cachade — redo att köra' },
 	'mode.wasm.continue': { en: 'Continue', sv: 'Fortsätt' },
 
