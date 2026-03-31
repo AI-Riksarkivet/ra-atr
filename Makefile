@@ -17,7 +17,7 @@ build:
 
 ## deploy: build and deploy to HF Space
 deploy:
-	cd frontend && VITE_MODEL_BASE=https://huggingface.co/carpelan/htr-onnx-models/resolve/main VITE_DISABLE_BACKEND=true npm run build
+	cd frontend && VITE_DISABLE_BACKEND=true npm run build
 	rm -rf space/_app space/viewer space/*.html space/*.jpg space/*.svg space/*.mp4
 	mkdir -p space/viewer
 	rsync -a --exclude='models' frontend/build/ space/

@@ -99,9 +99,6 @@ export function getCacheName(): string {
 export const DEFAULT_GPU_SERVER = import.meta.env.VITE_GPU_SERVER || '';
 
 function getModelBase(): string {
-	const envBase = import.meta.env.VITE_MODEL_BASE;
-	// VITE_MODEL_BASE only applies to the default profile (local dev models)
-	if (envBase && getSelectedModelId() === DEFAULT_MODEL_ID) return envBase;
 	return getSelectedProfile().baseUrl;
 }
 
