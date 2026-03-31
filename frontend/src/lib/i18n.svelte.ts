@@ -27,6 +27,7 @@ const translations: Record<string, Record<Locale, string>> = {
 	},
 	'models.failed': { en: 'Download failed', sv: 'Nedladdning misslyckades' },
 	'models.retry': { en: 'Retry', sv: 'Försök igen' },
+	'model.choose': { en: 'Choose transcription model', sv: 'Välj transkriptionsmodell' },
 
 	// Mode picker
 	'mode.choose': { en: 'Choose inference mode', sv: 'Välj inferensläge' },

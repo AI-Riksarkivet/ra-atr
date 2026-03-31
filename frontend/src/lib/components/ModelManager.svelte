@@ -3,6 +3,7 @@
 
 	import { Scan, PenLine, SplitSquareHorizontal, Type, FileKey } from 'lucide-svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { getSelectedProfile } from '$lib/model-config';
 
 	interface Props {
 		modelProgress: Record<string, number>;
@@ -24,45 +25,47 @@
 
 	let loading = $state(false);
 
+	const profile = getSelectedProfile();
+
 	const models = [
 		{
 			key: 'layout',
 			labelKey: 'model.layout',
 			descKey: 'model.layout.desc',
-			size: '97 MB',
+			size: profile.modelSizes.layout,
 			icon: Scan,
 		},
 		{
 			key: 'yolo',
 			labelKey: 'model.yolo',
 			descKey: 'model.yolo.desc',
-			size: '229 MB',
+			size: profile.modelSizes.yolo,
 			icon: SplitSquareHorizontal,
 		},
 		{
 			key: 'trocr-encoder',
 			labelKey: 'model.encoder',
 			descKey: 'model.encoder.desc',
-			size: '329 MB',
+			size: profile.modelSizes.encoder,
 			icon: FileKey,
 		},
 		{
 			key: 'trocr-decoder',
 			labelKey: 'model.decoder',
 			descKey: 'model.decoder.desc',
-			size: '1.2 GB',
+			size: profile.modelSizes.decoder,
 			icon: PenLine,
 		},
 		{
 			key: 'tokenizer',
 			labelKey: 'model.tokenizer',
 			descKey: 'model.tokenizer.desc',
-			size: '2 MB',
+			size: profile.modelSizes.tokenizer,
 			icon: Type,
 		},
 	];
 
-	const totalSize = '~1.8 GB';
+	const totalSize = profile.totalSize;
 
 	$effect(() => {
 		if (error) loading = false;
