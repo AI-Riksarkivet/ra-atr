@@ -1,4 +1,4 @@
-const CACHE_NAME = 'htr-models-v3';
+import { getCacheName } from './model-config';
 
 export interface DownloadProgress {
 	model: string;
@@ -26,7 +26,7 @@ export async function getStorageEstimate(): Promise<{
 }
 
 export async function getCachedModel(url: string): Promise<ArrayBuffer | null> {
-	const cache = await caches.open(CACHE_NAME);
+	const cache = await caches.open(getCacheName());
 	const response = await cache.match(url);
 	if (response) {
 		return response.arrayBuffer();
@@ -79,7 +79,7 @@ export async function downloadAndCacheModel(
 
 	const blob = new Blob(chunks as BlobPart[]);
 	try {
-		const cache = await caches.open(CACHE_NAME);
+		const cache = await caches.open(getCacheName());
 		await cache.put(url, new Response(blob.slice(0)));
 	} catch (e) {
 		console.warn(`[model-cache] Failed to cache ${modelName}, continuing without cache:`, e);
@@ -89,17 +89,17 @@ export async function downloadAndCacheModel(
 }
 
 export async function isModelCached(url: string): Promise<boolean> {
-	const cache = await caches.open(CACHE_NAME);
+	const cache = await caches.open(getCacheName());
 	const response = await cache.match(url);
 	return response !== null;
 }
 
 export async function areAllModelsCached(urls: string[]): Promise<boolean> {
-	const cache = await caches.open(CACHE_NAME);
+	const cache = await caches.open(getCacheName());
 	const results = await Promise.all(urls.map((url) => cache.match(url)));
 	return results.every((r) => r !== null);
 }
 
 export async function clearModelCache(): Promise<void> {
-	await caches.delete(CACHE_NAME);
+	await caches.delete(getCacheName());
 }
