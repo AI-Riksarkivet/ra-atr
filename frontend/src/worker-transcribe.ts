@@ -96,7 +96,9 @@ self.onmessage = async (e: MessageEvent) => {
 					numLayers = decoderSession.inputNames.filter((n) => n.endsWith('.key')).length;
 				}
 				console.log(
-					`[transcribe-${workerId}] decoder: ${useKVCache ? 'KV cache' : 'no cache'}, inputs:`,
+					'[transcribe-%s] decoder: %s, inputs:',
+					workerId,
+					useKVCache ? 'KV cache' : 'no cache',
 					decoderSession.inputNames,
 				);
 				self.postMessage({
@@ -267,7 +269,10 @@ async function processNext() {
 				}
 			} catch (decErr: unknown) {
 				console.error(
-					`[transcribe-${workerId} line ${lineIndex}] decoder step ${step} failed:`,
+					'[transcribe-%s line %d] decoder step %d failed:',
+					workerId,
+					lineIndex,
+					step,
 					decErr instanceof Error ? decErr.message : String(decErr),
 				);
 				break;
