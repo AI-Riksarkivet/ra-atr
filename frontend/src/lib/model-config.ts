@@ -106,8 +106,14 @@ function getModelUrl(path: string): string {
 	return `${getModelBase()}/${path}`;
 }
 
+/** True only for an https URL whose host is exactly huggingface.co (the HF token is sent there). */
 export function isHuggingFaceUrl(): boolean {
-	return getModelBase().startsWith('https://huggingface.co');
+	try {
+		const url = new URL(getModelBase());
+		return url.protocol === 'https:' && url.hostname === 'huggingface.co';
+	} catch {
+		return false;
+	}
 }
 
 export function getModelUrls() {
