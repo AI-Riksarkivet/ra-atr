@@ -1,5 +1,5 @@
 # Static build for HF Space or any static hosting
-FROM node:22-slim AS build
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS build
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ ARG VITE_MODEL_BASE=https://huggingface.co/carpelan/htr-onnx-models/resolve/main
 ARG VITE_DISABLE_BACKEND=true
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine@sha256:72aeb3308ef6cb3118242fb16389518923916dfa206e32d1a8377acc328b9870
 COPY --from=build /app/build /usr/share/nginx/html
 
 # SPA fallback
